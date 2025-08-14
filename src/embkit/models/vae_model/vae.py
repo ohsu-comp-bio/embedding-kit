@@ -38,15 +38,13 @@ class VAE(BaseVAE):
             self,
             features: List[str],
             *,
-            latent_dim: int,
-            # encoder config
+            latent_dim: Optional[int] = None,
+            encoder: Optional[torch.nn.Module] = None,
+            decoder: Optional[torch.nn.Module] = None,
             encoder_layers: Optional[List[Dict]] = None,
             constraint=None,
             batch_norm: bool = False,
             activation: str = "relu",
-            # decoder config
-            hidden_dim_ignored: Optional[int] = None,  # kept for backward API compat
-            # training defaults
             lr: float = 1e-3,
     ):
         """
@@ -63,27 +61,34 @@ class VAE(BaseVAE):
 
         feature_dim = len(features)
 
-        # Use the base helpers to build fresh modules
-        self.encoder = self.build_encoder(
-            feature_dim=feature_dim,
-            latent_dim=latent_dim,
-            layers=encoder_layers,
-            constraint=constraint,
-            batch_norm=batch_norm,
-            activation=activation,
-        )
-        self.decoder = self.build_decoder(
-            feature_dim=feature_dim,
-            latent_dim=latent_dim,
-        )
+        if encoder is not None and decoder is not None:
+            # Loaded path: use provided modules (e.g., open_model)
+            self.encoder = encoder
+            self.decoder = decoder
+        else:
+            # Fresh build path: need latent_dim
+            if latent_dim is None:
+                raise ValueError(
+                    "latent_dim is required when encoder/decoder are not provided."
+                )
+            self.encoder = self.build_encoder(
+                feature_dim=feature_dim,
+                latent_dim=latent_dim,
+                layers=encoder_layers,
+                constraint=constraint,
+                batch_norm=batch_norm,
+                activation=activation,
+            )
+            self.decoder = self.build_decoder(
+                feature_dim=feature_dim,
+                latent_dim=latent_dim,
+            )
 
         # A place to record simple history if you want
         self.history: Dict[str, list] = {"loss": []}
         self.latent_index = None
         self.latent_groups = None
         self.normal_stats = None
-
-    # NOTE: forward() is inherited from BaseVAE
 
     def fit(self, X: pd.DataFrame, y=None, *, epochs: int = 20, lr: Optional[float] = None,
             device: Optional[torch.device] = None, progress: bool = True):
@@ -125,8 +130,28 @@ class VAE(BaseVAE):
             optimizer.step()
 
             self.history["loss"].append(float(total_loss.detach().cpu()))
+            print(f"Epoch {epoch + 1}/{epochs} | Loss: {total_loss.item():.4f} | "
+                  f"Recon: {recon_loss.item():.4f} | KL: {kl_loss.item():.4f}")
             if progress:
                 logger.debug(
                     f"Epoch {epoch + 1} | Loss: {total_loss.item():.4f} | "
                     f"Recon: {recon_loss.item():.4f} | KL: {kl_loss.item():.4f}"
                 )
+
+
+if __name__ == "__main__":
+    # Example usage
+    N = 100
+    df = pd.DataFrame({
+        "feat1": np.random.rand(N),
+        "feat2": np.random.rand(N),
+    })
+
+    vae: VAE = VAE(features=list(df.columns), latent_dim=2)
+    vae.fit(df, epochs=10, lr=0.01)
+
+    # Save the model if needed
+    vae.save("vae_model")
+
+    vae: VAE = VAE.open_model(path="vae_model", model_cls=VAE, device="cpu")
+    print("Model loaded with features:", vae.features)

@@ -211,7 +211,9 @@ class VAE(nn.Module, ABC):
 
     def save(self, path: str, normal_df: Optional[pd.DataFrame] = None):
         """Save VAE model with associated elements (PyTorch-native)."""
-        Path(path, exist_ok=True)
+        if not Path(path).exists():
+            Path(path).mkdir(parents=True, exist_ok=True)
+
 
         # Save encoder/decoder state dicts
         torch.save(self.encoder.state_dict(), Path(path, "model.enc.pt"))
