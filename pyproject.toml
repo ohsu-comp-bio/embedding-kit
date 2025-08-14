@@ -19,7 +19,9 @@ dependencies = [
     "pandas",
     "numpy",
     "click",
-    "scikit-learn"
+    "scikit-learn",
+    "scipy",
+    "gripql"
 ]
 
 [tool.setuptools]
