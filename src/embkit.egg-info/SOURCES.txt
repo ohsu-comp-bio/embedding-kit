@@ -12,8 +12,11 @@ src/embkit/vae.py
 src/embkit.egg-info/PKG-INFO
 src/embkit.egg-info/SOURCES.txt
 src/embkit.egg-info/dependency_links.txt
+src/embkit.egg-info/entry_points.txt
 src/embkit.egg-info/requires.txt
 src/embkit.egg-info/top_level.txt
+src/embkit/commands/__init__.py
+src/embkit/commands/model.py
 src/embkit/constraints/__init__.py
 src/embkit/constraints/network_constraint.py
 src/embkit/estimator/__init__.py
