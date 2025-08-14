@@ -179,7 +179,7 @@ class BaseVAE(nn.Module, ABC):
 
         return out
 
-    def __init__(self, features: List[str], hidden_dim=400, encoder: Optional[Encoder] = None, decoder: Optional[Decoder] = None,
+    def __init__(self, features: List[str], encoder: Optional[Encoder] = None, decoder: Optional[Decoder] = None,
                  **kwargs):
         super().__init__()
         self.features = list(features)

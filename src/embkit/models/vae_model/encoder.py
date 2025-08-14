@@ -1,5 +1,5 @@
 from torch import nn
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Union
 import torch
 from ...layers import MaskedLinear, LayerInfo, convert_activation
 from ...constraints import NetworkConstraint
@@ -10,20 +10,28 @@ logger = logging.getLogger(__name__)
 
 class Encoder(nn.Module):
     """
-    input -> [optional global BN] -> [LayerInfo...] -> embed (latent_dim)
-         -> BN -> (z_mean, z_log_var) -> reparam -> (mu, logvar, z)
+    input -> [optional global BN] -> [LayerInfo...] -> (latent heads optional)
+    Behavior:
+      - If `layers` is empty/None: we auto-insert a projection to `latent_dim` and attach latent heads.
+      - If `layers` is provided: we do NOT project to latent; we only attach latent heads
+        when the last layer's width equals `latent_dim`. Otherwise we raise with a clear message.
+    Forward:
+      - With latent heads: returns (mu, logvar, z)
+      - Without latent heads: returns hidden h
     """
 
     def __init__(self,
                  feature_dim: int,
-                 latent_dim: int,
+                 latent_dim: Optional[int] = None,
                  layers: Optional[List[LayerInfo]] = None,
                  constraint: Optional[NetworkConstraint] = None,
                  batch_norm: bool = False,
-                 default_activation: str = "relu"):
+                 default_activation: Union[str, None] = "relu",
+                 make_latent_heads: bool = True):
         super().__init__()
         self._constraint = constraint
         self._default_activation = default_activation
+        self._make_latent_heads = make_latent_heads
 
         self.net = nn.ModuleList()
         in_features = feature_dim
@@ -32,7 +40,7 @@ class Encoder(nn.Module):
         if batch_norm:
             self.net.append(nn.BatchNorm1d(in_features))
 
-        # Hidden stack
+        # ---- Build user-defined hidden stack (no implicit latent projection here) ----
         if layers:
             logger.info("Building encoder with %d layers", len(layers))
             for i, li in enumerate(layers):
@@ -50,7 +58,7 @@ class Encoder(nn.Module):
 
                 self.net.append(layer)
 
-                if li.activation is not None:  # only if explicitly set
+                if li.activation is not None:
                     act = convert_activation(li.activation)
                     if act is not None:
                         self.net.append(act)
@@ -59,17 +67,53 @@ class Encoder(nn.Module):
                     self.net.append(nn.BatchNorm1d(out_features))
 
                 in_features = out_features
+
+            # If we want latent heads, the final width must already match latent_dim.
+            self.z_mean = None
+            self.z_log_var = None
+            if self._make_latent_heads:
+                if latent_dim is None:
+                    raise ValueError("latent_dim is required when make_latent_heads=True.")
+                if in_features != latent_dim:
+                    raise ValueError(
+                        "Final hidden width must equal latent_dim because the encoder "
+                        "does not insert a latent projection when layers are provided.\n"
+                        f"Final hidden size: {in_features}  vs  latent_dim: {latent_dim}\n"
+                        "Fix by setting your last LayerInfo(units=latent_dim)."
+                    )
+                self.z_mean = nn.Linear(latent_dim, latent_dim)
+                self.z_log_var = nn.Linear(latent_dim, latent_dim)
+
         else:
-            logger.info("Building encoder with no hidden layers")
+            if latent_dim is None:
+                raise ValueError(
+                    "latent_dim is required when no layers are provided (auto-projection)."
+                )
+            logger.info("No encoder layers provided; inserting auto-projection to latent_dim=%d", latent_dim)
 
-        # Latent "embedding" layer before parameter heads
-        self.embedding = nn.Linear(in_features, latent_dim)
-        self.embedding_act = convert_activation(self._default_activation)
-        self.embedding_bn = nn.BatchNorm1d(latent_dim)
+            # Auto projection to latent size
+            proj = nn.Linear(in_features, latent_dim, bias=True)
+            self.net.append(proj)
 
-        # Latent parameter heads
-        self.z_mean = nn.Linear(latent_dim, latent_dim)
-        self.z_log_var = nn.Linear(latent_dim, latent_dim)
+            # Optional default activation after the auto-projection
+            act = convert_activation(self._default_activation)
+            if act is not None:
+                self.net.append(act)
+
+            # Optional BN after the auto-projection
+            self.net.append(nn.BatchNorm1d(latent_dim))
+
+            in_features = latent_dim
+
+            # Latent heads if requested
+            self.z_mean = None
+            self.z_log_var = None
+            if self._make_latent_heads:
+                self.z_mean = nn.Linear(latent_dim, latent_dim)
+                self.z_log_var = nn.Linear(latent_dim, latent_dim)
+
+        # Book-keeping
+        self._final_width = in_features
 
     def refresh_mask(self, device: torch.device):
         """Update masks from constraint (if MaskedLinear used)."""
@@ -80,19 +124,18 @@ class Encoder(nn.Module):
             if isinstance(m, MaskedLinear):
                 m.set_mask(mask_t)
 
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor):
         h = x
         for layer in self.net:
             h = layer(h)
 
-        h = self.embedding(h)
-        if self.embedding_act is not None:
-            h = self.embedding_act(h)
-        h = self.embedding_bn(h)
+        if self._make_latent_heads and (self.z_mean is not None) and (self.z_log_var is not None):
+            mu = self.z_mean(h)
+            logvar = self.z_log_var(h)
+            std = torch.exp(0.5 * logvar)
+            eps = torch.randn_like(std)
+            z = mu + eps * std
+            return mu, logvar, z
 
-        mu = self.z_mean(h)
-        logvar = self.z_log_var(h)
-        std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
-        z = mu + eps * std
-        return mu, logvar, z
+        # No latent heads: return hidden representation
+        return h
