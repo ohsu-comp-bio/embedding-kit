@@ -1,6 +1,6 @@
 from torch import nn
-from typing import Type, Any, List, Optional, Dict, overload, TypeVar
-from abc import ABC
+from typing import Type, Any, List, Optional, Dict, overload, TypeVar, Union
+from abc import ABC, abstractmethod
 import torch
 from .encoder import Encoder
 from .decoder import Decoder
@@ -8,12 +8,13 @@ from pathlib import Path
 import pandas as pd
 import json
 import logging
+from ...layers import LayerInfo
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-class VAE(nn.Module, ABC):
+class BaseVAE(nn.Module, ABC):
     """
     Minimal VAE wrapper to hold encoder/decoder and provide forward().
     Allows late-binding of encoder/decoder by subclasses.
@@ -21,24 +22,20 @@ class VAE(nn.Module, ABC):
 
     @staticmethod
     def build_encoder(feature_dim: int, latent_dim: int,
-                      layers: List[Dict] = None,
+                      layers: List[LayerInfo] = None,
                       constraint=None,
-                      batch_norm: bool = False,
-                      activation: str = "relu") -> Encoder:
+                      batch_norm: bool = False) -> Encoder:
         return Encoder(
             feature_dim=feature_dim,
             latent_dim=latent_dim,
             layers=layers,
             constraint=constraint,
-            batch_norm=batch_norm,
-            activation=activation
+            batch_norm=batch_norm
         )
 
     @staticmethod
     def build_decoder(feature_dim: int, latent_dim: int) -> Decoder:
         return Decoder(latent_dim, feature_dim)
-
-        # Overload 1: no model_cls provided -> returns NetVae
 
     @overload
     @staticmethod
@@ -146,8 +143,8 @@ class VAE(nn.Module, ABC):
                 latent_index = [f"z{i}" for i in range(latent_dim)]
 
         # --- Build fresh modules and load weights ---
-        enc = VAE.build_encoder(feature_dim, latent_dim, constraint=None)
-        dec = VAE.build_decoder(feature_dim, latent_dim)
+        enc = BaseVAE.build_encoder(feature_dim, latent_dim, constraint=None)
+        dec = BaseVAE.build_decoder(feature_dim, latent_dim)
 
         enc.load_state_dict(torch.load(Path(path, "model.enc.pt"), map_location=device))
         dec.load_state_dict(torch.load(Path(path, "model.dec.pt"), map_location=device))
@@ -198,9 +195,21 @@ class VAE(nn.Module, ABC):
         recon = self.decoder(z)
         return recon, mu, logvar, z
 
+    @abstractmethod
+    def fit(self, X: Union[pd.DataFrame, torch.Tensor], **kwargs):
+        """
+        Train the VAE on input data.
+
+        Subclasses must override this to implement their training loop.
+        `X` may be a pandas.DataFrame or a torch.Tensor; additional training
+        parameters should be provided via **kwargs (e.g., epochs, lr, device).
+        """
+        raise NotImplementedError("Subclasses must implement fit() in VAE subclasses.")
+
     def save(self, path: str, normal_df: Optional[pd.DataFrame] = None):
         """Save VAE model with associated elements (PyTorch-native)."""
-        Path(path, exist_ok=True)
+        if not Path(path).exists():
+            Path(path).mkdir(parents=True, exist_ok=True)
 
         # Save encoder/decoder state dicts
         torch.save(self.encoder.state_dict(), Path(path, "model.enc.pt"))

@@ -2,3 +2,7 @@ venv
 .venv
 *.idea
 __pycache__
+*index
+model.dec*
+model.enc*
+stats.json*
