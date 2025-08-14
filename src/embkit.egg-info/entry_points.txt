@@ -1,0 +1,2 @@
+[console_scripts]
+embkit = embkit.__main__:cli
