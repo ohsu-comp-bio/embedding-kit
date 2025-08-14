@@ -8,6 +8,7 @@ from pathlib import Path
 import pandas as pd
 import json
 import logging
+from ...layers import LayerInfo
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
@@ -21,24 +22,20 @@ class BaseVAE(nn.Module, ABC):
 
     @staticmethod
     def build_encoder(feature_dim: int, latent_dim: int,
-                      layers: List[Dict] = None,
+                      layers: List[LayerInfo] = None,
                       constraint=None,
-                      batch_norm: bool = False,
-                      activation: str = "relu") -> Encoder:
+                      batch_norm: bool = False) -> Encoder:
         return Encoder(
             feature_dim=feature_dim,
             latent_dim=latent_dim,
             layers=layers,
             constraint=constraint,
-            batch_norm=batch_norm,
-            activation=activation
+            batch_norm=batch_norm
         )
 
     @staticmethod
     def build_decoder(feature_dim: int, latent_dim: int) -> Decoder:
         return Decoder(latent_dim, feature_dim)
-
-        # Overload 1: no model_cls provided -> returns NetVae
 
     @overload
     @staticmethod

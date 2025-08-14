@@ -12,11 +12,13 @@ Requires-Dist: pandas
 Requires-Dist: numpy
 Requires-Dist: click
 Requires-Dist: scikit-learn
+Requires-Dist: scipy
+Requires-Dist: gripql
 
 
 # Embedding Kit
 
-Methods for data normalizatio, embedding, synthesis and transformation
+Methods for data normalization, embedding, synthesis and transformation
 
 
 ## Installation
@@ -30,13 +32,8 @@ python setup.py install
 python -m embkit model train ./experiments/tcga/tumor.normalized.tsv --epochs 120
 ```
 
+## Development
 
-
-
-## Notebook cleaning
-
-To avoid checking in large notebooks with lots of intermediate figures, please follow the instructions at https://gist.github.com/33eyes/431e3d432f73371509d176d0dfb95b6e
-
-
-Running build
+To install the library locally use:  
+```pip install -e .```
 

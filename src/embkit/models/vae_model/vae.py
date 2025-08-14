@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import pandas as pd
 from torch.optim import Adam
+from ...layers import LayerInfo
 from .base_vae import BaseVAE
 from ...losses import vae_loss
 
@@ -38,7 +39,7 @@ class VAE(BaseVAE):
             latent_dim: Optional[int] = None,
             encoder: Optional[torch.nn.Module] = None,
             decoder: Optional[torch.nn.Module] = None,
-            encoder_layers: Optional[List[Dict]] = None,
+            encoder_layers: Optional[List[LayerInfo]] = None,
             constraint=None,
             batch_norm: bool = False,
             activation: str = "relu",
@@ -74,7 +75,6 @@ class VAE(BaseVAE):
                 layers=encoder_layers,
                 constraint=constraint,
                 batch_norm=batch_norm,
-                activation=activation,
             )
             self.decoder = self.build_decoder(
                 feature_dim=feature_dim,

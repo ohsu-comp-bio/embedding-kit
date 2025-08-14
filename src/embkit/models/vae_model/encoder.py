@@ -1,85 +1,84 @@
 from torch import nn
-from typing import Optional, Tuple, List, Dict
+from typing import Optional, Tuple, List
 import torch
-from ...layers import MaskedLinear
+from ...layers import MaskedLinear, LayerInfo, convert_activation
 from ...constraints import NetworkConstraint
 import logging
 
 logger = logging.getLogger(__name__)
 
+
 class Encoder(nn.Module):
     """
-    Dynamically built encoder:
-      input -> [optional BN] -> [list of Dense layers] -> latent dense -> BN -> (z_mean, z_log_var) -> sample z
-    forward(x) returns (z_mean, z_log_var, z)
+    input -> [optional global BN] -> [LayerInfo...] -> embed (latent_dim)
+         -> BN -> (z_mean, z_log_var) -> reparam -> (mu, logvar, z)
     """
 
-    def __init__(self, feature_dim: int, latent_dim: int,
-                 layers: List[Dict] = None,
+    def __init__(self,
+                 feature_dim: int,
+                 latent_dim: int,
+                 layers: Optional[List[LayerInfo]] = None,
                  constraint: Optional[NetworkConstraint] = None,
                  batch_norm: bool = False,
-                 activation: str = "relu"):
+                 default_activation: str = "relu"):
         super().__init__()
         self._constraint = constraint
+        self._default_activation = default_activation
 
         self.net = nn.ModuleList()
         in_features = feature_dim
 
-        # Optional initial batch norm
+        # Optional global BN on input
         if batch_norm:
             self.net.append(nn.BatchNorm1d(in_features))
 
-        # Build intermediate layers
+        # Hidden stack
         if layers:
-            logger.info(f"Building encoder with {len(layers)} layers")
-            for i, layer_cfg in enumerate(layers):
-                units = layer_cfg.get("units")
-                use_mask = layer_cfg.get("masked", False)
+            logger.info("Building encoder with %d layers", len(layers))
+            for i, li in enumerate(layers):
+                out_features = li.units
 
-                if use_mask:
+                if li.op == "masked_linear":
                     init_mask = None
-                    if constraint is not None and constraint._mask_np is not None:
+                    if constraint is not None and getattr(constraint, "_mask_np", None) is not None:
                         init_mask = torch.tensor(constraint._mask_np, dtype=torch.float32)
-                    self.net.append(MaskedLinear(in_features, units, mask=init_mask))
+                    layer = MaskedLinear(in_features, out_features, bias=li.bias, mask=init_mask)
+                elif li.op == "linear":
+                    layer = nn.Linear(in_features, out_features, bias=li.bias)
                 else:
-                    self.net.append(nn.Linear(in_features, units))
+                    raise ValueError(f"Unknown LayerInfo.op '{li.op}' at index {i}")
 
-                act = self._get_activation(activation)
-                if act is not None:
-                    self.net.append(act)
+                self.net.append(layer)
 
-                if layer_cfg.get("batch_norm", False):
-                    self.net.append(nn.BatchNorm1d(units))
+                if li.activation is not None:  # only if explicitly set
+                    act = convert_activation(li.activation)
+                    if act is not None:
+                        self.net.append(act)
 
-                in_features = units
+                if li.batch_norm:
+                    self.net.append(nn.BatchNorm1d(out_features))
+
+                in_features = out_features
         else:
-            logger.info(f"Building encoder with no layers")
+            logger.info("Building encoder with no hidden layers")
 
-        # Embedding layer
+        # Latent "embedding" layer before parameter heads
         self.embedding = nn.Linear(in_features, latent_dim)
-        self.embedding_act = self._get_activation(activation)
+        self.embedding_act = convert_activation(self._default_activation)
         self.embedding_bn = nn.BatchNorm1d(latent_dim)
 
-        # Latent outputs
+        # Latent parameter heads
         self.z_mean = nn.Linear(latent_dim, latent_dim)
         self.z_log_var = nn.Linear(latent_dim, latent_dim)
 
-    def _get_activation(self, activation: str):
-        act_map = {
-            "relu": nn.ReLU(),
-            "tanh": nn.Tanh(),
-            "sigmoid": nn.Sigmoid(),
-            "leaky_relu": nn.LeakyReLU(),
-            "elu": nn.ELU(),
-            None: None
-        }
-        return act_map.get(activation.lower()) if activation else None
-
     def refresh_mask(self, device: torch.device):
-        if self._constraint is not None:
-            for module in self.net:
-                if isinstance(module, MaskedLinear):
-                    module.set_mask(self._constraint.as_torch(device))
+        """Update masks from constraint (if MaskedLinear used)."""
+        if self._constraint is None:
+            return
+        mask_t = self._constraint.as_torch(device)
+        for m in self.net:
+            if isinstance(m, MaskedLinear):
+                m.set_mask(mask_t)
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         h = x
@@ -87,7 +86,7 @@ class Encoder(nn.Module):
             h = layer(h)
 
         h = self.embedding(h)
-        if self.embedding_act:
+        if self.embedding_act is not None:
             h = self.embedding_act(h)
         h = self.embedding_bn(h)
 

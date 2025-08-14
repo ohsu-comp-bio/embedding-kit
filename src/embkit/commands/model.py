@@ -1,5 +1,6 @@
 import click
 import pandas as pd
+from ..layers import LayerInfo
 from ..models.vae_model.vae import VAE
 
 
@@ -13,13 +14,11 @@ def train(input_path: str, latent: int, epochs: int):
     """Train VAE model from a TSV file."""
     df = pd.read_csv(input_path, sep="\t", index_col=0)
 
-    encoder_layers: list = [{
-        "input_dim": df.shape[1],
-        "hidden_dim": 400,
-        "latent_dim": latent,
-        "activation": "relu",
-        "batch_norm": True
-    }]
+    encoder_layers: list[LayerInfo] = [
+        LayerInfo(units=400, activation="relu", batch_norm=True),
+        LayerInfo(units=200, activation="relu", batch_norm=True),
+        LayerInfo(units=latent, activation=None, batch_norm=False, bias=False)
+    ]
 
     vae = VAE(features=df.columns, latent_dim=latent, encoder_layers=encoder_layers)
 
