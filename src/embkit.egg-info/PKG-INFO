@@ -1,3 +1,18 @@
+Metadata-Version: 2.4
+Name: embkit
+Version: 0.1.0
+Summary: Embedding Kit for embedding models
+Author-email: Kyle Ellrott <ellrott@ohsu.edu>, Raphael Kirchgaessner <kirchgae@ohsu.edu>
+License: MIT
+Keywords: embeddings,machine learning,deep learning
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: torch>=2.0
+Requires-Dist: pandas
+Requires-Dist: numpy
+Requires-Dist: click
+Requires-Dist: scikit-learn
+
 
 # Embedding Kit
 

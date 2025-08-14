@@ -1,0 +1,1 @@
+from .vae_loss import vae_loss_from_model

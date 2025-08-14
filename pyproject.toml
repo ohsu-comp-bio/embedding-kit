@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "embkit"
+version = "0.1.0"
+description = "Embedding Kit for embedding models"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+    { name = "Kyle Ellrott", email = "ellrott@ohsu.edu" },
+    { name = "Raphael Kirchgaessner", email = "kirchgae@ohsu.edu" }
+]
+keywords = ["embeddings", "machine learning", "deep learning"]
+dependencies = [
+    "torch>=2.0",
+    "pandas",
+    "numpy",
+    "click",
+    "scikit-learn"
+]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
