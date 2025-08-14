@@ -1,8 +1,8 @@
 from torch import nn
 from typing import Optional, Tuple, List, Dict
 import torch
-from src.embkit.layers import MaskedLinear
-from src.embkit.constraints import NetworkConstraint
+from ...layers import MaskedLinear
+from ...constraints import NetworkConstraint
 import logging
 
 logger = logging.getLogger(__name__)

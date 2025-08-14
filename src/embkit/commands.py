@@ -1,6 +1,6 @@
 import click
 import pandas as pd
-from .vae import VAE
+from ..models import VAE
 
 @click.group()
 def model():

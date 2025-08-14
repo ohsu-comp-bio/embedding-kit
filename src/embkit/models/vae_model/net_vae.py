@@ -5,7 +5,7 @@ import torch
 
 from torch.utils.data import TensorDataset, DataLoader
 import logging
-from .base_vae import VAE
+from .base_vae import BaseVAE
 from .encoder import Encoder
 from .decoder import Decoder
 from ...losses import net_vae_loss
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # NetVae (training with optional alternating constraint)
 # ---------------------------------------------------------
 
-class NetVae(VAE):
+class NetVae(BaseVAE):
     """
     """
 
@@ -69,9 +69,9 @@ class NetVae(VAE):
         constraint = NetworkConstraint(list(df.columns), latent_index, latent_groups)
         if self.encoder is None or self.decoder is None:
             feature_dim = len(df.columns)
-            self.encoder = VAE.build_encoder(feature_dim=feature_dim, latent_dim=len(latent_index),
+            self.encoder = BaseVAE.build_encoder(feature_dim=feature_dim, latent_dim=len(latent_index),
                                              constraint=constraint)
-            self.decoder = VAE.build_decoder(feature_dim=feature_dim, latent_dim=len(latent_index))
+            self.decoder = BaseVAE.build_decoder(feature_dim=feature_dim, latent_dim=len(latent_index))
         self.latent_index = list(latent_index)
 
         # --- data/optim ---
@@ -168,12 +168,12 @@ if __name__ == "__main__":
 
     # Setup and train NetVae (this builds encoder/decoder internally)
     net = NetVae(features=list(df.columns))
-    net.encoder = VAE.build_encoder(feature_dim=len(df.columns), latent_dim=2)
-    net.decoder = VAE.build_decoder(feature_dim=len(df.columns), latent_dim=2)
+    net.encoder = BaseVAE.build_encoder(feature_dim=len(df.columns), latent_dim=2)
+    net.decoder = BaseVAE.build_decoder(feature_dim=len(df.columns), latent_dim=2)
     net.fit(df, latent_dim=2, epochs=10, learning_rate=0.01, batch_size=16)
     # Save artifacts
     net.save("net_vae_model")
 
-    model: NetVae = VAE.open_model(path="net_vae_model", model_cls=NetVae, device="cpu")
+    model: NetVae = BaseVAE.open_model(path="net_vae_model", model_cls=NetVae, device="cpu")
     print("Model loaded with features:", model.features)
     print(model.decoder)

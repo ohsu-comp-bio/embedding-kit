@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-class VAE(nn.Module, ABC):
+class BaseVAE(nn.Module, ABC):
     """
     Minimal VAE wrapper to hold encoder/decoder and provide forward().
     Allows late-binding of encoder/decoder by subclasses.
@@ -146,8 +146,8 @@ class VAE(nn.Module, ABC):
                 latent_index = [f"z{i}" for i in range(latent_dim)]
 
         # --- Build fresh modules and load weights ---
-        enc = VAE.build_encoder(feature_dim, latent_dim, constraint=None)
-        dec = VAE.build_decoder(feature_dim, latent_dim)
+        enc = BaseVAE.build_encoder(feature_dim, latent_dim, constraint=None)
+        dec = BaseVAE.build_decoder(feature_dim, latent_dim)
 
         enc.load_state_dict(torch.load(Path(path, "model.enc.pt"), map_location=device))
         dec.load_state_dict(torch.load(Path(path, "model.dec.pt"), map_location=device))
@@ -182,7 +182,7 @@ class VAE(nn.Module, ABC):
 
         return out
 
-    def __init__(self, features: List[str], encoder: Optional[Encoder] = None, decoder: Optional[Decoder] = None,
+    def __init__(self, features: List[str], hidden_dim=400, encoder: Optional[Encoder] = None, decoder: Optional[Decoder] = None,
                  **kwargs):
         super().__init__()
         self.features = list(features)
@@ -199,7 +199,7 @@ class VAE(nn.Module, ABC):
         return recon, mu, logvar, z
 
     @abstractmethod
-    def fit(self, X: Union[pd.DataFrame | torch.Tensor], **kwargs):
+    def fit(self, X: Union[pd.DataFrame, torch.Tensor], **kwargs):
         """
         Train the VAE on input data.
 
@@ -213,7 +213,6 @@ class VAE(nn.Module, ABC):
         """Save VAE model with associated elements (PyTorch-native)."""
         if not Path(path).exists():
             Path(path).mkdir(parents=True, exist_ok=True)
-
 
         # Save encoder/decoder state dicts
         torch.save(self.encoder.state_dict(), Path(path, "model.enc.pt"))

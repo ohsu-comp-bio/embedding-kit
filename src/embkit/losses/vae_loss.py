@@ -1,5 +1,5 @@
 import torch
-from src.embkit.models import VAE
+from ..models.vae_model.base_vae import BaseVAE
 import torch.nn.functional as F
 
 
@@ -10,7 +10,7 @@ def vae_loss(recon_x, x, mu, logvar):
     return (reconstruction_loss + kl_loss).mean(), reconstruction_loss.mean(), kl_loss.mean()
 
 
-def net_vae_loss(model: VAE, x: torch.Tensor):
+def net_vae_loss(model: BaseVAE, x: torch.Tensor):
     mu, logvar, z = model.encoder(x)
     reconstruction = model.decoder(z)
     # keras: x.shape[1] * binary_crossentropy(x, reconstruction)

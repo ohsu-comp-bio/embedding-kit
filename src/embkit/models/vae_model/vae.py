@@ -1,14 +1,11 @@
-import json
 import logging
 from typing import Dict, List, Optional
-
 import numpy as np
 import torch
 import pandas as pd
 from torch.optim import Adam
-
-from .base_vae import VAE as BaseVAE  # <- alias to avoid name clash
-from ...losses import vae_loss  # your existing loss
+from .base_vae import BaseVAE
+from ...losses import vae_loss
 
 # If Encoder/Decoder kwargs need constraints etc., they’ll be passed through.
 
