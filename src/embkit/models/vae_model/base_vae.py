@@ -1,6 +1,6 @@
 from torch import nn
-from typing import Type, Any, List, Optional, Dict, overload, TypeVar
-from abc import ABC
+from typing import Type, Any, List, Optional, Dict, overload, TypeVar, Union
+from abc import ABC, abstractmethod
 import torch
 from .encoder import Encoder
 from .decoder import Decoder
@@ -197,6 +197,17 @@ class VAE(nn.Module, ABC):
         mu, logvar, z = self.encoder(x)
         recon = self.decoder(z)
         return recon, mu, logvar, z
+
+    @abstractmethod
+    def fit(self, X: Union[pd.DataFrame | torch.Tensor], **kwargs):
+        """
+        Train the VAE on input data.
+
+        Subclasses must override this to implement their training loop.
+        `X` may be a pandas.DataFrame or a torch.Tensor; additional training
+        parameters should be provided via **kwargs (e.g., epochs, lr, device).
+        """
+        raise NotImplementedError("Subclasses must implement fit() in VAE subclasses.")
 
     def save(self, path: str, normal_df: Optional[pd.DataFrame] = None):
         """Save VAE model with associated elements (PyTorch-native)."""

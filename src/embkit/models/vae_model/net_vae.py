@@ -1,6 +1,4 @@
-import os
-import json
-from typing import Dict, List, Optional, Callable
+from typing import Dict, List, Optional, Callable, Union
 import numpy as np
 import pandas as pd
 import torch
@@ -10,7 +8,7 @@ import logging
 from .base_vae import VAE
 from .encoder import Encoder
 from .decoder import Decoder
-from src.embkit.losses import vae_loss_from_model
+from ...losses import net_vae_loss
 from src.embkit.constraints import NetworkConstraint
 
 logger = logging.getLogger(__name__)
@@ -30,6 +28,24 @@ class NetVae(VAE):
         self.latent_index: Optional[List[str]] = None
         self.history: Optional[Dict[str, List[float]]] = None
         self.normal_stats: Optional[pd.DataFrame] = None
+
+    def fit(self, X: Union[pd.DataFrame | torch.Tensor], **kwargs):
+        """
+        Override train() to ensure we use the custom run_train() method.
+        """
+        for epoch in range(100):
+            net.run_train(
+                df=df,
+                latent_index=["latent1", "latent2"],  # latent_dim = 2
+                learning_rate=1e-3,
+                batch_size=32,
+                epochs=10,
+                device="cpu",
+                phases=None,
+            )
+            # print model training stats
+            print(
+                f"Epoch {epoch + 1}: Loss={net.history['loss'][-1]:.4f}, Recon Loss={net.history['reconstruction_loss'][-1]:.4f}, KL Loss={net.history['kl_loss'][-1]:.4f}")
 
     def run_train(self, df: pd.DataFrame, latent_index: List[str],
                   latent_groups: Optional[Dict[str, List[str]]] = None,
@@ -116,7 +132,7 @@ class NetVae(VAE):
             for (batch_x,) in loader:
                 opt.zero_grad()
                 # assumes vae_loss_from_model(model, x) calls model.forward(x)
-                total, recon, kl = vae_loss_from_model(self, batch_x)
+                total, recon, kl = net_vae_loss(self, batch_x)
                 total.backward()
                 opt.step()
                 epoch_tot += float(total.item())
@@ -146,14 +162,6 @@ class NetVae(VAE):
         self.normal_stats = pd.DataFrame({"mean": resid.mean(), "std": resid.std(ddof=0)})
 
 
-
-# ----------------
-# Load convenience
-# ----------------
-
-
-
-
 if __name__ == "__main__":
     # Make a simple 2-feature dataset with 1-D columns
     N = 100
@@ -164,20 +172,7 @@ if __name__ == "__main__":
 
     # Setup and train NetVae (this builds encoder/decoder internally)
     net = NetVae(features=list(df.columns))
-    for epoch in range(100):
-        net.run_train(
-            df=df,
-            latent_index=["latent1", "latent2"],  # latent_dim = 2
-            learning_rate=1e-3,
-            batch_size=32,
-            epochs=10,
-            device="cpu",
-            phases=None,
-        )
-        # print model training stats
-        print(
-            f"Epoch {epoch + 1}: Loss={net.history['loss'][-1]:.4f}, Recon Loss={net.history['reconstruction_loss'][-1]:.4f}, KL Loss={net.history['kl_loss'][-1]:.4f}")
-
+    net.train()
     # Save artifacts
     net.save("vae_model")
 

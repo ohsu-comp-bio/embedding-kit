@@ -1,1 +1,1 @@
-from .vae_loss import vae_loss_from_model
+from .vae_loss import net_vae_loss, vae_loss
