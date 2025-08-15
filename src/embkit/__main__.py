@@ -1,5 +1,5 @@
 import click
-from .commands import model
+from .commands import model, matrix
 
 # ---- Top-level CLI ----
 @click.group(invoke_without_command=True)
@@ -16,6 +16,8 @@ def cli(ctx):
 
 # Register our commands here
 cli.add_command(model)
+cli.add_command(matrix)
+
 
 # ---- 'help' command ----
 @cli.command("help", context_settings=dict(ignore_unknown_options=True))

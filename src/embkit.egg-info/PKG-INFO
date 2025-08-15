@@ -12,6 +12,8 @@ Requires-Dist: pandas
 Requires-Dist: numpy
 Requires-Dist: click
 Requires-Dist: scikit-learn
+Requires-Dist: scipy
+Requires-Dist: gripql
 
 
 # Embedding Kit
