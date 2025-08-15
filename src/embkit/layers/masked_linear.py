@@ -40,7 +40,7 @@ class MaskedLinear(nn.Module):
         Update the mask buffer without rebinding (keeps state_dict key stable).
         """
         if mask.shape != self.linear.weight.shape:
-            raise ValueError(
+            raise AssertionError(
                 f"Mask shape {tuple(mask.shape)} must match weight shape "
                 f"{tuple(self.linear.weight.shape)}."
             )
