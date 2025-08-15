@@ -6,7 +6,6 @@ src/embkit/__main__.py
 src/embkit/bmeg.py
 src/embkit/commands.py
 src/embkit/pathway.py
-src/embkit/vae.py
 src/embkit.egg-info/PKG-INFO
 src/embkit.egg-info/SOURCES.txt
 src/embkit.egg-info/dependency_links.txt
@@ -20,6 +19,7 @@ src/embkit/constraints/network_constraint.py
 src/embkit/estimator/__init__.py
 src/embkit/estimator/vae_estimator.py
 src/embkit/layers/__init__.py
+src/embkit/layers/layer_info.py
 src/embkit/layers/masked_linear.py
 src/embkit/losses/__init__.py
 src/embkit/losses/vae_loss.py
@@ -29,6 +29,7 @@ src/embkit/models/vae_model/base_vae.py
 src/embkit/models/vae_model/decoder.py
 src/embkit/models/vae_model/encoder.py
 src/embkit/models/vae_model/net_vae.py
+src/embkit/models/vae_model/vae.py
 src/embkit/preprocessing/__init__.py
 src/embkit/preprocessing/align.py
 src/embkit/preprocessing/normalize.py
