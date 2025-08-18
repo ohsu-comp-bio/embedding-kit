@@ -6,3 +6,7 @@ __pycache__
 model.dec*
 model.enc*
 stats.json*
+dist/*
+.coverage
+coverage.xml
+htmlcov
