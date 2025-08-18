@@ -1,6 +1,9 @@
 from typing import Optional
+import torch
+from torch.utils.data import DataLoader, TensorDataset
 from sklearn.base import BaseEstimator
-
+from sklearn.metrics import mean_squared_error
+import pandas as pd
 
 class VAEEstimator(BaseEstimator):
     """
@@ -20,10 +23,19 @@ class VAEEstimator(BaseEstimator):
         self.device = device
 
     def fit(self, X: pd.DataFrame):
+        """
+        Fit the VAE model to the input data.
+
+        Parameters:
+            X (pd.DataFrame): The input data with shape (number_of_samples, number_of_features).
+
+        Returns:
+            None
+        """
         feature_dim = X.shape[1]
         features = list(X.columns)
 
-        # Build unconstrained encoder/decoder
+
         encoder = build_encoder(feature_dim, self.latent_dim, constraint=None)
         decoder = build_decoder(feature_dim, self.latent_dim)
         vae = VAE(features, encoder, decoder)
@@ -63,5 +75,4 @@ class VAEEstimator(BaseEstimator):
             mu, _, _ = self.model.encoder(x)
             recon = self.model.decoder(mu).cpu().numpy()
         return -mean_squared_error(X.values, recon)
-
 

@@ -1,0 +1,14 @@
+site_name: Embedding-Kit
+nav:
+  - Home: index.md
+  - About: about.md
+  - API: api.md
+theme: readthedocs
+
+plugins:
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            show_source: false # Example option
