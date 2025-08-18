@@ -1,4 +1,8 @@
 
+"""
+Methods for opening and processing Pathway files
+"""
+
 import pandas as pd
 
 def extract_pathway_interactions(sif_path, relation='controls-expression-of'):

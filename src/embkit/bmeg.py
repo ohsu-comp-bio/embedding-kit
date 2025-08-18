@@ -1,3 +1,10 @@
+
+"""
+BMEG
+
+Data retrieval from BMEG instance
+"""
+
 import gripql
 
 def connect(url="https://bmeg.io/grip", graph="rc6", cred_file="./bmeg_credentials.json"):
