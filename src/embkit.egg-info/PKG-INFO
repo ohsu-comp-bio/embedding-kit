@@ -23,8 +23,7 @@ Methods for data normalization, embedding, synthesis and transformation
 
 ## Installation
 ```
-python setup.py build
-python setup.py install
+pip install -e .
 ```
 
 # Training a model
