@@ -3,7 +3,7 @@ import torch
 from torch import nn
 
 from embkit.models.vae_model.decoder import Decoder
-from embkit.layers import LayerInfo, MaskedLinear  # adjust paths as needed
+from embkit.layers import LayerInfo, MaskedLinear
 
 
 class TestDecoder(unittest.TestCase):
