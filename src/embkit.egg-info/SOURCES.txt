@@ -13,6 +13,7 @@ src/embkit.egg-info/entry_points.txt
 src/embkit.egg-info/requires.txt
 src/embkit.egg-info/top_level.txt
 src/embkit/commands/__init__.py
+src/embkit/commands/matrix.py
 src/embkit/commands/model.py
 src/embkit/constraints/__init__.py
 src/embkit/constraints/network_constraint.py
@@ -21,6 +22,7 @@ src/embkit/estimator/vae_estimator.py
 src/embkit/layers/__init__.py
 src/embkit/layers/layer_info.py
 src/embkit/layers/masked_linear.py
+src/embkit/layers/pairwise_comparison_layer.py
 src/embkit/losses/__init__.py
 src/embkit/losses/vae_loss.py
 src/embkit/models/__init__.py
