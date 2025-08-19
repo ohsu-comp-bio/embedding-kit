@@ -36,6 +36,5 @@ jobs:
     - name: Comment PR with coverage
       uses: orgoro/coverage@v3.2
       with:
-        coverage-file: coverage.xml
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        coverageFile: coverage.xml
+        token: ${{ secrets.GITHUB_TOKEN }}
