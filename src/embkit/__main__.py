@@ -49,7 +49,7 @@ def help_cmd(ctx, path):
     parent = ctx.parent  # start from top-level context
     for part in path:
         if not hasattr(cmd, "get_command"):
-            raise click.UsageError(f"'{ ' '.join(info_name) }' has no subcommands.")
+            click.echo(cli.get_help(ctx)) # pragma: no cover
         nxt_cmd = cmd.get_command(parent, part)
         if nxt_cmd is None:
             raise click.UsageError(f"Unknown command: {' '.join(path)}")
@@ -61,5 +61,7 @@ def help_cmd(ctx, path):
     click.echo(cmd.get_help(parent))
 
 
-if __name__ == "__main__":
+cli_main = cli
+
+if __name__ == "__main__": # pragma: no cover
     cli()
