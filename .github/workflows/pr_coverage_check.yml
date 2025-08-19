@@ -34,7 +34,7 @@ jobs:
         coverage xml
 
     - name: Comment PR with coverage
-      uses: ewjoachim/py-coverage-comment@v1
+      uses: orgoro/coverage@v3.2
       with:
         coverage-file: coverage.xml
       env:
