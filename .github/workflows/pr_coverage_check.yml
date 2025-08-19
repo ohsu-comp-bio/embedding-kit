@@ -36,10 +36,8 @@ jobs:
         coverage run --rcfile=.coveragerc -m unittest discover -s tests
         coverage xml
 
-    - name: Print coverage report for forked repositories
-      if: github.event.pull_request.head.repo.full_name != github.repository
+    - name: Print coverage report
       run: |
-        echo "Coverage report is not available for forked repositories."
         coverage report -m
 
     - name: Comment PR with coverage
