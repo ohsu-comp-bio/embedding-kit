@@ -30,7 +30,7 @@ jobs:
 
     - name: Run unittests with coverage
       run: |
-        coverage run --source=embkit -m unittest discover -s tests
+        coverage run --rcfile=.coveragerc -m unittest discover -s tests
         coverage xml
 
     - name: Comment PR with coverage
