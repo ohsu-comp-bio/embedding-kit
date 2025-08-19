@@ -39,7 +39,14 @@ jobs:
         coverage run --rcfile=.coveragerc -m unittest discover -s tests
         coverage xml
 
+    - name: Print coverage report for forked repositories
+      if: github.event.pull_request.head.repo.full_name != github.repository
+      run: |
+        echo "Coverage report is not available for forked repositories."
+        coverage report -m
+
     - name: Comment PR with coverage
+      if: github.event.pull_request.head.repo.full_name == github.repository
       uses: orgoro/coverage@v3.2
       with:
         coverageFile: coverage.xml
