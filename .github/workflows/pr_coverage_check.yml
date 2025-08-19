@@ -1,9 +1,6 @@
 name: PR Coverage Check
 
 on:
-  pull_request:
-    branches:
-      - main
   pull_request_target:
     branches:
       - main
@@ -39,7 +36,12 @@ jobs:
         coverage run --rcfile=.coveragerc -m unittest discover -s tests
         coverage xml
 
+    - name: Print coverage report
+      run: |
+        coverage report -m
+
     - name: Comment PR with coverage
+      if: github.event.pull_request.head.repo.full_name == github.repository
       uses: orgoro/coverage@v3.2
       with:
         coverageFile: coverage.xml
