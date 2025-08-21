@@ -1,5 +1,5 @@
 import click
-from .commands import model, matrix, cbio
+from .commands import model, matrix, cbio_cmd
 import logging
 
 @click.group(invoke_without_command=True)
@@ -26,7 +26,7 @@ def cli(ctx, verbose):
 # Register our commands here
 cli.add_command(model)
 cli.add_command(matrix)
-cli.add_command(cbio)
+cli.add_command(cbio_cmd)
 
 
 # ---- 'help' command ----
