@@ -23,16 +23,16 @@ def list_studies(ctx):
 
 @cbio.command(name="download", help="Download cbio dataset.")
 @click.option("--save_path", "-s", type=click.Path(exists=False, writable=True, path_type=str), help="Path to save the dataset.")
-@click.option("--study_name", "-sn", type=str,  show_default=True, help="Name of the study to download.")
+@click.option("--study_id", "-si", type=str,  show_default=True, help="Id of the study to download.")
 @click.pass_context
-def download_tmp(ctx, save_path: str | None, study_name: str):
+def download_tmp(ctx, save_path: str | None, study_id: str):
     """Download the TMP dataset."""
 
-    if study_name is None:
-        click.echo("Study name not specified. Please use --s option to specify the study name.")
+    if study_id is None:
+        click.echo("Study Id not specified. Please use -si option to specify the study id.")
         return
 
-    cbio_portal: CBIOPortal = CBIOPortal(save_path=save_path, study_name=study_name, download=True)
+    cbio_portal: CBIOPortal = CBIOPortal(save_path=save_path, study_id=study_id, download=True)
     cbio_portal.download()
     cbio_portal.unpack()
 

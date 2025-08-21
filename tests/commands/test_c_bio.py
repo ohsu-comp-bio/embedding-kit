@@ -43,22 +43,22 @@ class TestCBIOCLI(unittest.TestCase):
 
         result = self.runner.invoke(
             cbio,
-            ["download", "--study_name", "studyX", "--save_path", "/tmp/testcbio"]
+            ["download", "--study_id", "studyX", "--save_path", "/tmp/testcbio"]
         )
 
         self.assertEqual(result.exit_code, 0)
         mock_cbioportal_cls.assert_called_once_with(
-            save_path="/tmp/testcbio", study_name="studyX", download=True
+            save_path="/tmp/testcbio", study_id="studyX", download=True
         )
         mock_portal.download.assert_called_once()
         mock_portal.unpack.assert_called_once()
 
-    def test_download_missing_study_name(self):
+    def test_download_missing_study_id(self):
         import embkit.commands.cbio as cbio
         result = self.runner.invoke(cbio, ["download"])
 
         self.assertEqual(result.exit_code, 0)
-        self.assertIn("Study name not specified", result.output)
+        self.assertIn("Study Id not specified", result.output)
 
 
 if __name__ == "__main__":
