@@ -1,7 +1,6 @@
 import unittest
 from unittest.mock import patch, MagicMock
 from click.testing import CliRunner
-from embkit.commands.cbio import cbio
 
 
 class TestCBIOCLI(unittest.TestCase):
@@ -10,6 +9,7 @@ class TestCBIOCLI(unittest.TestCase):
 
     @patch("embkit.commands.cbio.CBIOAPI")
     def test_list_studies_displays_results(self, mock_cbioapi_cls):
+        from embkit.commands.cbio import cbio
         mock_api = MagicMock()
         mock_api.list_studies.return_value = [
             {"studyId": "study1", "name": "Study One"},
@@ -25,6 +25,7 @@ class TestCBIOCLI(unittest.TestCase):
 
     @patch("embkit.commands.cbio.CBIOAPI")
     def test_list_studies_no_results(self, mock_cbioapi_cls):
+        from embkit.commands.cbio import cbio
         mock_api = MagicMock()
         mock_api.list_studies.return_value = []
         mock_cbioapi_cls.return_value = mock_api
@@ -36,6 +37,7 @@ class TestCBIOCLI(unittest.TestCase):
 
     @patch("embkit.commands.cbio.CBIOPortal")
     def test_download_command_runs_download_and_unpack(self, mock_cbioportal_cls):
+        from embkit.commands.cbio import cbio
         mock_portal = MagicMock()
         mock_cbioportal_cls.return_value = mock_portal
 
@@ -52,6 +54,7 @@ class TestCBIOCLI(unittest.TestCase):
         mock_portal.unpack.assert_called_once()
 
     def test_download_missing_study_name(self):
+        from embkit.commands.cbio import cbio
         result = self.runner.invoke(cbio, ["download"])
 
         self.assertEqual(result.exit_code, 0)
