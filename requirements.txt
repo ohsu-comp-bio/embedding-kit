@@ -4,3 +4,5 @@ numpy
 torch
 coverage
 click
+tqdm
+cbio_py

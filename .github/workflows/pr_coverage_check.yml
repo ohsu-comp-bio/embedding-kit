@@ -33,7 +33,7 @@ jobs:
     - name: Run unittests with coverage
       run: |
         echo "PYTHONPATH=$PWD/src" >> $GITHUB_ENV
-        coverage run --rcfile=.coveragerc -m unittest discover -s tests
+        coverage run --source=embkit -m unittest discover -s tests
         coverage xml
 
     - name: Print coverage report
