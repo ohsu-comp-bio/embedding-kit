@@ -6,7 +6,15 @@ from scipy.optimize import linear_sum_assignment
 def calc_rmsd(array1, array2):
     if len(array1) != len(array2):
         raise ValueError("Arrays must be of the same length")
+    """
+    Calculates the Root Mean Square Deviation (RMSD) between two arrays.
+    Parameters:
+        array1 (numpy.ndarray): The first array.
+        array2 (numpy.ndarray): The second array, must be of the same length as array1.
 
+    Returns:
+        float: The RMSD between the two arrays.
+    """
     diff = array1 - array2
     squared_diff = diff ** 2
     mean_squared_diff = np.mean(squared_diff)

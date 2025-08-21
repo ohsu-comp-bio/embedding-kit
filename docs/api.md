@@ -10,13 +10,17 @@
 
 ::: embkit.estimator
 
+::: embkit.estimator.vae_estimator
+
 ---
 
 ::: embkit.constraints
+::: embkit.constraints.network_constraint
 
 ---
 
 ::: embkit.losses
+::: embkit.losses.vae_loss
 
 ---
 
