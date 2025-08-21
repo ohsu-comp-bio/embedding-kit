@@ -63,6 +63,15 @@ class TestDecoder(unittest.TestCase):
         y = dec(torch.randn(2, 4))
         self.assertEqual(tuple(y.shape), (2, 3))
 
+    def test_invalid_layer_op_raises_value_error(self):
+        layers = [
+            LayerInfo(units=5, op="foo_bar", activation="relu")  # Invalid op
+        ]
+        with self.assertRaises(ValueError) as context:
+            Decoder(latent_dim=3, feature_dim=4, layers=layers)
+
+        self.assertIn("Unknown LayerInfo.op 'foo_bar'", str(context.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

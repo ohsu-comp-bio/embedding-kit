@@ -1,15 +1,24 @@
 import click
-from .commands import model, matrix
+from .commands import model, matrix, cbio_cmd
+import logging
 
-# ---- Top-level CLI ----
 @click.group(invoke_without_command=True)
+@click.option('--verbose', is_flag=True, help="Enable verbose logging")
 @click.pass_context
-def cli(ctx):
+def cli(ctx, verbose):
     """Embedding Kit CLI.
 
     Use 'embkit help [COMMAND]' for details on a specific command.
     """
-    # If no subcommand provided, show the top-level help
+    # Set up logging based on the verbose flag
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s"
+    )
+
+    ctx.ensure_object(dict)
+    ctx.obj["VERBOSE"] = verbose
+
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
 
@@ -17,6 +26,7 @@ def cli(ctx):
 # Register our commands here
 cli.add_command(model)
 cli.add_command(matrix)
+cli.add_command(cbio_cmd)
 
 
 # ---- 'help' command ----
@@ -49,7 +59,7 @@ def help_cmd(ctx, path):
     parent = ctx.parent  # start from top-level context
     for part in path:
         if not hasattr(cmd, "get_command"):
-            raise click.UsageError(f"'{ ' '.join(info_name) }' has no subcommands.")
+            click.echo(cli.get_help(ctx)) # pragma: no cover
         nxt_cmd = cmd.get_command(parent, part)
         if nxt_cmd is None:
             raise click.UsageError(f"Unknown command: {' '.join(path)}")
@@ -61,5 +71,7 @@ def help_cmd(ctx, path):
     click.echo(cmd.get_help(parent))
 
 
-if __name__ == "__main__":
+cli_main = cli
+
+if __name__ == "__main__": # pragma: no cover
     cli()
