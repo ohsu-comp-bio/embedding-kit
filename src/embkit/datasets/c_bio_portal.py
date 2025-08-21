@@ -100,10 +100,12 @@ class CBIOPortal(Dataset):
             logger.error(f"Failed to download cBioPortal study data: {e}")
             raise RuntimeError(f"Failed to download cBioPortal study data: {e}")
 
-    def unpack(self):
+    def unpack(self) -> Path:
         """
         Unpack the downloaded tar.gz file into the save path.
         Skips unpacking if the unpacked folder contains files other than the tar.gz itself.
+        :return: Path to the unpacked folder
+        :raises FileNotFoundError: If the tar.gz file does not exist
         """
         save_path = Path(self.save_path).expanduser().resolve()
         target_file = Path(save_path, f"{self.study_id}.tar.gz")
@@ -116,7 +118,7 @@ class CBIOPortal(Dataset):
             if other_files:
                 logger.info(f"Unpacked folder {unpack_folder} already contains files. Skipping unpack.")
                 self.__unpacked_file_path = unpack_folder
-                return
+                return unpack_folder
 
         if not target_file.exists():
             raise FileNotFoundError(f"File {target_file} does not exist.")
@@ -126,6 +128,7 @@ class CBIOPortal(Dataset):
                 tar.extractall(path=save_path)
             logger.info(f"Unpacked {target_file} into {save_path}")
             self.__unpacked_file_path = unpack_folder
+            return unpack_folder
         except tarfile.TarError as e:
             logger.error(f"Failed to unpack tar.gz file: {e}")
             raise RuntimeError(f"Failed to unpack tar.gz file: {e}")
