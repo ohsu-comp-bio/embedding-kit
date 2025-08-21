@@ -220,6 +220,45 @@ class TestCBIOPortal(unittest.TestCase):
             self.assertEqual(result, b"")
             mock_logger.info.assert_called_with(f"Unpacked folder {unpacked_folder} already exists. Skipping download.")
 
+    @patch("embkit.datasets.c_bio_portal.tarfile.open")
+    def test_unpack_returns_correct_path_on_success(self, mock_tar_open):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tar_path = Path(tmpdir) / f"{self.study_id}.tar.gz"
+            tar_path.write_bytes(b"fake tar file")
+
+            dataset = CBIOPortal(
+                study_id=self.study_id,
+                save_path=tmpdir,
+                download=False
+            )
+
+            mock_tar = MagicMock()
+            mock_tar_open.return_value.__enter__.return_value = mock_tar
+
+            returned_path = dataset.unpack()
+            expected_path = Path(tmpdir) / self.study_id
+
+            self.assertEqual(returned_path.resolve(), expected_path.resolve())
+            self.assertEqual(dataset.unpacked_file_path.resolve(), expected_path.resolve())
+
+    def test_unpack_returns_path_if_skipped_due_to_existing_files(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tar_path = Path(tmpdir) / f"{self.study_id}.tar.gz"
+            tar_path.write_bytes(b"fake")
+
+            unpacked_folder = Path(tmpdir) / self.study_id
+            unpacked_folder.mkdir()
+            (unpacked_folder / "existing_file.txt").write_text("Already here")
+
+            dataset = CBIOPortal(
+                study_id=self.study_id,
+                save_path=tmpdir,
+                download=False
+            )
+
+            returned_path = dataset.unpack()
+            self.assertEqual(returned_path.resolve(), unpacked_folder.resolve())
+            self.assertEqual(dataset.unpacked_file_path.resolve(), unpacked_folder.resolve())
 
 if __name__ == "__main__":
     unittest.main()
