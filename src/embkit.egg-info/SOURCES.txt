@@ -22,7 +22,6 @@ src/embkit/constraints/network_constraint.py
 src/embkit/datasets/__init__.py
 src/embkit/datasets/c_bio_portal.py
 src/embkit/datasets/dataset.py
-src/embkit/datasets/tmp.py
 src/embkit/estimator/__init__.py
 src/embkit/estimator/vae_estimator.py
 src/embkit/layers/__init__.py
@@ -37,6 +36,7 @@ src/embkit/models/vae_model/base_vae.py
 src/embkit/models/vae_model/decoder.py
 src/embkit/models/vae_model/encoder.py
 src/embkit/models/vae_model/net_vae.py
+src/embkit/models/vae_model/pytorch.py
 src/embkit/models/vae_model/vae.py
 src/embkit/preprocessing/__init__.py
 src/embkit/preprocessing/align.py

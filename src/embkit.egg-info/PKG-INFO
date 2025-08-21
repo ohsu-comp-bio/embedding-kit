@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: embkit
-Version: 0.1.0
+Version: 0.1.1
 Summary: Embedding Kit for embedding models
 Author-email: Kyle Ellrott <ellrott@ohsu.edu>, Raphael Kirchgaessner <kirchgae@ohsu.edu>
 License: MIT
