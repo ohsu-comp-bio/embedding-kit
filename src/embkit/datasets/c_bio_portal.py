@@ -15,7 +15,7 @@ class CBIOPortal(Dataset):
 
     def __init__(
             self,
-            study_name: str,
+            study_id: str,
             save_path: Path | str | None = None,
             download: bool = True,
             **kwargs
@@ -26,7 +26,7 @@ class CBIOPortal(Dataset):
         :param save_path: Path to save the dataset
         :param download: Whether to immediately download
         """
-        self.study_name = study_name
+        self.study_id = study_id
         self.__unpacked_file_path: Path = Path()
         super().__init__(save_path=save_path, download=download)
 
@@ -58,8 +58,8 @@ class CBIOPortal(Dataset):
         else:
             save_path = self.save_path
 
-        target_file: Path = Path(save_path, f"{self.study_name}.tar.gz")
-        unpacked_folder: Path = Path(save_path, self.study_name)
+        target_file: Path = Path(save_path, f"{self.study_id}.tar.gz")
+        unpacked_folder: Path = Path(save_path, self.study_id)
 
         # Check if already downloaded or unpacked
         if target_file.exists():
@@ -70,7 +70,7 @@ class CBIOPortal(Dataset):
             return b''
 
         try:
-            profiles_url = f"{self.BASE_URL}/{self.study_name}.tar.gz"
+            profiles_url = f"{self.BASE_URL}/{self.study_id}.tar.gz"
             logger.info(f"Downloading cBioPortal study data from {profiles_url}")
             response = requests.get(profiles_url, stream=True)
             response.raise_for_status()
@@ -80,7 +80,7 @@ class CBIOPortal(Dataset):
             with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
                 tmp_path = Path(tmp_file.name)
                 with tqdm(
-                        desc=f"Downloading {self.study_name}",
+                        desc=f"Downloading {self.study_id}",
                         total=total_size,
                         unit='B',
                         unit_scale=True,
@@ -106,13 +106,13 @@ class CBIOPortal(Dataset):
         Skips unpacking if the unpacked folder contains files other than the tar.gz itself.
         """
         save_path = Path(self.save_path).expanduser().resolve()
-        target_file = Path(save_path, f"{self.study_name}.tar.gz")
-        unpack_folder = Path(save_path, self.study_name)
+        target_file = Path(save_path, f"{self.study_id}.tar.gz")
+        unpack_folder = Path(save_path, self.study_id)
 
         if unpack_folder.exists():
             # List all contents other than the tar.gz
             contents = list(unpack_folder.iterdir())
-            other_files = [p for p in contents if p.name != f"{self.study_name}.tar.gz"]
+            other_files = [p for p in contents if p.name != f"{self.study_id}.tar.gz"]
             if other_files:
                 logger.info(f"Unpacked folder {unpack_folder} already contains files. Skipping unpack.")
                 self.__unpacked_file_path = unpack_folder

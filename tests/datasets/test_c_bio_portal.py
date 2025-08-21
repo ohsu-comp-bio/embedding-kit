@@ -12,7 +12,7 @@ from embkit.datasets import CBIOPortal
 class TestCBIOPortal(unittest.TestCase):
 
     def setUp(self):
-        self.study_name = "test_study"
+        self.study_id = "test_study"
         self.test_data = b"Fake .tar.gz content"
 
     @patch("embkit.datasets.c_bio_portal.requests.get")
@@ -26,13 +26,13 @@ class TestCBIOPortal(unittest.TestCase):
             mock_get.return_value = mock_response
 
             dataset = CBIOPortal(
-                study_name=self.study_name,
+                study_id=self.study_id,
                 save_path=tmpdir,
                 download=False
             )
             data = dataset.download()
 
-            expected_file = Path(tmpdir) / f"{self.study_name}.tar.gz"
+            expected_file = Path(tmpdir) / f"{self.study_id}.tar.gz"
             self.assertTrue(expected_file.exists())
             self.assertEqual(data, self.test_data)
 
@@ -40,7 +40,7 @@ class TestCBIOPortal(unittest.TestCase):
     def test_download_warns_on_repeat(self, mock_get):
         with tempfile.TemporaryDirectory() as tmpdir:
             dataset = CBIOPortal(
-                study_name=self.study_name,
+                study_id=self.study_id,
                 save_path=tmpdir,
                 download=True
             )
@@ -51,18 +51,18 @@ class TestCBIOPortal(unittest.TestCase):
     def test_download_failure_raises(self, mock_get):
         with tempfile.TemporaryDirectory() as tmpdir:
             mock_get.side_effect = RequestException("Boom!")
-            dataset = CBIOPortal(study_name=self.study_name, save_path=tmpdir, download=False)
+            dataset = CBIOPortal(study_id=self.study_id, save_path=tmpdir, download=False)
             with self.assertRaises(RuntimeError):
                 dataset.download()
 
     @patch("embkit.datasets.c_bio_portal.tarfile.open")
     def test_unpack_success(self, mock_tar_open):
         with tempfile.TemporaryDirectory() as tmpdir:
-            tar_path = Path(tmpdir) / f"{self.study_name}.tar.gz"
+            tar_path = Path(tmpdir) / f"{self.study_id}.tar.gz"
             tar_path.write_bytes(b"fake tar file")
 
             dataset = CBIOPortal(
-                study_name=self.study_name,
+                study_id=self.study_id,
                 save_path=tmpdir,
                 download=False
             )
@@ -73,12 +73,12 @@ class TestCBIOPortal(unittest.TestCase):
             dataset.unpack()
             args, kwargs = mock_tar.extractall.call_args
             self.assertEqual(kwargs["path"].resolve(), Path(tmpdir).resolve())
-            self.assertEqual(dataset.unpacked_file_path.resolve(), Path(tmpdir, self.study_name).resolve())
+            self.assertEqual(dataset.unpacked_file_path.resolve(), Path(tmpdir, self.study_id).resolve())
 
     def test_unpack_missing_file_raises(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             dataset = CBIOPortal(
-                study_name=self.study_name,
+                study_id=self.study_id,
                 save_path=tmpdir,
                 download=False
             )
@@ -88,11 +88,11 @@ class TestCBIOPortal(unittest.TestCase):
     @patch("embkit.datasets.c_bio_portal.tarfile.open")
     def test_unpack_tarfile_error(self, mock_tar_open):
         with tempfile.TemporaryDirectory() as tmpdir:
-            tar_path = Path(tmpdir) / f"{self.study_name}.tar.gz"
+            tar_path = Path(tmpdir) / f"{self.study_id}.tar.gz"
             tar_path.write_bytes(b"bad tar")
 
             dataset = CBIOPortal(
-                study_name=self.study_name,
+                study_id=self.study_id,
                 save_path=tmpdir,
                 download=False
             )
@@ -103,14 +103,14 @@ class TestCBIOPortal(unittest.TestCase):
 
     def test_unpack_skips_if_folder_has_extra_files(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            tar_path = Path(tmpdir) / f"{self.study_name}.tar.gz"
+            tar_path = Path(tmpdir) / f"{self.study_id}.tar.gz"
             tar_path.write_bytes(b"fake")
-            study_folder = Path(tmpdir) / self.study_name
+            study_folder = Path(tmpdir) / self.study_id
             study_folder.mkdir()
             (study_folder / "some_file.txt").write_text("extra")
 
             dataset = CBIOPortal(
-                study_name=self.study_name,
+                study_id=self.study_id,
                 save_path=tmpdir,
                 download=False
             )
@@ -128,7 +128,7 @@ class TestCBIOPortal(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with self.assertWarns(UserWarning):
-                dataset = CBIOPortal(study_name=self.study_name, save_path=tmpdir, download=True)
+                dataset = CBIOPortal(study_id=self.study_id, save_path=tmpdir, download=True)
                 dataset.download()  # triggers the warning path
 
     def test_default_save_path_creation(self):
@@ -137,7 +137,7 @@ class TestCBIOPortal(unittest.TestCase):
             shutil.rmtree(default_path)
         self.assertFalse(default_path.exists())
 
-        dataset = CBIOPortal(study_name=self.study_name, save_path=None, download=False)
+        dataset = CBIOPortal(study_id=self.study_id, save_path=None, download=False)
         self.assertTrue(Path(dataset.save_path).exists())
         self.assertEqual(Path(dataset.save_path).resolve(), default_path.resolve())
 
@@ -152,15 +152,15 @@ class TestCBIOPortal(unittest.TestCase):
             mock_response.raise_for_status = MagicMock()
             mock_get.return_value = mock_response
 
-            dataset = CBIOPortal(study_name=self.study_name, save_path=tmpdir, download=False)
+            dataset = CBIOPortal(study_id=self.study_id, save_path=tmpdir, download=False)
             dataset.download()
 
-            target_file = Path(tmpdir) / f"{self.study_name}.tar.gz"
-            unpack_folder = Path(tmpdir) / self.study_name
+            target_file = Path(tmpdir) / f"{self.study_id}.tar.gz"
+            unpack_folder = Path(tmpdir) / self.study_id
 
             self.assertTrue(target_file.exists())
-            self.assertEqual(target_file.name, f"{self.study_name}.tar.gz")
-            self.assertEqual(unpack_folder.name, self.study_name)
+            self.assertEqual(target_file.name, f"{self.study_id}.tar.gz")
+            self.assertEqual(unpack_folder.name, self.study_id)
 
     @patch("embkit.datasets.c_bio_portal.requests.get")
     def test_default_embkit_path_created_if_missing(self, mock_get):
@@ -180,13 +180,13 @@ class TestCBIOPortal(unittest.TestCase):
         mock_get.return_value = mock_response
 
         # Run
-        dataset = CBIOPortal(study_name=self.study_name, save_path=None, download=False)
+        dataset = CBIOPortal(study_id=self.study_id, save_path=None, download=False)
         self.assertEqual(Path(dataset.save_path).resolve(), default_path.resolve())
 
         # Should be created in download
         dataset.download()
         self.assertTrue(default_path.exists())
-        self.assertTrue((default_path / f"{self.study_name}.tar.gz").exists())
+        self.assertTrue((default_path / f"{self.study_id}.tar.gz").exists())
 
     @patch("embkit.datasets.c_bio_portal.requests.get")
     @patch("embkit.datasets.c_bio_portal.logger")
