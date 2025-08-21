@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch, MagicMock
 from click.testing import CliRunner
+from embkit.commands.cbio import cbio_cmd
 
 
 class TestCBIOCLI(unittest.TestCase):
@@ -9,7 +10,6 @@ class TestCBIOCLI(unittest.TestCase):
 
     @patch("embkit.commands.cbio.CBIOAPI")
     def test_list_studies_displays_results(self, mock_cbioapi_cls):
-        import embkit.commands.cbio as cbio
         mock_api = MagicMock()
         mock_api.list_studies.return_value = [
             {"studyId": "study1", "name": "Study One"},
@@ -17,7 +17,7 @@ class TestCBIOCLI(unittest.TestCase):
         ]
         mock_cbioapi_cls.return_value = mock_api
 
-        result = self.runner.invoke(cbio, ["studies"])
+        result = self.runner.invoke(cbio_cmd, ["studies"])
 
         self.assertEqual(result.exit_code, 0)
         self.assertIn("Study ID: study1", result.output)
@@ -25,24 +25,22 @@ class TestCBIOCLI(unittest.TestCase):
 
     @patch("embkit.commands.cbio.CBIOAPI")
     def test_list_studies_no_results(self, mock_cbioapi_cls):
-        import embkit.commands.cbio as cbio
         mock_api = MagicMock()
         mock_api.list_studies.return_value = []
         mock_cbioapi_cls.return_value = mock_api
 
-        result = self.runner.invoke(cbio, ["studies"])
+        result = self.runner.invoke(cbio_cmd, ["studies"])
 
         self.assertEqual(result.exit_code, 0)
         self.assertIn("No studies found", result.output)
 
     @patch("embkit.commands.cbio.CBIOPortal")
     def test_download_command_runs_download_and_unpack(self, mock_cbioportal_cls):
-        import embkit.commands.cbio as cbio
         mock_portal = MagicMock()
         mock_cbioportal_cls.return_value = mock_portal
 
         result = self.runner.invoke(
-            cbio,
+            cbio_cmd,
             ["download", "--study_id", "studyX", "--save_path", "/tmp/testcbio"]
         )
 
@@ -54,8 +52,7 @@ class TestCBIOCLI(unittest.TestCase):
         mock_portal.unpack.assert_called_once()
 
     def test_download_missing_study_id(self):
-        import embkit.commands.cbio as cbio
-        result = self.runner.invoke(cbio, ["download"])
+        result = self.runner.invoke(cbio_cmd, ["download"])
 
         self.assertEqual(result.exit_code, 0)
         self.assertIn("Study Id not specified", result.output)
