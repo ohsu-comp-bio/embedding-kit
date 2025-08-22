@@ -4,6 +4,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+REPO_DIR = ".embkit"
 
 class Dataset(ABC):
     def __init__(self, save_path: Path | str | None, download: bool = True) -> None:
@@ -17,7 +18,7 @@ class Dataset(ABC):
         self._download_called_from_init = False
 
         if save_path is None:
-            self.save_path: Path = Path(Path.home(), "embkit")
+            self.save_path: Path = Path(Path.home(), REPO_DIR)
             if not self.save_path.exists():
                 self.save_path.mkdir(parents=True, exist_ok=True)
 

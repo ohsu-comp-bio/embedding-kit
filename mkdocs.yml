@@ -2,6 +2,7 @@ site_name: Embedding-Kit
 nav:
   - Home: index.md
   - About: about.md
+  - Examples: examples.md
   - API: api.md
 theme: readthedocs
 
