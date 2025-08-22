@@ -7,7 +7,7 @@ import tarfile
 import shutil
 
 from embkit.datasets import CBIOPortal
-from embkit.datasets.datasets import REPO_DIR
+from embkit.datasets.dataset import REPO_DIR
 
 class TestCBIOPortal(unittest.TestCase):
 
