@@ -2,6 +2,10 @@
 
 ::: embkit.commands
 
+::: embkit.commands.cbio
+    options:
+      show-root-full-help: true
+
 ---
 
 ::: embkit.layers

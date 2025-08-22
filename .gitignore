@@ -13,3 +13,4 @@ htmlcov
 .DS_Store
 *tar.gz
 tmp_data.csv
+/site
