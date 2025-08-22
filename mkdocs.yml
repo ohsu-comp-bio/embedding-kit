@@ -12,3 +12,6 @@ plugins:
           paths: [src]
           options:
             show_source: false # Example option
+
+markdown_extensions:
+    - mkdocs-click

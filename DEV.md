@@ -6,6 +6,7 @@
 ```
 pip install mkdocs
 pip install mkdocstrings mkdocstrings-python
+pip install mkdocs-click
 ```
 
 ### View docs
