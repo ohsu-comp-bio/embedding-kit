@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # NetVae (training with optional alternating constraint)
 # ---------------------------------------------------------
 
-class NetVae(BaseVAE):
+class NetVAE(BaseVAE):
     """
     """
 
