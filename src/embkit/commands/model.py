@@ -1,7 +1,7 @@
 import click
 import pandas as pd
 from ..layers import LayerInfo
-from ..models.vae_model.vae import VAE
+from ..models.vae.vae import VAE
 
 
 model = click.Group(name="model", help="Model commands.")

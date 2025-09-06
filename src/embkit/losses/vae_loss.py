@@ -5,7 +5,7 @@ VAE loss functions
 """
 
 import torch
-from ..models.vae_model.base_vae import BaseVAE
+from ..models.vae.base_vae import BaseVAE
 import torch.nn.functional as F
 
 
