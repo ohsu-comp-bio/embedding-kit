@@ -2,7 +2,7 @@ import unittest
 import torch
 from torch import nn
 
-from embkit.models.vae_model.encoder import Encoder
+from embkit.models.vae.encoder import Encoder
 from embkit.layers import LayerInfo, MaskedLinear
 from embkit.constraints import NetworkConstraint
 

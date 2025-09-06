@@ -2,7 +2,7 @@ import unittest
 import torch
 from torch import nn
 
-from embkit.models.vae_model.decoder import Decoder
+from embkit.models.vae.decoder import Decoder
 from embkit.layers import LayerInfo, MaskedLinear
 
 
