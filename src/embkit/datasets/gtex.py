@@ -1,11 +1,15 @@
-from pathlib import Path
-import requests
-from .dataset import Dataset
+"""
+GTEx data downloader
+"""
 import logging
 import tempfile
-from tqdm import tqdm
-import tarfile
 import warnings
+from pathlib import Path
+import requests
+
+from tqdm import tqdm
+
+from .dataset import Dataset
 
 logger = logging.getLogger(__name__)
 
