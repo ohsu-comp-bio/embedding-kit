@@ -79,7 +79,8 @@ class VAE(BaseVAE):
         self.latent_groups = None
         self.normal_stats = None
 
-    def fit(self, X: Union[pd.DataFrame, torch.utils.data.DataLoader], y=None, *, epochs: int = 20, lr: Optional[float] = None,
+    def fit(self, X: Union[pd.DataFrame, torch.utils.data.DataLoader], y=None, *, 
+            epochs: int = 20, lr: Optional[float] = None, beta: float = 1.0,
             device: Optional[torch.device] = None, progress: bool = True):
         """
         Training loop using vae_loss(recon, x, mu, logvar).
@@ -120,7 +121,7 @@ class VAE(BaseVAE):
                 optimizer.zero_grad()
 
                 recon, mu, logvar, _z = super().forward(x_tensor)
-                total_loss, recon_loss, kl_loss = vae_loss(recon, x_tensor, mu, logvar)
+                total_loss, recon_loss, kl_loss = vae_loss(recon, x_tensor, mu, logvar, beta=beta)
 
                 total_loss.backward()
                 optimizer.step()
