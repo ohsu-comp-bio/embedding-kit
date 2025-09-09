@@ -30,6 +30,7 @@ class VAE(BaseVAE):
             encoder: Optional[torch.nn.Module] = None,
             decoder: Optional[torch.nn.Module] = None,
             encoder_layers: Optional[List[LayerInfo]] = None,
+            decoder_layers: Optional[List[LayerInfo]] = None,
             constraint=None,
             batch_norm: bool = False,
             activation: str = "relu",
@@ -69,6 +70,7 @@ class VAE(BaseVAE):
             self.decoder = self.build_decoder(
                 feature_dim=feature_dim,
                 latent_dim=latent_dim,
+                layers=decoder_layers
             )
 
         # A place to record simple history if you want
@@ -105,7 +107,7 @@ class VAE(BaseVAE):
         # IMPORTANT: assign the result of .to(device)
         data_loader = None
         if isinstance(X, pd.DataFrame):
-            data_loader = dataframe_loader(X)
+            data_loader = dataframe_loader(X, device=device)
             #x_tensor = torch.from_numpy(X.values.astype(np.float32)).to(device)
         else:
             data_loader = X

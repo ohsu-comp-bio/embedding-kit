@@ -1,6 +1,7 @@
 from typing import List, Optional
 import torch
 from torch import nn
+from ...constraints import NetworkConstraint
 from ...layers import MaskedLinear, LayerInfo, convert_activation
 import logging
 
@@ -13,10 +14,11 @@ class Decoder(nn.Module):
     """
 
     def __init__(self,
-                 latent_dim: int,
-                 feature_dim: int,
-                 layers: Optional[List[LayerInfo]] = None,
-                 default_activation: str = "relu"):
+                latent_dim: int,
+                feature_dim: int,
+                layers: Optional[List[LayerInfo]] = None,
+                constraint: Optional[NetworkConstraint] = None,
+                default_activation: str = "relu"):
         super().__init__()
         self._default_activation = default_activation
 

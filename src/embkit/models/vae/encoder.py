@@ -1,5 +1,9 @@
+"""
+Encoder layer
+"""
+
+from typing import Optional, List, Union
 from torch import nn
-from typing import Optional, Tuple, List, Union
 import torch
 from ...layers import MaskedLinear, LayerInfo, convert_activation
 from ...constraints import NetworkConstraint
