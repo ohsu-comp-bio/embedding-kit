@@ -30,8 +30,6 @@ hugo = Hugo()
 
 hugo_df = pd.read_csv(hugo.unpacked_file_path, sep="\t", index_col=0)
 df = load_gct( g.unpacked_file_path )
-```
-
 
 hugo_df["ensembl_gene_id"]
 # select protein coding genes and build a dict that translates from ensembl gene id to Hugo name
