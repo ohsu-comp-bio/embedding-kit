@@ -1,16 +1,21 @@
-from pathlib import Path
-import requests
-from .dataset import Dataset
+"""
+GTEx data downloader
+"""
 import logging
 import tempfile
-from tqdm import tqdm
-import tarfile
 import warnings
+from pathlib import Path
+import requests
+
+from tqdm import tqdm
+
+from .dataset import Dataset
 
 logger = logging.getLogger(__name__)
 
 
 class GTEx(Dataset):
+    # pragma: no cover
     BASE_URLS = {
         "gene_tpm" : "https://storage.googleapis.com/adult-gtex/bulk-gex/v10/rna-seq/GTEx_Analysis_v10_RNASeQCv2.4.2_gene_tpm.gct.gz",
         "transcript_tpm": "https://storage.googleapis.com/adult-gtex/bulk-gex/v10/rna-seq/GTEx_Analysis_v10_RSEMv1.3.3_transcripts_tpm.txt.gz"

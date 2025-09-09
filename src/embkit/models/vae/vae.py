@@ -1,28 +1,18 @@
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 import numpy as np
 import torch
 import pandas as pd
+from tqdm.autonotebook import tqdm
 from torch.optim import Adam
 from ...layers import LayerInfo
 from .base_vae import BaseVAE
 from ...losses import vae_loss
+from ... import get_device, dataframe_loader
 
 # If Encoder/Decoder kwargs need constraints etc., they’ll be passed through.
 
 logger = logging.getLogger(__name__)
-
-
-def get_device() -> torch.device:
-    if torch.cuda.is_available():
-        logger.info("Using CUDA GPU")
-        return torch.device("cuda")
-    if torch.backends.mps.is_available():
-        logger.info("Using Metal GPU")
-        return torch.device("mps")
-    logger.info("Using CPU")
-    return torch.device("cpu")
-
 
 class VAE(BaseVAE):
     """
@@ -82,15 +72,15 @@ class VAE(BaseVAE):
             )
 
         # A place to record simple history if you want
-        self.history: Dict[str, list] = {"loss": []}
+        self.history: Dict[str, list] = {"loss": [], "recon": [], "kl": []}
         self.latent_index = None
         self.latent_groups = None
         self.normal_stats = None
 
-    def fit(self, X: pd.DataFrame, y=None, *, epochs: int = 20, lr: Optional[float] = None,
+    def fit(self, X: Union[pd.DataFrame, torch.utils.data.DataLoader], y=None, *, epochs: int = 20, lr: Optional[float] = None,
             device: Optional[torch.device] = None, progress: bool = True):
         """
-        Full-batch training loop using vae_loss(recon, x, mu, logvar).
+        Training loop using vae_loss(recon, x, mu, logvar).
 
         X: pandas.DataFrame with float features, columns must match `self.features`.
         """
@@ -113,27 +103,38 @@ class VAE(BaseVAE):
         self.train()
 
         # IMPORTANT: assign the result of .to(device)
-        x_tensor = torch.from_numpy(X.values.astype(np.float32)).to(device)
+        data_loader = None
+        if isinstance(X, pd.DataFrame):
+            data_loader = dataframe_loader(X)
+            #x_tensor = torch.from_numpy(X.values.astype(np.float32)).to(device)
+        else:
+            data_loader = X
 
         optimizer = Adam(self.parameters(), lr=lr)
 
-        for epoch in range(epochs):
-            optimizer.zero_grad()
+        pbar = tqdm(range(epochs))
+        for epoch in pbar:
+            for batch_idx, (x_tensor,) in enumerate(data_loader):
+                optimizer.zero_grad()
 
-            recon, mu, logvar, _z = super().forward(x_tensor)
-            total_loss, recon_loss, kl_loss = vae_loss(recon, x_tensor, mu, logvar)
+                recon, mu, logvar, _z = super().forward(x_tensor)
+                total_loss, recon_loss, kl_loss = vae_loss(recon, x_tensor, mu, logvar)
 
-            total_loss.backward()
-            optimizer.step()
+                total_loss.backward()
+                optimizer.step()
 
-            self.history["loss"].append(float(total_loss.detach().cpu()))
-            print(f"Epoch {epoch + 1}/{epochs} | Loss: {total_loss.item():.4f} | "
-                  f"Recon: {recon_loss.item():.4f} | KL: {kl_loss.item():.4f}")
-            if progress:
-                logger.debug(
-                    f"Epoch {epoch + 1} | Loss: {total_loss.item():.4f} | "
-                    f"Recon: {recon_loss.item():.4f} | KL: {kl_loss.item():.4f}"
-                )
+                self.history["loss"].append(float(total_loss.detach().cpu()))
+                self.history["recon"].append(float(recon_loss.detach().cpu()))
+                self.history["kl"].append(float(kl_loss.detach().cpu()))
+
+                #print(f"Epoch {epoch + 1}/{epochs} | Loss: {total_loss.item():.4f} | "
+                #    f"Recon: {recon_loss.item():.4f} | KL: {kl_loss.item():.4f}")
+                if progress:
+                    if batch_idx % 100 == 0:
+                        pbar.set_description(
+                            f"Epoch {epoch + 1} | Loss: {total_loss.item():.4f} | " + 
+                            f"Recon: {recon_loss.item():.4f} | KL: {kl_loss.item():.4f}"
+                        )
 
 
 if __name__ == "__main__":
