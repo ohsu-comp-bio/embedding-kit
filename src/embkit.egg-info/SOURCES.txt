@@ -23,6 +23,7 @@ src/embkit/datasets/__init__.py
 src/embkit/datasets/c_bio_portal.py
 src/embkit/datasets/dataset.py
 src/embkit/datasets/gtex.py
+src/embkit/datasets/hugo.py
 src/embkit/estimator/__init__.py
 src/embkit/estimator/vae_estimator.py
 src/embkit/layers/__init__.py

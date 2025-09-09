@@ -24,6 +24,16 @@ def get_device() -> torch.device:
     logger.info("Using CPU")
     return torch.device("cpu")
 
+def dataframe_tensor(df: pd.DataFrame,device=None) -> torch.Tensor:
+    """
+    dataframe_tensor
+
+    
+    """
+    if device is None:
+        device = get_device()
+    return torch.from_numpy(df.values.astype(np.float32)).to(device)
+
 def dataframe_loader(df: pd.DataFrame,
                      batch_size = 256, shuffle=True,
                      device=None) -> torch.utils.data.DataLoader:
