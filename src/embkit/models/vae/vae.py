@@ -7,7 +7,7 @@ from tqdm.autonotebook import tqdm
 from torch.optim import Adam
 from ...layers import LayerInfo
 from .base_vae import BaseVAE
-from ...losses import bce_with_logits
+from collections.abc import Callable
 from ... import get_device, dataframe_loader
 
 # If Encoder/Decoder kwargs need constraints etc., they’ll be passed through.
@@ -79,17 +79,7 @@ class VAE(BaseVAE):
         self.latent_groups = None
         self.normal_stats = None
 
-    def fit(self, X: Union[pd.DataFrame, torch.utils.data.DataLoader],
-            y=None,
-            *,
-            epochs: int = 20,
-            lr: Optional[float] = None,
-            beta: float = 1.0,
-            optimizer: Optional[torch.optim.Optimizer] = None,
-            reset_optimizer: bool = False,
-            device: Optional[torch.device] = None,
-            progress: bool = True,
-            beta_schedule: Optional[List[tuple]] = None):
+    def fit(self, X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoader], **kwargs):
         """
         Training loop using vae_loss(recon, x, mu, logvar).
 
@@ -98,6 +88,21 @@ class VAE(BaseVAE):
         the single-phase (beta, epochs) arguments and runs multiple phases while
         reusing the same optimizer/momentum.
         """
+
+        epochs: int = int(kwargs.pop("epochs", 20))
+        lr: Optional[float] = kwargs.pop("lr", None)
+        beta: float = float(kwargs.pop("beta", 1.0))
+        optimizer: Optional[torch.optim.Optimizer] = kwargs.pop("optimizer", None)
+        loss: Optional[Callable] = kwargs.pop("loss", None)
+        reset_optimizer: bool = bool(kwargs.pop("reset_optimizer", False))
+        device: Optional[torch.device] = kwargs.pop("device", None)
+        progress: bool = bool(kwargs.pop("progress", True))
+        beta_schedule = kwargs.pop("beta_schedule", None)
+        y = kwargs.pop("y", None)  # if you need it, fetch it from kwargs
+
+        if loss is None:
+            raise ValueError("loss function is required (e.g., from embkit.losses.vae_loss)")
+
         # --- setup ---
         if lr is None:
             lr = self.lr
@@ -150,8 +155,7 @@ class VAE(BaseVAE):
                     # Forward
                     recon, mu, logvar, _ = self(x_tensor)
 
-                    # Loss (use your chosen loss here; default: vae_loss expects probs or logits per your implementation)
-                    total_loss, recon_loss, kl_loss = bce_with_logits(recon, x_tensor, mu, logvar, beta=beta_value)
+                    total_loss, recon_loss, kl_loss = loss(recon, x_tensor, mu, logvar, beta=beta_value)
 
                     # Backprop
                     total_loss.backward()

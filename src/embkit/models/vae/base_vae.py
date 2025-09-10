@@ -7,7 +7,6 @@ from pathlib import Path
 import json
 import logging
 import pandas as pd
-
 from torch import nn
 import torch
 from .encoder import Encoder
@@ -202,7 +201,7 @@ class BaseVAE(nn.Module, ABC):
         return recon, mu, logvar, z
 
     @abstractmethod
-    def fit(self, X: Union[pd.DataFrame, torch.Tensor], **kwargs):
+    def fit(self, X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoader], **kwargs):
         """
         Train the VAE on input data.
 

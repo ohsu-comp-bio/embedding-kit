@@ -1,4 +1,5 @@
 from embkit import dataframe_loader, dataframe_tensor
+from embkit.losses import bce_with_logits
 from embkit.preprocessing import load_gct
 from embkit.datasets import GTEx, Hugo
 from embkit.models.vae import VAE
@@ -6,6 +7,7 @@ from embkit.preprocessing import ExpMinMaxScaler
 from embkit.layers import LayerInfo
 import torch
 import pandas as pd
+import numpy as np
 
 g=GTEx()
 hugo = Hugo()
@@ -32,7 +34,7 @@ enc_layers = [LayerInfo(2048, activation="relu"), LayerInfo(1024, activation="re
 
 schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
 vae = VAE(df_norm.columns, latent_dim=128, decoder_layers=dec_layers, encoder_layers=enc_layers)
-vae.fit(dataloader, beta_schedule=schedule, lr=1e-3)
+vae.fit(X=dataloader, beta_schedule=schedule, lr=1e-3, loss=bce_with_logits)
 
 vae.eval()
 with torch.no_grad():
@@ -41,3 +43,17 @@ with torch.no_grad():
     recon = torch.sigmoid(recon_logits)
 
 out = pd.DataFrame(recon.cpu().numpy(), index=df_norm.index, columns=df_norm.columns)
+
+# Example metrics
+gene = "OR4F5"
+y = df_norm[gene].values
+yhat = out[gene].values
+
+corr = np.corrcoef(y, yhat)[0,1]
+mae_gene = np.mean(np.abs(y - yhat))
+print(gene, "corr:", float(corr), "MAE:", float(mae_gene))
+
+# global calibration
+print("input mean/std:", float(df_norm.values.mean()), float(df_norm.values.std()))
+print("recon mean/std:", float(out.values.mean()), float(out.values.std()))
+print("global MAE:", float((out.values - df_norm.values).mean()))
