@@ -7,8 +7,6 @@ VAE loss functions
 import torch
 import torch.nn.functional as F
 
-from ..models.vae.base_vae import BaseVAE
-
 
 def bce(recon_x, x, mu, logvar, beta=1.0):
     """Calculate the VAE loss.
@@ -52,7 +50,7 @@ def bce_with_logits(recon_logits, x, mu, logvar, beta=1.0):
     return total, recon_loss.mean(), kl_loss.mean()
 
 
-def net_vae_loss(model: BaseVAE, x: torch.Tensor, beta: float = 1.0):
+def net_vae_loss(model: "BaseVAE", x: torch.Tensor, beta: float = 1.0):
     """Calculate the VAE loss for a given model and input data.
 
     Args:

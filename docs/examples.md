@@ -17,6 +17,7 @@ gtex_df = load_gct(g.unpacked_file_path)
 ```python
 from embkit import dataframe_loader, dataframe_tensor
 from embkit.preprocessing import load_gct
+from embkit.losses import bce_with_logits
 from embkit.datasets import GTEx, Hugo
 from embkit.models.vae import VAE
 from embkit.preprocessing import ExpMinMaxScaler
@@ -50,7 +51,7 @@ enc_layers = [LayerInfo(2048, activation="relu"), LayerInfo(1024, activation="re
 
 schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
 vae = VAE(df_norm.columns, latent_dim=128, decoder_layers=dec_layers, encoder_layers=enc_layers)
-vae.fit(dataloader, beta_schedule=schedule, lr=1e-3)
+vae.fit(X=dataloader, beta_schedule=schedule, lr=1e-3, loss=bce_with_logits)
 
 vae.eval()
 with torch.no_grad():
