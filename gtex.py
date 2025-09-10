@@ -1,30 +1,11 @@
-
-
-## Loading GTEx data
-
-```python
-from embkit.datasets import GTEx
-from embkit.preprocessing import load_gct
-
-gtex_df = load_gct(g.unpacked_file_path)
-```
-
-
-
-
-## GTEx embedding
-
-```python
 from embkit import dataframe_loader, dataframe_tensor
 from embkit.preprocessing import load_gct
 from embkit.datasets import GTEx, Hugo
 from embkit.models.vae import VAE
 from embkit.preprocessing import ExpMinMaxScaler
-from embkit import bmeg
 from embkit.layers import LayerInfo
 import torch
 import pandas as pd
-import numpy as np
 
 g=GTEx()
 hugo = Hugo()
@@ -57,7 +38,6 @@ vae.eval()
 with torch.no_grad():
     x_t = dataframe_tensor(df_norm)
     recon_logits, mu, logvar, z = vae(x_t)
-    recon = torch.sigmoid(recon_logits)           
+    recon = torch.sigmoid(recon_logits)
 
 out = pd.DataFrame(recon.cpu().numpy(), index=df_norm.index, columns=df_norm.columns)
-```
