@@ -1,20 +1,3 @@
-
-
-## Loading GTEx data
-
-```python
-from embkit.datasets import GTEx
-from embkit.preprocessing import load_gct
-
-gtex_df = load_gct(g.unpacked_file_path)
-```
-
-
-
-
-## GTEx embedding
-
-```python
 from embkit import dataframe_loader, dataframe_tensor
 from embkit.preprocessing import load_gct
 from embkit.datasets import GTEx, Hugo
@@ -23,7 +6,6 @@ from embkit.preprocessing import ExpMinMaxScaler
 from embkit.layers import LayerInfo
 import torch
 import pandas as pd
-import numpy as np
 
 g=GTEx()
 hugo = Hugo()
@@ -56,22 +38,6 @@ vae.eval()
 with torch.no_grad():
     x_t = dataframe_tensor(df_norm)
     recon_logits, mu, logvar, z = vae(x_t)
-    recon = torch.sigmoid(recon_logits)           
+    recon = torch.sigmoid(recon_logits)
 
 out = pd.DataFrame(recon.cpu().numpy(), index=df_norm.index, columns=df_norm.columns)
-
-# Example metrics
-gene = "OR4F5"
-y = df_norm[gene].values
-yhat = out[gene].values
-
-corr = np.corrcoef(y, yhat)[0,1]
-mae_gene = np.mean(np.abs(y - yhat))
-print(gene, "corr:", float(corr), "MAE:", float(mae_gene))
-
-# global calibration
-print("input mean/std:", float(df_norm.values.mean()), float(df_norm.values.std()))
-print("recon mean/std:", float(out.values.mean()), float(out.values.std()))
-print("global MAE:", float((out.values - df_norm.values).mean()))
-
-```
