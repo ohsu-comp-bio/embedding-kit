@@ -7,12 +7,13 @@ from tqdm.autonotebook import tqdm
 from torch.optim import Adam
 from ...layers import LayerInfo
 from .base_vae import BaseVAE
-from ...losses import vae_loss
+from ...losses import bce_with_logits
 from ... import get_device, dataframe_loader
 
 # If Encoder/Decoder kwargs need constraints etc., they’ll be passed through.
 
 logger = logging.getLogger(__name__)
+
 
 class VAE(BaseVAE):
     """
@@ -33,7 +34,6 @@ class VAE(BaseVAE):
             decoder_layers: Optional[List[LayerInfo]] = None,
             constraint=None,
             batch_norm: bool = False,
-            activation: str = "relu",
             lr: float = 1e-3,
     ):
         """
@@ -79,21 +79,32 @@ class VAE(BaseVAE):
         self.latent_groups = None
         self.normal_stats = None
 
-    def fit(self, X: Union[pd.DataFrame, torch.utils.data.DataLoader], y=None, *, 
-            epochs: int = 20, lr: Optional[float] = None, beta: float = 1.0,
-            device: Optional[torch.device] = None, progress: bool = True):
+    def fit(self, X: Union[pd.DataFrame, torch.utils.data.DataLoader],
+            y=None,
+            *,
+            epochs: int = 20,
+            lr: Optional[float] = None,
+            beta: float = 1.0,
+            optimizer: Optional[torch.optim.Optimizer] = None,
+            reset_optimizer: bool = False,
+            device: Optional[torch.device] = None,
+            progress: bool = True,
+            beta_schedule: Optional[List[tuple]] = None):
         """
         Training loop using vae_loss(recon, x, mu, logvar).
 
         X: pandas.DataFrame with float features, columns must match `self.features`.
+        If `beta_schedule` is provided as a list of (beta, epochs) pairs, it overrides
+        the single-phase (beta, epochs) arguments and runs multiple phases while
+        reusing the same optimizer/momentum.
         """
+        # --- setup ---
         if lr is None:
             lr = self.lr
-
         if device is None:
             device = get_device()
 
-        # Safety check for feature alignment
+        # Column alignment safety check if a DataFrame is passed
         if hasattr(X, "columns") and self.features is not None:
             if list(X.columns) != list(self.features):
                 raise ValueError(
@@ -105,39 +116,85 @@ class VAE(BaseVAE):
         self.to(device)
         self.train()
 
-        # IMPORTANT: assign the result of .to(device)
-        data_loader = None
+        # Build dataloader once
         if isinstance(X, pd.DataFrame):
-            data_loader = dataframe_loader(X, device=device)
-            #x_tensor = torch.from_numpy(X.values.astype(np.float32)).to(device)
+            data_loader = dataframe_loader(X, device=device)  # ensure it shuffles in training mode
         else:
             data_loader = X
 
-        optimizer = Adam(self.parameters(), lr=lr)
+        # --- persistent optimizer (reuse momentum/velocity across phases) ---
+        if optimizer is not None:
+            self._optimizer = optimizer
+        elif reset_optimizer or not hasattr(self, "_optimizer") or self._optimizer is None:
+            self._optimizer = Adam(self.parameters(), lr=lr)
+        else:
+            # Reuse existing optimizer but refresh LR if changed
+            for g in self._optimizer.param_groups:
+                g["lr"] = lr
+        opt = self._optimizer
 
-        pbar = tqdm(range(epochs))
-        for epoch in pbar:
-            for batch_idx, (x_tensor,) in enumerate(data_loader):
-                optimizer.zero_grad()
+        # --- one simple epoch runner (PyTorch-idiomatic) ---
+        def run_epochs(n_epochs: int, beta_value: float) -> float:
+            running_loss = 0.0
+            last_loss = 0.0
 
-                recon, mu, logvar, _z = super().forward(x_tensor)
-                total_loss, recon_loss, kl_loss = vae_loss(recon, x_tensor, mu, logvar, beta=beta)
+            epoch_iter = tqdm(range(n_epochs)) if progress else range(n_epochs)
+            for epoch_idx in epoch_iter:
+                epoch_loss_sum = 0.0
+                epoch_recon_sum = 0.0
+                epoch_kl_sum = 0.0
+                epoch_batches = 0
 
-                total_loss.backward()
-                optimizer.step()
+                for i, (x_tensor,) in enumerate(data_loader):
+                    # Zero your gradients for every batch
+                    opt.zero_grad(set_to_none=True)
 
-                self.history["loss"].append(float(total_loss.detach().cpu()))
-                self.history["recon"].append(float(recon_loss.detach().cpu()))
-                self.history["kl"].append(float(kl_loss.detach().cpu()))
+                    # Move/ensure dtype
+                    x_tensor = x_tensor.to(device).float()
 
-                #print(f"Epoch {epoch + 1}/{epochs} | Loss: {total_loss.item():.4f} | "
-                #    f"Recon: {recon_loss.item():.4f} | KL: {kl_loss.item():.4f}")
-                if progress:
-                    if batch_idx % 100 == 0:
-                        pbar.set_description(
-                            f"Epoch {epoch + 1} | Loss: {total_loss.item():.4f} | " + 
-                            f"Recon: {recon_loss.item():.4f} | KL: {kl_loss.item():.4f}"
-                        )
+                    # Forward: recon, mu, logvar, z
+                    recon, mu, logvar, _ = self(x_tensor)
+
+                    # Compute loss components
+                    total_loss, recon_loss, kl_loss = bce_with_logits(recon, x_tensor, mu, logvar,
+                                                                              beta=beta_value)
+
+                    # Backward + step
+                    total_loss.backward()
+                    opt.step()
+
+                    # Intra-epoch reporting-style accumulation
+                    running_loss += float(total_loss.detach().cpu())
+                    if (i + 1) % 100 == 0:
+                        last_loss = running_loss / 100.0
+                        if progress:
+                            epoch_iter.set_description(
+                                f"Epoch {epoch_idx + 1} | Loss {last_loss:.4f} | β={beta_value}"
+                            )
+                        running_loss = 0.0
+
+                    # Epoch means
+                    epoch_loss_sum += float(total_loss.detach().cpu())
+                    epoch_recon_sum += float(recon_loss.detach().cpu())
+                    epoch_kl_sum += float(kl_loss.detach().cpu())
+                    epoch_batches += 1
+
+                # Store epoch-mean stats in history
+                if epoch_batches > 0:
+                    self.history["loss"].append(epoch_loss_sum / epoch_batches)
+                    self.history["recon"].append(epoch_recon_sum / epoch_batches)
+                    self.history["kl"].append(epoch_kl_sum / epoch_batches)
+
+            return last_loss
+
+        # --- single phase or multi-phase (beta schedule) ---
+        if beta_schedule is None:
+            return run_epochs(epochs, beta)
+        else:
+            last = 0.0
+            for beta_value, n_epochs in beta_schedule:
+                last = run_epochs(n_epochs, beta_value)
+            return last
 
 
 if __name__ == "__main__":

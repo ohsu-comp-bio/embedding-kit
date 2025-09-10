@@ -12,16 +12,16 @@ class Decoder(nn.Module):
     """
     z -> [LayerInfo...] -> recon(features)
     """
-
     def __init__(self,
-                latent_dim: int,
-                feature_dim: int,
-                layers: Optional[List[LayerInfo]] = None,
-                constraint: Optional[NetworkConstraint] = None,
-                default_activation: str = "relu"):
+                 latent_dim: int,
+                 feature_dim: int,
+                 layers: Optional[List[LayerInfo]] = None,
+                 constraint: Optional[NetworkConstraint] = None,
+                 batch_norm: bool = False,
+                 default_activation: str = "relu"):
         super().__init__()
         self._default_activation = default_activation
-
+        self._global_bn = batch_norm
         self.net = nn.ModuleList()
         in_features = latent_dim
 
@@ -30,29 +30,32 @@ class Decoder(nn.Module):
             for i, li in enumerate(layers):
                 out_features = li.units
 
+                # 1) Linear / MaskedLinear
                 if li.op == "masked_linear":
-                    # Typically decoder doesn’t use constraints; keep for symmetry / future use
                     layer = MaskedLinear(in_features, out_features, bias=li.bias, mask=None)
                 elif li.op == "linear":
                     layer = nn.Linear(in_features, out_features, bias=li.bias)
                 else:
                     raise ValueError(f"Unknown LayerInfo.op '{li.op}' at index {i}")
-
                 self.net.append(layer)
 
-                if li.activation is not None:
-                    act = convert_activation(li.activation)
-                    if act is not None:
-                        self.net.append(act)
-
-                if li.batch_norm:
+                # 2) BatchNorm (Linear -> BN -> Activation)
+                use_bn = getattr(li, "batch_norm", False)
+                # honor global default if LayerInfo doesn't request BN explicitly
+                if use_bn or self._global_bn:
                     self.net.append(nn.BatchNorm1d(out_features))
+
+                # 3) Activation (fallback to default if not provided)
+                act_name = li.activation if li.activation is not None else self._default_activation
+                act = convert_activation(act_name)
+                if act is not None:
+                    self.net.append(act)
 
                 in_features = out_features
         else:
             logger.info("Building decoder with no hidden layers")
 
-        # Final projection to feature space
+        # Final projection to feature space (linear head; no activation)
         self.out = nn.Linear(in_features, feature_dim)
 
     def forward(self, z: torch.Tensor) -> torch.Tensor:
