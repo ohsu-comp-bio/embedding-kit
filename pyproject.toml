@@ -21,7 +21,8 @@ dependencies = [
     "click",
     "scikit-learn",
     "scipy",
-    "gripql"
+    "gripql",
+    "tqdm"
 ]
 
 [tool.setuptools]

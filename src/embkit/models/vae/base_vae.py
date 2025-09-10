@@ -1,13 +1,17 @@
-from torch import nn
+"""
+Base VAE class
+"""
 from typing import Type, Any, List, Optional, Dict, overload, TypeVar, Union
 from abc import ABC, abstractmethod
+from pathlib import Path
+import json
+import logging
+import pandas as pd
+
+from torch import nn
 import torch
 from .encoder import Encoder
 from .decoder import Decoder
-from pathlib import Path
-import pandas as pd
-import json
-import logging
 from ...layers import LayerInfo
 
 logger = logging.getLogger(__name__)
@@ -34,8 +38,10 @@ class BaseVAE(nn.Module, ABC):
         )
 
     @staticmethod
-    def build_decoder(feature_dim: int, latent_dim: int) -> Decoder:
-        return Decoder(latent_dim, feature_dim)
+    def build_decoder(feature_dim: int, latent_dim: int, layers: List[LayerInfo] = None,
+                      constraint=None, batch_norm: bool = False) -> Decoder:
+        return Decoder(latent_dim, feature_dim, layers=layers,
+                       constraint=constraint)
 
     @overload
     @staticmethod

@@ -2,8 +2,7 @@ import unittest
 import tempfile
 import logging
 from pathlib import Path
-from embkit.datasets.dataset import Dataset
-
+from embkit.datasets.dataset import Dataset, REPO_DIR
 
 class DummyDataset(Dataset):
     def download(self) -> None:
@@ -46,7 +45,7 @@ class TestDataset(unittest.TestCase):
 
     def test_none_save_path_with_download_skips_creation(self):
         dataset = DummyDataset(save_path=None, download=False)
-        expected_path = Path.home() / "embkit"
+        expected_path = Path.home() / REPO_DIR
         self.assertEqual(Path(dataset.save_path).resolve(), expected_path.resolve())
 
 

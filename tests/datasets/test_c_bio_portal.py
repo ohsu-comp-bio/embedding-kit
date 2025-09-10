@@ -7,7 +7,7 @@ import tarfile
 import shutil
 
 from embkit.datasets import CBIOPortal
-
+from embkit.datasets.dataset import REPO_DIR
 
 class TestCBIOPortal(unittest.TestCase):
 
@@ -132,7 +132,7 @@ class TestCBIOPortal(unittest.TestCase):
                 dataset.download()  # triggers the warning path
 
     def test_default_save_path_creation(self):
-        default_path = Path.home() / "embkit"
+        default_path = Path.home() / REPO_DIR
         if default_path.exists():
             shutil.rmtree(default_path)
         self.assertFalse(default_path.exists())
@@ -164,7 +164,7 @@ class TestCBIOPortal(unittest.TestCase):
 
     @patch("embkit.datasets.c_bio_portal.requests.get")
     def test_default_embkit_path_created_if_missing(self, mock_get):
-        default_path = Path.home() / "embkit"
+        default_path = Path.home() / REPO_DIR
 
         # Clean up before test
         if default_path.exists():

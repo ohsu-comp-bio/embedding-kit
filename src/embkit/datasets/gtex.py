@@ -1,66 +1,44 @@
 """
-Dataset base classes
+GTEx data downloader
 """
-
-from abc import ABC, abstractmethod
-from pathlib import Path
 import logging
-import warnings
 import tempfile
+import warnings
+from pathlib import Path
 import requests
 
 from tqdm import tqdm
 
+from .dataset import Dataset
+
 logger = logging.getLogger(__name__)
 
-REPO_DIR = ".embkit"
 
-class Dataset(ABC):
-    def __init__(self, save_path: Path | str | None, download: bool = True) -> None:
+class GTEx(Dataset):
+    # pragma: no cover
+    BASE_URLS = {
+        "gene_tpm" : "https://storage.googleapis.com/adult-gtex/bulk-gex/v10/rna-seq/GTEx_Analysis_v10_RNASeQCv2.4.2_gene_tpm.gct.gz",
+        "transcript_tpm": "https://storage.googleapis.com/adult-gtex/bulk-gex/v10/rna-seq/GTEx_Analysis_v10_RSEMv1.3.3_transcripts_tpm.txt.gz"
+    }
+    NAMES = {
+        "gene_tpm" : "GTEx_Analysis_v10_RNASeQCv2.4.2_gene_tpm.gct.gz",
+        "transcript_tpm": "GTEx_Analysis_v10_RSEMv1.3.3_transcripts_tpm.txt.gz"
+    }
+
+    def __init__(
+            self,
+            data_type: str = "gene_tpm", # gene_tpm / transcript_tpm
+            save_path: Path | str | None = None,
+            download: bool = True,
+            **kwargs
+    ) -> None:
         """
-        Initialize the TMP dataset handler.
-        :param save_path: Path to save the dataset.
-        :param download: Whether to download the dataset immediately. If False, you must call download() manually.
-        :raises ValueError: If save_path is not provided.
-        :raises FileNotFoundError: If the specified save path does not exist.
-        """
-        self._download_called_from_init = False
-
-        if save_path is None:
-            self.save_path: Path = Path(Path.home(), REPO_DIR)
-            if not self.save_path.exists():
-                self.save_path.mkdir(parents=True, exist_ok=True)
-
-        else:
-            self.save_path: Path = Path(save_path)
-            if not self.save_path.exists():
-                self.save_path.mkdir(parents=True, exist_ok=True)
-
-        if download:
-            try:
-                self.download()
-                self._download_called_from_init = True
-            except Exception as e:
-                logger.error(e)
-
-    @abstractmethod
-    def download(self) -> None:
-        """
-        Download the dataset to the specified path.
-        If no path is provided, it will use the default save path.
-        """
-        pass # pragma: no cover
-
-class SingleFileDownloader(Dataset):
-    def __init__(self, save_path = None, download = True):
-        """
+        Initialize the CBIOPortal dataset handler.
+        :param dataset_name: cBioPortal study ID, e.g., 'brca_tcga'
         :param save_path: Path to save the dataset
         :param download: Whether to immediately download
         """
-        if not hasattr(self, 'URL'):
-            raise NotImplementedError("Subclass must define the 'URL' attribute.")
-        if not hasattr(self, 'NAME'):
-            raise NotImplementedError("Subclass must define the 'NAME' attribute.")
+        self.data_type = data_type
         self.__unpacked_file_path: Path = Path()
         super().__init__(save_path=save_path, download=download)
 
@@ -74,7 +52,7 @@ class SingleFileDownloader(Dataset):
 
     def download(self) -> bytes:
         """
-        download data file
+        Download all molecular profile data for all samples in the given study.
         """
         if getattr(self, "_download_called_from_init", False):
             warnings.warn(
@@ -92,7 +70,7 @@ class SingleFileDownloader(Dataset):
         else:
             save_path = self.save_path
 
-        target_file: Path = Path(save_path, self.NAME)
+        target_file: Path = Path(save_path, self.NAMES[self.data_type])
 
         # Check if already downloaded or unpacked
         if target_file.exists():
@@ -101,8 +79,8 @@ class SingleFileDownloader(Dataset):
             return b''
 
         try:
-            profiles_url = self.URL
-            logger.info(f"Downloading {self.NAME} study data from {self.URL}")
+            profiles_url = self.BASE_URLS[self.data_type]
+            logger.info(f"Downloading GTEx study data from {profiles_url}")
             response = requests.get(profiles_url, stream=True)
             response.raise_for_status()
             total_size = int(response.headers.get("Content-Length", 0))
@@ -111,7 +89,7 @@ class SingleFileDownloader(Dataset):
             with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
                 tmp_path = Path(tmp_file.name)
                 with tqdm(
-                        desc=f"Downloading {self.NAME}",
+                        desc=f"Downloading {self.data_type}",
                         total=total_size,
                         unit='B',
                         unit_scale=True,
@@ -129,8 +107,6 @@ class SingleFileDownloader(Dataset):
             return target_file.read_bytes()
 
         except requests.RequestException as e:
-            logger.error(f"Failed to download {self.NAME}: {e}")
-            raise RuntimeError(f"Failed to download {self.NAME} data: {e}")
+            logger.error(f"Failed to download GTEx data: {e}")
+            raise RuntimeError(f"Failed to download GTEx data: {e}")
 
-
-    

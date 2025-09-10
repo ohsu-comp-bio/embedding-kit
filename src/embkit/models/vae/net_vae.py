@@ -1,10 +1,14 @@
+"""
+NetVAE implementation
+"""
+import logging
+
 from typing import Dict, List, Optional, Callable, Union
 import numpy as np
 import pandas as pd
 import torch
 
 from torch.utils.data import TensorDataset, DataLoader
-import logging
 from .base_vae import BaseVAE
 from .encoder import Encoder
 from .decoder import Decoder
@@ -18,8 +22,14 @@ logger = logging.getLogger(__name__)
 # NetVae (training with optional alternating constraint)
 # ---------------------------------------------------------
 
-class NetVae(BaseVAE):
+class NetVAE(BaseVAE):
     """
+    NetVAE
+
+    A VAE model with group based constraint. Designed to work with 
+    transcription factor network groups. All elements controlled by a common
+    transcription factor a pooled into a single embedding variable. All other connections
+    in from the input layer are forced to be zero
     """
 
     def __init__(self, features: List[str], encoder: Optional[Encoder] = None, decoder: Optional[Decoder] = None):
@@ -167,13 +177,13 @@ if __name__ == "__main__":
     })
 
     # Setup and train NetVae (this builds encoder/decoder internally)
-    net = NetVae(features=list(df.columns))
+    net = NetVAE(features=list(df.columns))
     net.encoder = BaseVAE.build_encoder(feature_dim=len(df.columns), latent_dim=2)
     net.decoder = BaseVAE.build_decoder(feature_dim=len(df.columns), latent_dim=2)
     net.fit(df, latent_dim=2, epochs=10, learning_rate=0.01, batch_size=16)
     # Save artifacts
     net.save("net_vae_model")
 
-    model: NetVae = BaseVAE.open_model(path="net_vae_model", model_cls=NetVae, device="cpu")
+    model: NetVAE = BaseVAE.open_model(path="net_vae_model", model_cls=NetVAE, device="cpu")
     print("Model loaded with features:", model.features)
     print(model.decoder)

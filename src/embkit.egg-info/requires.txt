@@ -5,3 +5,4 @@ click
 scikit-learn
 scipy
 gripql
+tqdm
