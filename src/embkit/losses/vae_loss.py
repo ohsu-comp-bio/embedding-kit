@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from ..models.vae.base_vae import BaseVAE
 
 
-def vae_loss(recon_x, x, mu, logvar, beta=1.0):
+def bce(recon_x, x, mu, logvar, beta=1.0):
     """Calculate the VAE loss.
 
     Args:
@@ -26,6 +26,14 @@ def vae_loss(recon_x, x, mu, logvar, beta=1.0):
     reconstruction_loss = x.size(1) * bce_per_sample
     kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp(), dim=1)
     return (reconstruction_loss + beta * kl_loss).mean(), reconstruction_loss.mean(), kl_loss.mean()
+
+def bce_with_logits(recon_logits, x, mu, logvar, beta=1.0):
+    # recon_logits: raw decoder output (no sigmoid)
+    bce_per_sample = F.binary_cross_entropy_with_logits(recon_logits, x, reduction="none").mean(dim=1)
+    recon_loss = x.size(1) * bce_per_sample
+    kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp(), dim=1)
+    total = (recon_loss + beta * kl_loss).mean()
+    return total, recon_loss.mean(), kl_loss.mean()
 
 
 def net_vae_loss(model: BaseVAE, x: torch.Tensor, beta: float = 1.0):

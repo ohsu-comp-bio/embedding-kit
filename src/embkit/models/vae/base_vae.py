@@ -38,8 +38,10 @@ class BaseVAE(nn.Module, ABC):
         )
 
     @staticmethod
-    def build_decoder(feature_dim: int, latent_dim: int, layers: List[LayerInfo] = None, constraint=None) -> Decoder:
-        return Decoder(latent_dim, feature_dim, layers=layers, constraint=constraint)
+    def build_decoder(feature_dim: int, latent_dim: int, layers: List[LayerInfo] = None,
+                      constraint=None, batch_norm: bool = False) -> Decoder:
+        return Decoder(latent_dim, feature_dim, layers=layers,
+                       constraint=constraint)
 
     @overload
     @staticmethod
