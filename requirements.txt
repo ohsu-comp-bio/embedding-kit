@@ -8,3 +8,4 @@ tqdm
 umap-learn
 matplotlib
 seaborn
+scipy
