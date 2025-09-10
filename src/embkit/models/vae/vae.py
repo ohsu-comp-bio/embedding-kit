@@ -133,57 +133,52 @@ class VAE(BaseVAE):
                 g["lr"] = lr
         opt = self._optimizer
 
-        # --- one simple epoch runner (PyTorch-idiomatic) ---
+        # --- epoch runner (epoch-only progress) ---
         def run_epochs(n_epochs: int, beta_value: float) -> float:
-            running_loss = 0.0
             last_loss = 0.0
-
-            epoch_iter = tqdm(range(n_epochs)) if progress else range(n_epochs)
-            for epoch_idx in epoch_iter:
+            epoch_bar = tqdm(range(n_epochs), disable=not progress, desc=f"β={beta_value:.2f}")
+            for epoch_idx in epoch_bar:
                 epoch_loss_sum = 0.0
                 epoch_recon_sum = 0.0
                 epoch_kl_sum = 0.0
                 epoch_batches = 0
 
-                for i, (x_tensor,) in enumerate(data_loader):
-                    # Zero your gradients for every batch
+                for (x_tensor,) in data_loader:
                     opt.zero_grad(set_to_none=True)
-
-                    # Move/ensure dtype
                     x_tensor = x_tensor.to(device).float()
 
-                    # Forward: recon, mu, logvar, z
+                    # Forward
                     recon, mu, logvar, _ = self(x_tensor)
 
-                    # Compute loss components
-                    total_loss, recon_loss, kl_loss = bce_with_logits(recon, x_tensor, mu, logvar,
-                                                                              beta=beta_value)
+                    # Loss (use your chosen loss here; default: vae_loss expects probs or logits per your implementation)
+                    total_loss, recon_loss, kl_loss = bce_with_logits(recon, x_tensor, mu, logvar, beta=beta_value)
 
-                    # Backward + step
+                    # Backprop
                     total_loss.backward()
                     opt.step()
 
-                    # Intra-epoch reporting-style accumulation
-                    running_loss += float(total_loss.detach().cpu())
-                    if (i + 1) % 100 == 0:
-                        last_loss = running_loss / 100.0
-                        if progress:
-                            epoch_iter.set_description(
-                                f"Epoch {epoch_idx + 1} | Loss {last_loss:.4f} | β={beta_value}"
-                            )
-                        running_loss = 0.0
-
-                    # Epoch means
-                    epoch_loss_sum += float(total_loss.detach().cpu())
+                    # Accumulate epoch stats
+                    tl = float(total_loss.detach().cpu())
+                    epoch_loss_sum += tl
                     epoch_recon_sum += float(recon_loss.detach().cpu())
                     epoch_kl_sum += float(kl_loss.detach().cpu())
                     epoch_batches += 1
+                    last_loss = tl
 
-                # Store epoch-mean stats in history
+                # Compute epoch means
                 if epoch_batches > 0:
-                    self.history["loss"].append(epoch_loss_sum / epoch_batches)
-                    self.history["recon"].append(epoch_recon_sum / epoch_batches)
-                    self.history["kl"].append(epoch_kl_sum / epoch_batches)
+                    ep_loss = epoch_loss_sum / epoch_batches
+                    ep_recon = epoch_recon_sum / epoch_batches
+                    ep_kl = epoch_kl_sum / epoch_batches
+                    self.history["loss"].append(ep_loss)
+                    self.history["recon"].append(ep_recon)
+                    self.history["kl"].append(ep_kl)
+
+                    # Update the epoch progress bar once per epoch (no jitter)
+                    if progress:
+                        epoch_bar.set_postfix(loss=f"{ep_loss:.3f}",
+                                              recon=f"{ep_recon:.3f}",
+                                              kl=f"{ep_kl:.3f}")
 
             return last_loss
 
@@ -195,7 +190,6 @@ class VAE(BaseVAE):
             for beta_value, n_epochs in beta_schedule:
                 last = run_epochs(n_epochs, beta_value)
             return last
-
 
 if __name__ == "__main__":
     # Example usage
