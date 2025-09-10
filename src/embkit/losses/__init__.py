@@ -1,1 +1,1 @@
-from .vae_loss import net_vae_loss, vae_loss
+from .vae_loss import net_vae_loss, bce_with_logits, bce

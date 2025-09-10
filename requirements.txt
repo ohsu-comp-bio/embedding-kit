@@ -5,3 +5,6 @@ torch
 coverage
 click
 tqdm
+umap-learn
+matplotlib
+seaborn
