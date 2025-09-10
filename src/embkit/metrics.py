@@ -1,3 +1,7 @@
+import numpy as np
+import statistics
+from scipy.spatial import distance
+
 def eucpair(v1, v2):
     '''
     calcuate the mean eucl distance for the pair of lists
