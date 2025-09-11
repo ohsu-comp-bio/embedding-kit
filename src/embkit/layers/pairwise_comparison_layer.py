@@ -2,6 +2,26 @@ import torch
 import torch.nn as nn
 
 class PairwiseComparison(nn.Module):
+    """
+    A layer that performs pairwise comparisons between features in the input tensor.
+    The layer computes pairwise differences, ratios, or boolean comparisons (greater than, less than)
+    between all unique pairs of features in the input tensor.
+    The output tensor contains the results of these comparisons for each input sample.
+    The number of output features is given by the formula: num_pairs = feature_dim * (feature_dim - 1) // 2,
+    where feature_dim is the number of features in the input tensor.
+    Supported comparison types:
+    - "difference": Computes the difference between each pair of features (feature_i - feature_j).
+    - "ratio": Computes the ratio between each pair of features (feature_i / feature_j).
+    - "greater_than": Outputs 1 if feature_i > feature_j, else 0.
+    - "less_than": Outputs 1 if feature_i < feature_j, else 0.
+    Example:
+        >>> layer = PairwiseComparison(comparison_type="difference")
+        >>> input_tensor = torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        >>> output_tensor = layer(input_tensor)
+        >>> print(output_tensor)
+        tensor([[-1., -2., -1.],
+                [-1., -2., -1.]])
+    """
     def __init__(self, comparison_type="difference"):
         super().__init__()
         if comparison_type not in {"difference", "ratio", "greater_than", "less_than"}:
@@ -17,8 +37,12 @@ class PairwiseComparison(nn.Module):
         to be compared. The pairs are generated such that i < j, covering all unique pairs
         of features in the input tensor.
         This is done only once per feature dimension.
-        :param feature_dim: The number of features in the input tensor.
-        :return: None
+
+        Args:
+            feature_dim (int): The number of features in the input tensor.
+
+        Returns:
+            None
         """
         # Only build once
         if self.i_idx is not None and self.j_idx is not None:
@@ -31,9 +55,13 @@ class PairwiseComparison(nn.Module):
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         """
         Forward pass for pairwise comparison of features.
-        :param inputs: A 2D tensor of shape (batch_size, feature_dim).
-        :return: A 2D tensor of shape (batch_size, num_pairs) where
-                    num_pairs = feature_dim * (feature_dim - 1) // 2.
+
+        Args:
+            inputs (torch.Tensor): A 2D tensor of shape (batch_size, feature_dim).
+
+        Returns:
+            torch.Tensor: A 2D tensor of shape (batch_size, num_pairs) where
+                            num_pairs = feature_dim * (feature_dim - 1) // 2.
 
         """
         if inputs.ndim != 2:
