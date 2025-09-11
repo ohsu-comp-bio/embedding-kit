@@ -1,6 +1,8 @@
 
 """
-Models
+
+This module provides access to various models used in the embkit package.
+
 """
 
 from typing import TYPE_CHECKING

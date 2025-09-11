@@ -2,8 +2,36 @@ site_name: Embedding-Kit
 nav:
   - Home: index.md
   - About: about.md
-  - Examples: examples.md
-  - API: api.md
+  - Examples:
+      - GTEX: examples/gtex.md
+  - API:
+      - Overview: api/index.md
+      - Commands:
+          - Overview: api/commands/index.md
+          - cbio: api/commands/cbio.md
+      - Layers:
+          - Overview: api/layers/layers.md
+          - Layer Info: api/layers/layer_info.md
+          - Masked Linear: api/layers/masked_linear.md
+          - Pairwise Comparison: api/layers/pairwise_comparison_layer.md
+      - Estimator:
+          - Overview: api/estimator/index.md
+          - VAE Estimator: api/estimator/vae_estimator.md
+      - Constraints:
+          - Overview: api/constraints/index.md
+          - NetworkConstraint: api/constraints/network_constraint.md
+      - Losses:
+          - Overview: api/losses/index.md
+          - VAE Loss: api/losses/vae_loss.md
+
+      - Metrics:
+          - Distance: api/metrics/distance.md
+
+      - Models:
+          - Overview: api/models/index.md
+          - VAE: api/models/vae.md
+      - BMEG: api/bmeg.md
+      - Pathway: api/pathway.md
 theme: readthedocs
 
 plugins:
