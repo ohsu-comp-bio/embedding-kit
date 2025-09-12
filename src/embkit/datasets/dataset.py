@@ -4,10 +4,7 @@ Dataset base classes
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-import logging
-import warnings
-import tempfile
-import requests
+import logging, os, warnings, tempfile, requests
 
 from tqdm import tqdm
 
@@ -15,7 +12,8 @@ logger = logging.getLogger(__name__)
 
 REPO_DIR = ".embkit"
 
-class Dataset(ABC):
+
+class Dataset(os.PathLike[str]):
     def __init__(self, save_path: Path | str | None, download: bool = True) -> None:
         """
         Initialize the TMP dataset handler.
@@ -25,6 +23,7 @@ class Dataset(ABC):
         :raises FileNotFoundError: If the specified save path does not exist.
         """
         self._download_called_from_init = False
+        self._unpacked_file_path: Path = Path()
 
         if save_path is None:
             self.save_path: Path = Path(Path.home(), REPO_DIR)
@@ -42,6 +41,16 @@ class Dataset(ABC):
                 self._download_called_from_init = True
             except Exception as e:
                 logger.error(e)
+        else:
+            target_file: Path = Path(save_path, self.NAME)
+            if target_file.exists():
+                self._unpacked_file_path = target_file
+
+    def __fspath__(self) -> str:
+        return str(self._unpacked_file_path)
+
+    def __str__(self):
+        return f"Saved at: {self.save_path}, Unpacked file: {self._unpacked_file_path}, Downloaded: {self._unpacked_file_path.exists()}"
 
     @abstractmethod
     def download(self) -> None:
@@ -49,10 +58,11 @@ class Dataset(ABC):
         Download the dataset to the specified path.
         If no path is provided, it will use the default save path.
         """
-        pass # pragma: no cover
+        pass  # pragma: no cover
+
 
 class SingleFileDownloader(Dataset):
-    def __init__(self, save_path = None, download = True):
+    def __init__(self, save_path=None, download=True):
         """
         :param save_path: Path to save the dataset
         :param download: Whether to immediately download
@@ -61,7 +71,7 @@ class SingleFileDownloader(Dataset):
             raise NotImplementedError("Subclass must define the 'URL' attribute.")
         if not hasattr(self, 'NAME'):
             raise NotImplementedError("Subclass must define the 'NAME' attribute.")
-        self.__unpacked_file_path: Path = Path()
+
         super().__init__(save_path=save_path, download=download)
 
     @property
@@ -70,7 +80,7 @@ class SingleFileDownloader(Dataset):
         Returns the name of the unpacked file.
         This is set after unpacking the downloaded tar.gz file.
         """
-        return self.__unpacked_file_path
+        return self._unpacked_file_path
 
     def download(self) -> bytes:
         """
@@ -84,19 +94,13 @@ class SingleFileDownloader(Dataset):
             )
             return b''
 
-        # Create specific study save path if default path is used
-        if Path(self.save_path).expanduser().resolve() == (Path.home() / "embkit").resolve():
-            save_path = Path(self.save_path)
-            if not save_path.exists():
-                save_path.mkdir(parents=True, exist_ok=True) # pragma: no cover
-        else:
-            save_path = self.save_path
+        save_path = self.save_path
 
         target_file: Path = Path(save_path, self.NAME)
 
         # Check if already downloaded or unpacked
         if target_file.exists():
-            self.__unpacked_file_path = target_file
+            self._unpacked_file_path = target_file
             logger.info(f"File {target_file} already exists. Skipping download.")
             return b''
 
@@ -124,13 +128,10 @@ class SingleFileDownloader(Dataset):
 
             # Move to final destination after successful download
             tmp_path.replace(target_file)
-            self.__unpacked_file_path = target_file
+            self._unpacked_file_path = target_file
             logger.info(f"Data downloaded and saved to {target_file}")
             return target_file.read_bytes()
 
         except requests.RequestException as e:
             logger.error(f"Failed to download {self.NAME}: {e}")
             raise RuntimeError(f"Failed to download {self.NAME} data: {e}")
-
-
-    

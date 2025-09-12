@@ -4,8 +4,10 @@ Methods to load alternative matrix formats
 
 import pandas as pd
 from pathlib import Path
+from ..datasets.dataset import Dataset
+from os import PathLike
 
-def load_gct(path: Path, nrows: int = None):
+def load_gct(path: Path | PathLike[str], nrows: int = None):
     """
     gct files start with a special header:
         #1.2
