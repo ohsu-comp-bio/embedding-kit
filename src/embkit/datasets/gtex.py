@@ -39,7 +39,6 @@ class GTEx(Dataset):
         :param download: Whether to immediately download
         """
         self.data_type = data_type
-        self.__unpacked_file_path: Path = Path()
         super().__init__(save_path=save_path, download=download)
 
     @property
@@ -48,7 +47,7 @@ class GTEx(Dataset):
         Returns the name of the unpacked file.
         This is set after unpacking the downloaded tar.gz file.
         """
-        return self.__unpacked_file_path
+        return self._unpacked_file_path
 
     def download(self) -> bytes:
         """
@@ -62,11 +61,10 @@ class GTEx(Dataset):
             )
             return b''
 
-        # Create specific study save path if default path is used
-        if Path(self.save_path).expanduser().resolve() == (Path.home() / "embkit").resolve():
+        if Path(self.save_path).expanduser().resolve() == (Path.home() / ".embkit").resolve():
             save_path = Path(self.save_path)
             if not save_path.exists():
-                save_path.mkdir(parents=True, exist_ok=True) # pragma: no cover
+                save_path.mkdir(parents=True, exist_ok=True)  # pragma: no cover
         else:
             save_path = self.save_path
 
@@ -74,7 +72,7 @@ class GTEx(Dataset):
 
         # Check if already downloaded or unpacked
         if target_file.exists():
-            self.__unpacked_file_path = target_file
+            self._unpacked_file_path = target_file
             logger.info(f"File {target_file} already exists. Skipping download.")
             return b''
 
@@ -102,7 +100,7 @@ class GTEx(Dataset):
 
             # Move to final destination after successful download
             tmp_path.replace(target_file)
-            self.__unpacked_file_path = target_file
+            self._unpacked_file_path = target_file
             logger.info(f"Data downloaded and saved to {target_file}")
             return target_file.read_bytes()
 
