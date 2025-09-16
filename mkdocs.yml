@@ -14,6 +14,7 @@ nav:
           - Layer Info: api/layers/layer_info.md
           - Masked Linear: api/layers/masked_linear.md
           - Pairwise Comparison: api/layers/pairwise_comparison_layer.md
+          - Top Scoring Pair: api/layers/tsp.md
       - Estimator:
           - Overview: api/estimator/index.md
           - VAE Estimator: api/estimator/vae_estimator.md
