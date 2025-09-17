@@ -2,15 +2,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
+from tqdm import tqdm
 
 torch.manual_seed(7)
 
 
-# ---------------- Synthetic data (safer scales) ----------------
+# Synthetic data (safer scales)
 class SyntheticMixDataset(Dataset):
     def __init__(self, n_bulk=400, m_cells_per_bulk=8, n_genes=200, n_celltypes=6):
-        self.number_of_genes = n_genes;
-        self.m = m_cells_per_bulk;
+        self.number_of_genes = n_genes
+        self.m = m_cells_per_bulk
         self.n_bulk = n_bulk
         rank = 8
         U = torch.randn(n_celltypes, rank) * 0.6
@@ -62,7 +63,7 @@ class SyntheticMixDataset(Dataset):
         return it["cells"], it["weights"], it["bulk"]
 
 
-# ---------------- NB log-likelihood (stabilized) ----------------
+# NB log-likelihood
 def nb_loglik(x, mu, theta, eps=1e-8):
     # x: (..., number_of_genes) counts; mu, theta > 0
     x = x.float()
@@ -76,12 +77,12 @@ def nb_loglik(x, mu, theta, eps=1e-8):
     t2 = x * (torch.log(mu) - log_theta_plus_mu)
     t3 = theta * (log_theta - log_theta_plus_mu)
     ll = (t1 + t2 + t3).sum(dim=-1)
-    # guard: replace non-finite with large negative
+    # replace non-finite with large negative
     ll = torch.where(torch.isfinite(ll), ll, torch.full_like(ll, -1e6))
     return ll
 
 
-# ---------------- Model ----------------
+#  Model
 class Encoder(nn.Module):
     def __init__(self, number_of_genes, zdim, hidden=256):
         super().__init__()
@@ -141,10 +142,10 @@ class MultiViewVAE(nn.Module):
 
     # helpers: size factors & encoder inputs
     def _prep_inputs_sc(self, x_cells):
-        B, m, number_of_genes = x_cells.shape
-        x = x_cells.reshape(B * m, number_of_genes).float()
+        bulk_sample_groups, number_of_single_cells, number_of_genes = x_cells.shape
+        x = x_cells.reshape(bulk_sample_groups * number_of_single_cells, number_of_genes).float()
         lib = x.sum(dim=1, keepdim=True).clamp(min=1.0)
-        sf = lib / lib.median()  # (B*m,1)
+        sf = lib / lib.median()  # (B*number_of_single_cells,1)
         x_norm = torch.log1p(x / sf)
         return x, sf, x_norm
 
@@ -156,14 +157,14 @@ class MultiViewVAE(nn.Module):
         return x, sf, x_norm
 
     def forward_sc(self, x_cells):
-        B, m, number_of_genes = x_cells.shape
+        bulk_sample_groups, number_of_single_cells, number_of_genes = x_cells.shape
         x, sf, x_norm = self._prep_inputs_sc(x_cells)
         mu_z, logvar_z = self.enc_sc(x_norm)
         z = self.reparam(mu_z, logvar_z)
         recon_mu = self.dec_sc(z, sf)
-        kl = self.kl_normal(mu_z, logvar_z).reshape(B, m)
-        ll = nb_loglik(x, recon_mu, self.theta_sc).reshape(B, m)
-        return z.reshape(B, m, -1), kl, ll
+        kl = self.kl_normal(mu_z, logvar_z).reshape(bulk_sample_groups, number_of_single_cells)
+        ll = nb_loglik(x, recon_mu, self.theta_sc).reshape(bulk_sample_groups, number_of_single_cells)
+        return z.reshape(bulk_sample_groups, number_of_single_cells, -1), kl, ll
 
     def forward_bulk(self, x_bulk):
         x, sf, x_norm = self._prep_inputs_bulk(x_bulk)
@@ -195,20 +196,22 @@ lambda_rec_bulk = 1.0
 
 
 def train_epoch(epoch, total_epochs=20):
-    model.train()
-    tot = 0.0
-    # KL warmup
-    beta_kl = min(1.0, epoch / max(5, total_epochs // 4))
-    for cells, weights, bulks in train_loader:
+    model.train() # set train mode
+    total_loss = 0.0
+    beta_kl = min(1.0, epoch / max(5, total_epochs // 4)) # warmup over 5 epochs or 1/4 total epochs
+
+    pbar = tqdm(enumerate(train_loader, start=1), total=len(train_loader),
+                desc=f"Epoch {epoch:02d} β_KL={beta_kl:.2f}", leave=False)
+
+    for step, (cells, weights, bulks) in pbar:
         cells, weights, bulks = cells.to(device), weights.to(device), bulks.to(device)
         z_sc, kl_sc, ll_sc = model.forward_sc(cells)
         z_bulk, kl_bulk, ll_bulk = model.forward_bulk(bulks)
 
-        z_mix = torch.einsum('bm,bmz->bz', weights, z_sc)  # weighted average in latent
+        z_mix = torch.einsum('bm,bmz->bz', weights, z_sc)
         rec_sc = - ll_sc.mean(dim=1)
         rec_bulk = - ll_bulk
         kl_sc = kl_sc.mean(dim=1)
-        kl_bulk = kl_bulk
         align = F.mse_loss(z_bulk, z_mix)
 
         loss = (lambda_rec_sc * rec_sc
@@ -216,16 +219,26 @@ def train_epoch(epoch, total_epochs=20):
                 + beta_kl * (kl_sc + kl_bulk)
                 + lambda_align * align).mean()
 
-        opt.zero_grad(set_to_none=True)
-        loss.backward()
+        opt.zero_grad(set_to_none=True); loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
         opt.step()
-        tot += loss.item()
-    print(f"epoch {epoch:02d} | beta_kl={beta_kl:.2f} | loss={tot / len(train_loader):.3f}")
 
+        total_loss += loss.item()
+        # live bar metrics (cheap to compute)
+        pbar.set_postfix({
+            "loss": f"{loss.item():.3f}",
+            "rec_sc": f"{rec_sc.mean().item():.1f}",
+            "rec_bulk": f"{rec_bulk.mean().item():.1f}",
+            "kl_sc": f"{kl_sc.mean().item():.1f}",
+            "kl_bulk": f"{kl_bulk.mean().item():.1f}",
+            "align": f"{align.item():.3f}",
+        })
 
-for ep in range(1, 16):
-    train_epoch(ep, total_epochs=16)
+    print(f"Epoch {epoch:02d} | avg_loss={total_loss/len(train_loader):.3f} | β_KL={beta_kl:.2f}")
+
+train_epochs = 20
+for ep in range(1,train_epochs):
+    train_epoch(ep, total_epochs=train_epochs)
 
 # ---------------- Sanity check ----------------
 model.eval()
