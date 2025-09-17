@@ -66,21 +66,33 @@ class SyntheticMixDataset(Dataset):
 # NB log-likelihood
 def nb_loglik(x, mu, theta, eps=1e-8):
     # x: (..., number_of_genes) counts; mu, theta > 0
-    x = x.float()
-    mu = mu.clamp(min=eps, max=1e7)
-    theta = theta.clamp(min=1e-3, max=1e5)
+    x = x.float()  # ensure floating-point for log/ratio ops (counts may come in as ints)
+    mu = mu.clamp(min=eps, max=1e7)  # clip mean away from 0/inf for numerical stability
+    theta = theta.clamp(min=1e-3, max=1e5)  # clip dispersion away from 0/inf for stability
+
     # log NB with mean/disp: log C(x+θ-1, x) + x log(mu/(mu+θ)) + θ log(θ/(mu+θ))
     # Use log1p for stability: log(mu+θ) = logθ + log1p(mu/θ)
-    t1 = torch.lgamma(x + theta) - torch.lgamma(theta) - torch.lgamma(x + 1.0)
-    log_theta = torch.log(theta)
-    log_theta_plus_mu = log_theta + torch.log1p(mu / theta)
-    t2 = x * (torch.log(mu) - log_theta_plus_mu)
-    t3 = theta * (log_theta - log_theta_plus_mu)
-    ll = (t1 + t2 + t3).sum(dim=-1)
-    # replace non-finite with large negative
-    ll = torch.where(torch.isfinite(ll), ll, torch.full_like(ll, -1e6))
-    return ll
 
+    # t1: log binomial coefficient term = lgamma(x+θ) - lgamma(θ) - lgamma(x+1)
+    t1 = torch.lgamma(x + theta) - torch.lgamma(theta) - torch.lgamma(x + 1.0)
+
+    log_theta = torch.log(theta)  # precompute log(θ) once (broadcasts over last dim)
+    # log(μ+θ) computed stably as logθ + log1p(μ/θ)
+    log_theta_plus_mu = log_theta + torch.log1p(mu / theta)
+
+    # t2: x * [log(μ) - log(μ+θ)]  (success-count dependent part)
+    t2 = x * (torch.log(mu) - log_theta_plus_mu)
+
+    # t3: θ * [log(θ) - log(μ+θ)]  (dispersion-dependent part)
+    t3 = theta * (log_theta - log_theta_plus_mu)
+
+    # total log-likelihood per sample: sum over genes/features on the last dimension
+    ll = (t1 + t2 + t3).sum(dim=-1)
+
+    # replace any NaN/Inf outputs with a large negative sentinel to avoid breaking downstream code
+    ll = torch.where(torch.isfinite(ll), ll, torch.full_like(ll, -1e6))
+
+    return ll  # shape: input batch shape without the last (gene) dimension
 
 #  Model
 class Encoder(nn.Module):
