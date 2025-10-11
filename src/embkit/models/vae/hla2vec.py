@@ -9,7 +9,7 @@ EMBEDDING_DIM_DEFAULT = 64
 
 
 # ----------------------------
-# Datasets (unchanged)
+# Datasets
 # ----------------------------
 class TableIterableDataset(IterableDataset):
     def __init__(self, table, label, allele_vec, embeddings, peptideMap, peptide_dim, mhc_dim):
@@ -64,7 +64,7 @@ def collate_batch(batch):
 
 
 # ----------------------------
-# Model (unchanged)
+# Model
 # ----------------------------
 class HLA2Vec(nn.Module):
     def __init__(self, mhc_dim: int, peptide_dim: int, emb_dim: int = EMBEDDING_DIM_DEFAULT):
@@ -176,9 +176,6 @@ def fit_hla2vec(
     return model, history
 
 
-# ----------------------------
-# Optional helper: load from HDF5 into the exact data dict above
-# ----------------------------
 def load_bigmhc(h5_path: str):
     """
     Returns a dict of {embeddings, peptides, posTable, negTable, allele_vec, peptideMap, peptide_dim, mhc_dim}
