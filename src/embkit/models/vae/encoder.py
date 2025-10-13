@@ -47,19 +47,10 @@ class Encoder(nn.Module):
         # ---- Build user-defined hidden stack (no implicit latent projection here) ----
         if layers:
             logger.info("Building encoder with %d layers", len(layers))
-            for i, li in enumerate(layers):
+            for li in layers:
                 out_features = li.units
 
-                if li.op == "masked_linear":
-                    init_mask = None
-                    if constraint is not None and getattr(constraint, "_mask_np", None) is not None:
-                        init_mask = torch.tensor(constraint._mask_np, dtype=torch.float32)
-                    layer = MaskedLinear(in_features, out_features, bias=li.bias, mask=init_mask)
-                elif li.op == "linear":
-                    layer = nn.Linear(in_features, out_features, bias=li.bias)
-                else:
-                    raise ValueError(f"Unknown LayerInfo.op '{li.op}' at index {i}")
-
+                layer = li.gen_layer(in_features)
                 self.net.append(layer)
 
                 if li.activation is not None:

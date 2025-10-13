@@ -1,6 +1,11 @@
-from typing import Optional
+"""
+LayerInfo - Layer Build description
+"""
+from typing import Optional, List, Tuple, Any
 from torch import nn
-
+import torch
+from .masked_linear import MaskedLinear
+from .constraint_info import ConstraintInfo
 
 class LayerInfo:
     """
@@ -11,7 +16,9 @@ class LayerInfo:
     """
 
     def __init__(self, units: int, *, op: str = "linear",
-                 activation: Optional[str] = "relu", batch_norm: bool = False, bias: bool = True):
+                 activation: Optional[str] = "relu", 
+                 constraint: Optional[ConstraintInfo] = None,
+                 batch_norm: bool = False, bias: bool = True):
         """
         Initialize LayerInfo with specified parameters.
         Args:
@@ -23,14 +30,27 @@ class LayerInfo:
 
         Raises:
             ValueError: If the specified operation is not supported.
-
-
         """
         self.units = units
         self.op = op
         self.activation = activation
         self.batch_norm = batch_norm
+        self.constraint = constraint
         self.bias = bias
+        self.constraint = None
+    
+    def gen_layer(self, in_features):
+        out_features = self.units
+        if self.op == "masked_linear":
+            init_mask = None
+            if self.constraint is not None:
+                init_mask = torch.tensor(self.constraint.gen_mask(), dtype=torch.float32)
+            return MaskedLinear(in_features, out_features, bias=self.bias, mask=init_mask)
+        elif self.op == "linear":
+            return nn.Linear(in_features, out_features, bias=self.bias)
+        raise ValueError(f"Unknown LayerInfo.op '{self.op}'")
+
+
 
 
 def convert_activation(name: Optional[str]) -> Optional[nn.Module]:
