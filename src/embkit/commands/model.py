@@ -4,7 +4,7 @@ import pandas as pd
 
 from .. import dataframe_loader, dataframe_tensor
 from ..layers import LayerInfo, build_layers, ConstraintInfo
-from ..models.vae.vae import VAE
+from ..models.vae.vae import VAE, BaseVAE
 from ..preprocessing import ExpMinMaxScaler
 from ..losses import bce_with_logits
 from ..pathway import extract_pathway_interactions, feature_map_intersect, FeatureGroups
@@ -20,7 +20,7 @@ model = click.Group(name="model", help="VAE Model commands.")
 @click.option("--normalize", "-n", type=str, default="none")
 @click.option("--learning-rate", "-r", type=float, default=0.0001)
 @click.option("--out", "-o", type=str, default=None)
-def vae_train(input_path: str, latent: int, 
+def train_vae(input_path: str, latent: int, 
               epochs: int, out: str, normalize:str, 
               encode_layers:str, decode_layers:str,
               learning_rate: float):
@@ -64,7 +64,7 @@ def vae_train(input_path: str, latent: int,
 @click.option("--normalize", "-n", type=str, default="none")
 @click.option("--learning-rate", "-r", type=float, default=0.0001)
 @click.option("--out", "-o", type=str, default=None)
-def netvae_train(input_path: str, pathway_sif:str, out:str,
+def train_netvae(input_path: str, pathway_sif:str, out:str,
                 encode_layers:str, decode_layers:str,
                 epochs: int, normalize: str,
                 learning_rate: float):
@@ -109,3 +109,14 @@ def netvae_train(input_path: str, pathway_sif:str, out:str,
     click.echo("Training complete.")
 
     vae.save(out, df)
+
+@model.command()
+@click.argument("input_path", type=click.Path(exists=True, dir_okay=False, readable=True, path_type=str))
+@click.argument("model_path", type=click.Path(exists=True, dir_okay=True, readable=True, path_type=str))
+def encode(input_path: str, model_path:str):
+
+    df = pd.read_csv(input_path, sep="\t", index_col=0)
+
+    m = BaseVAE.open_model(model_path)
+    
+    print(m)
