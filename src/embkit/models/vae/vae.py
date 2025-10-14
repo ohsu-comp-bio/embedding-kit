@@ -10,7 +10,6 @@ from .base_vae import BaseVAE
 from collections.abc import Callable
 from ... import get_device, dataframe_loader
 
-# If Encoder/Decoder kwargs need constraints etc., they’ll be passed through.
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,6 @@ class VAE(BaseVAE):
             decoder: Optional[torch.nn.Module] = None,
             encoder_layers: Optional[List[LayerInfo]] = None,
             decoder_layers: Optional[List[LayerInfo]] = None,
-            constraint=None,
             batch_norm: bool = False,
             lr: float = 1e-3,
     ):
@@ -64,7 +62,6 @@ class VAE(BaseVAE):
                 feature_dim=feature_dim,
                 latent_dim=latent_dim,
                 layers=encoder_layers,
-                constraint=constraint,
                 batch_norm=batch_norm,
             )
             self.decoder = self.build_decoder(

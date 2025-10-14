@@ -16,7 +16,6 @@ class Decoder(nn.Module):
                  latent_dim: int,
                  feature_dim: int,
                  layers: Optional[List[LayerInfo]] = None,
-                 constraint: Optional[NetworkConstraint] = None,
                  batch_norm: bool = False,
                  default_activation: str = "relu"):
         super().__init__()
@@ -30,13 +29,7 @@ class Decoder(nn.Module):
             for i, li in enumerate(layers):
                 out_features = li.units
 
-                # 1) Linear / MaskedLinear
-                if li.op == "masked_linear":
-                    layer = MaskedLinear(in_features, out_features, bias=li.bias, mask=None)
-                elif li.op == "linear":
-                    layer = nn.Linear(in_features, out_features, bias=li.bias)
-                else:
-                    raise ValueError(f"Unknown LayerInfo.op '{li.op}' at index {i}")
+                layer = li.gen_layer(in_features)
                 self.net.append(layer)
 
                 # 2) BatchNorm (Linear -> BN -> Activation)

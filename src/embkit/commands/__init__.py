@@ -14,4 +14,4 @@ from .model import model
 from .matrix import matrix
 from .cbio import cbio_cmd
 
-__all__ = ["model", "matrix"]
+__all__ = ["matrix", "model"]

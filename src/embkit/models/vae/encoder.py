@@ -28,12 +28,10 @@ class Encoder(nn.Module):
                  feature_dim: int,
                  latent_dim: Optional[int] = None,
                  layers: Optional[List[LayerInfo]] = None,
-                 constraint: Optional[NetworkConstraint] = None,
                  batch_norm: bool = False,
                  default_activation: Union[str, None] = "relu",
                  make_latent_heads: bool = True):
         super().__init__()
-        self._constraint = constraint
         self._default_activation = default_activation
         self._make_latent_heads = make_latent_heads
 

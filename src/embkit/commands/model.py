@@ -1,51 +1,110 @@
+
 import click
 import pandas as pd
-from ..layers import LayerInfo
+
+from .. import dataframe_loader, dataframe_tensor
+from ..layers import LayerInfo, build_layers, ConstraintInfo
 from ..models.vae.vae import VAE
+from ..preprocessing import ExpMinMaxScaler
+from ..losses import bce_with_logits
+from ..pathway import extract_pathway_interactions, feature_map_intersect, FeatureGroups
 
-from ..pathway import extract_pathway_interactions, FeatureGroups
+model = click.Group(name="model", help="VAE Model commands.")
 
-
-vae_model = click.Group(name="vae-model", help="VAE Model commands.")
-@vae_model.command()
+@model.command()
 @click.argument("input_path", type=click.Path(exists=True, dir_okay=False, readable=True, path_type=str))
 @click.option("--latent", "-l", type=int, default=256, show_default=True, help="Latent dimension size.")
 @click.option("--epochs", "-e", type=int, default=20, show_default=True, help="Training epochs.")
-def vae_train(input_path: str, latent: int, epochs: int):
+@click.option("--encode-layers", type=str, default="400,200")
+@click.option("--decode-layers", type=str, default="200,400")
+@click.option("--normalize", "-n", type=str, default="none")
+@click.option("--learning-rate", "-r", type=float, default=0.0001)
+@click.option("--out", "-o", type=str, default=None)
+def vae_train(input_path: str, latent: int, 
+              epochs: int, out: str, normalize:str, 
+              encode_layers:str, decode_layers:str,
+              learning_rate: float):
     """Train VAE model from a TSV file."""
     df = pd.read_csv(input_path, sep="\t", index_col=0)
 
-    encoder_layers: list[LayerInfo] = [
-        LayerInfo(units=400, activation="relu", batch_norm=True),
-        LayerInfo(units=200, activation="relu", batch_norm=True),
-        LayerInfo(units=latent, activation=None, batch_norm=False, bias=False)
-    ]
+    if normalize == "expMinMax":
+        norm = ExpMinMaxScaler()
+        norm.fit(df)
+        df = pd.DataFrame( norm.transform(df), index=df.index, columns=df.columns)
 
-    vae = VAE(features=df.columns, latent_dim=latent, encoder_layers=encoder_layers)
+    layer_sizes = list( int(i) for i in encode_layers.split(",") )
+    layer_sizes.append(latent)
+    enc_layers = build_layers( layer_sizes )
 
-    vae.fit(df, epochs=epochs)
+    layer_sizes = list( int(i) for i in decode_layers.split(",") )
+    dec_layers = build_layers( layer_sizes )
+
+    schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
+    vae = VAE(features=df.columns,
+              latent_dim=latent,
+              encoder_layers=enc_layers,
+              decoder_layers=dec_layers)
+
+    vae.fit(df, epochs=epochs,
+            beta_schedule=schedule, lr=learning_rate, loss=bce_with_logits)
     click.echo("Training complete.")
 
+    vae.save(out, df)
 
 
-netvae_model = click.Group(name="netvae-model", help="VAE Model commands.")
-@netvae_model.command()
+@model.command()
 @click.argument("input_path", type=click.Path(exists=True, dir_okay=False, readable=True, path_type=str))
 @click.argument("pathway_sif", type=click.Path(exists=True, dir_okay=False, readable=True, path_type=str))
-def netvae_train(input_path: str, pathway_sif:str, epochs: int):
+@click.option("--epochs", "-e", type=int, default=20, show_default=True, help="Training epochs.")
+@click.option("--encode-layers", type=str, default="400,200")
+@click.option("--decode-layers", type=str, default="200,400")
+@click.option("--normalize", "-n", type=str, default="none")
+@click.option("--learning-rate", "-r", type=float, default=0.0001)
+@click.option("--out", "-o", type=str, default=None)
+def netvae_train(input_path: str, pathway_sif:str, out:str,
+                encode_layers:str, decode_layers:str,
+                epochs: int, normalize: str,
+                learning_rate: float):
     """Train VAE model from a TSV file."""
     df = pd.read_csv(input_path, sep="\t", index_col=0)
 
-    df_sif = extract_pathway_interactions(pathway_sif)
+    feature_map = extract_pathway_interactions(pathway_sif)
 
+    feature_map, isect = feature_map_intersect(feature_map, df.columns)
 
-    encoder_layers: list[LayerInfo] = [
-        LayerInfo(units=400, activation="relu", batch_norm=True),
-        LayerInfo(units=200, activation="relu", batch_norm=True),
-        LayerInfo(units=latent, activation=None, batch_norm=False, bias=False)
+    df = df[isect]
+    if normalize == "expMinMax":
+        norm = ExpMinMaxScaler()
+        norm.fit(df)
+        df = pd.DataFrame( norm.transform(df), index=df.index, columns=df.columns)
+
+    batch_size=256
+    dataloader = dataframe_loader(df, batch_size=batch_size)
+
+    layer_sizes = list( int(i) for i in encode_layers.split(",") )
+    enc_layers = build_layers( layer_sizes )
+
+    layer_sizes = list( int(i) for i in decode_layers.split(",") )
+    dec_layers = build_layers( layer_sizes )
+
+    fmap = FeatureGroups(feature_map)
+    group_count = len(fmap)
+
+    enc_layers = [
+        LayerInfo(group_count*10, op="masked_linear", constraint=ConstraintInfo("features-to-group")),
+        LayerInfo(group_count*3, op="masked_linear", constraint=ConstraintInfo("group-to-group")),
+        LayerInfo(group_count, op="masked_linear", constraint=ConstraintInfo("group-to-group")),       
     ]
 
-    vae = VAE(features=df.columns, latent_dim=latent, encoder_layers=encoder_layers)
+    dec_layers = [
+        LayerInfo(group_count*3, op="masked_linear", constraint=ConstraintInfo("groups-to-group")),
+        LayerInfo(group_count*10, op="masked_linear", constraint=ConstraintInfo("group-to-group")),
+    ]
 
-    vae.fit(df, epochs=epochs)
+    schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
+    vae = VAE(df.columns, latent_dim=group_count, encoder_layers=enc_layers, decoder_layers=dec_layers)
+    vae.fit(X=dataloader, beta_schedule=schedule, lr=learning_rate, loss=bce_with_logits)
+
     click.echo("Training complete.")
+
+    vae.save(out, df)
