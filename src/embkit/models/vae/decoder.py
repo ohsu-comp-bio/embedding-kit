@@ -32,6 +32,7 @@ class Decoder(nn.Module):
                 layer = li.gen_layer(in_features)
                 self.net.append(layer)
 
+                
                 # 2) BatchNorm (Linear -> BN -> Activation)
                 use_bn = getattr(li, "batch_norm", False)
                 # honor global default if LayerInfo doesn't request BN explicitly
@@ -48,11 +49,10 @@ class Decoder(nn.Module):
         else:
             logger.info("Building decoder with no hidden layers")
 
-        # Final projection to feature space (linear head; no activation)
-        self.out = nn.Linear(in_features, feature_dim)
+
 
     def forward(self, z: torch.Tensor) -> torch.Tensor:
         h = z
         for layer in self.net:
             h = layer(h)
-        return self.out(h)
+        return h

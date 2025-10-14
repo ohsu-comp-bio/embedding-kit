@@ -32,12 +32,15 @@ def vae_train(input_path: str, latent: int,
         norm.fit(df)
         df = pd.DataFrame( norm.transform(df), index=df.index, columns=df.columns)
 
+    feature_count = len(df.columns)
+
     layer_sizes = list( int(i) for i in encode_layers.split(",") )
     layer_sizes.append(latent)
     enc_layers = build_layers( layer_sizes )
 
     layer_sizes = list( int(i) for i in decode_layers.split(",") )
-    dec_layers = build_layers( layer_sizes )
+    layer_sizes.append(feature_count)
+    dec_layers = build_layers( layer_sizes, end_activation="none" )
 
     schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
     vae = VAE(features=df.columns,
@@ -81,24 +84,22 @@ def netvae_train(input_path: str, pathway_sif:str, out:str,
     batch_size=256
     dataloader = dataframe_loader(df, batch_size=batch_size)
 
-    layer_sizes = list( int(i) for i in encode_layers.split(",") )
-    enc_layers = build_layers( layer_sizes )
-
-    layer_sizes = list( int(i) for i in decode_layers.split(",") )
-    dec_layers = build_layers( layer_sizes )
-
     fmap = FeatureGroups(feature_map)
     group_count = len(fmap)
+    feature_count = len(isect)
+
+    print(f"Feature count {feature_count} latent_size: {group_count}")
 
     enc_layers = [
         LayerInfo(group_count*10, op="masked_linear", constraint=ConstraintInfo("features-to-group")),
         LayerInfo(group_count*3, op="masked_linear", constraint=ConstraintInfo("group-to-group")),
-        LayerInfo(group_count, op="masked_linear", constraint=ConstraintInfo("group-to-group")),       
+        LayerInfo(group_count, op="masked_linear", constraint=ConstraintInfo("group-to-group"))
     ]
 
     dec_layers = [
         LayerInfo(group_count*3, op="masked_linear", constraint=ConstraintInfo("groups-to-group")),
         LayerInfo(group_count*10, op="masked_linear", constraint=ConstraintInfo("group-to-group")),
+        LayerInfo(feature_count, op="masked_linear", constraint=ConstraintInfo("group-to-features"), activation="none")
     ]
 
     schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
