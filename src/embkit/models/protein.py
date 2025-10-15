@@ -37,10 +37,31 @@ def batch_iterable(iterable, batch_size):
 
         yield current_batch
 
-class ProteinEncoder:
-    def __init__(self, batch_size):
 
-        model, alphabet = esm.pretrained.esm2_t33_650M_UR50D()
+
+class ProteinEncoder:
+    def __init__(self, batch_size, model="t33"):
+        if model == "t48":
+            model, alphabet = esm.pretrained.esm2_t48_15B_UR50D()
+            self.out_layer = 48
+        elif model == "t36":
+            model, alphabet = esm.pretrained.esm2_t36_3B_UR50D()
+            self.out_layer = 36
+        elif model == "t33":
+            model, alphabet = esm.pretrained.esm2_t33_650M_UR50D()
+            self.out_layer = 33
+        elif model == "t30":
+            model, alphabet = esm.pretrained.esm2_t30_150M_UR50D()
+            self.out_layer = 30
+        elif model == "t12":
+            model, alphabet = esm.pretrained.esm2_t12_35M_UR50D()
+            self.out_layer = 12
+        elif model == "t6":
+            model, alphabet = esm.pretrained.esm2_t6_8M_UR50D()
+            self.out_layer = 6
+        else:
+            raise Exception(f"Unknown model {model}")
+
         batch_converter = alphabet.get_batch_converter()
 
         model.eval()  # disables dropout for deterministic results
@@ -54,13 +75,13 @@ class ProteinEncoder:
         self.batch_converter = batch_converter
     
     def encode(self, data):
-        for block in batch_iterable(data, self.batch_size):
+        for block in tqdm( batch_iterable(data, self.batch_size) ):
             batch_labels, batch_strs, batch_tokens = self.batch_converter(block)
             if torch.cuda.is_available():
                 batch_tokens = batch_tokens.to(device="cuda", non_blocking=True)
             batch_lens = (batch_tokens != self.alphabet.padding_idx).sum(1)
-            results = self.model(batch_tokens, repr_layers=[33], return_contacts=True)
-            token_representations = results["representations"][33]
+            results = self.model(batch_tokens, repr_layers=[self.out_layer], return_contacts=True)
+            token_representations = results["representations"][self.out_layer]
             for i, tokens_len in enumerate(batch_lens):
                 vec = token_representations[i, 1 : tokens_len - 1].mean(0).to(device="cpu")
                 yield block[i][1], vec

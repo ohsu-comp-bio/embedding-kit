@@ -34,8 +34,8 @@ def stringify(l:List[float], trim=None) -> List[str]:
 @click.option("--filter", type=str, default=None)
 @click.option("--batch-size", type=int, default=128)
 @click.option("--trim", type=int, default=None)
-
-def encode(fasta: str, filter:str, batch_size:int, trim:int=None):
-    enc = ProteinEncoder(batch_size)
+@click.option("--model", type=click.Choice(['t6', 't12', 't30', 't33', 't36', 't48']), default="t33")
+def encode(fasta: str, filter:str, batch_size:int, model:str, trim:int):
+    enc = ProteinEncoder(batch_size, model)
     for i, emb in enc.encode(fasta_reader(fasta, filter=filter)):
         print( f"{i}\t" + "\t".join(stringify(emb.tolist(), trim)))
