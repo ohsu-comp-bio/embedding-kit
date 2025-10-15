@@ -15,6 +15,7 @@ src/embkit/c_bio/__init__.py
 src/embkit/c_bio/api.py
 src/embkit/commands/__init__.py
 src/embkit/commands/cbio.py
+src/embkit/commands/datasets.py
 src/embkit/commands/matrix.py
 src/embkit/commands/model.py
 src/embkit/constraints/__init__.py
@@ -42,6 +43,7 @@ src/embkit/models/vae/__init__.py
 src/embkit/models/vae/base_vae.py
 src/embkit/models/vae/decoder.py
 src/embkit/models/vae/encoder.py
+src/embkit/models/vae/hla2vec.py
 src/embkit/models/vae/net_vae.py
 src/embkit/models/vae/pytorch.py
 src/embkit/models/vae/vae.py

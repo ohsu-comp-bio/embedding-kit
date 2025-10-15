@@ -13,5 +13,4 @@ embkit cbio <> : cBIO methods for data querying and download
 from .model import model
 from .matrix import matrix
 from .cbio import cbio_cmd
-
-__all__ = ["matrix", "model"]
+from .datasets import datasets
