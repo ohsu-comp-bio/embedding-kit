@@ -14,3 +14,4 @@ htmlcov
 *tar.gz
 tmp_data.csv
 /site
+/build
