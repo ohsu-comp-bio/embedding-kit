@@ -14,7 +14,7 @@ REPO_DIR = ".embkit"
 
 
 class Dataset(os.PathLike[str]):
-    def __init__(self, save_path: Path | str | None, download: bool = True) -> None:
+    def __init__(self, name: str, save_path: Path | str | None, download: bool = True) -> None:
         """
         Initialize the TMP dataset handler.
         :param save_path: Path to save the dataset.
@@ -24,6 +24,7 @@ class Dataset(os.PathLike[str]):
         """
         self._download_called_from_init = False
         self._unpacked_file_path: Path = Path()
+        self.name = name
 
         if save_path is None:
             self.save_path: Path = Path(Path.home(), REPO_DIR)
@@ -31,6 +32,7 @@ class Dataset(os.PathLike[str]):
                 self.save_path.mkdir(parents=True, exist_ok=True)
 
         else:
+            logger.debug(f"Using save_path={save_path}")
             self.save_path: Path = Path(save_path)
             if not self.save_path.exists():
                 self.save_path.mkdir(parents=True, exist_ok=True)
@@ -42,7 +44,7 @@ class Dataset(os.PathLike[str]):
             except Exception as e:
                 logger.error(e)
         else:
-            target_file: Path = Path(save_path, self.NAME)
+            target_file: Path = Path(save_path, self.name)
             if target_file.exists():
                 self._unpacked_file_path = target_file
 
@@ -62,17 +64,16 @@ class Dataset(os.PathLike[str]):
 
 
 class SingleFileDownloader(Dataset):
-    def __init__(self, save_path=None, download=True):
+    def __init__(self, url: str, name: str, save_path=None, download=True):
         """
         :param save_path: Path to save the dataset
         :param download: Whether to immediately download
         """
-        if not hasattr(self, 'URL'):
-            raise NotImplementedError("Subclass must define the 'URL' attribute.")
-        if not hasattr(self, 'NAME'):
-            raise NotImplementedError("Subclass must define the 'NAME' attribute.")
 
-        super().__init__(save_path=save_path, download=download)
+        self.url = url
+        self.name = name
+
+        super().__init__(save_path=save_path, download=download, name=name)
 
     @property
     def unpacked_file_path(self) -> Path:
@@ -96,7 +97,7 @@ class SingleFileDownloader(Dataset):
 
         save_path = self.save_path
 
-        target_file: Path = Path(save_path, self.NAME)
+        target_file: Path = Path(save_path, self.name)
 
         # Check if already downloaded or unpacked
         if target_file.exists():
@@ -105,8 +106,8 @@ class SingleFileDownloader(Dataset):
             return b''
 
         try:
-            profiles_url = self.URL
-            logger.info(f"Downloading {self.NAME} study data from {self.URL}")
+            profiles_url = self.url
+            logger.info(f"Downloading {self.name} study data from {self.url}")
             response = requests.get(profiles_url, stream=True)
             response.raise_for_status()
             total_size = int(response.headers.get("Content-Length", 0))
@@ -115,7 +116,7 @@ class SingleFileDownloader(Dataset):
             with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
                 tmp_path = Path(tmp_file.name)
                 with tqdm(
-                        desc=f"Downloading {self.NAME}",
+                        desc=f"Downloading {self.name}",
                         total=total_size,
                         unit='B',
                         unit_scale=True,
@@ -133,5 +134,5 @@ class SingleFileDownloader(Dataset):
             return target_file.read_bytes()
 
         except requests.RequestException as e:
-            logger.error(f"Failed to download {self.NAME}: {e}")
-            raise RuntimeError(f"Failed to download {self.NAME} data: {e}")
+            logger.error(f"Failed to download {self.name}: {e}")
+            raise RuntimeError(f"Failed to download {self.name} data: {e}")
