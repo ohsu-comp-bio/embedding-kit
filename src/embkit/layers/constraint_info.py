@@ -19,10 +19,10 @@ class ConstraintInfo:
 
         if self.op == "features-to-group":
             feature_idx, group_idx = self.groups.to_indices()
-            return build_features_to_group_mask(self.groups.map, feature_idx, group_idx)
+            return build_features_to_group_mask(self.groups.map, feature_idx, group_idx, group_node_count=self.out_group_count)
         elif self.op == "group-to-features":
             feature_idx, group_idx = self.groups.to_indices()
-            return build_features_to_group_mask(self.groups.map, feature_idx, group_idx, forward=False)
+            return build_features_to_group_mask(self.groups.map, feature_idx, group_idx, group_node_count=self.in_group_count, forward=False)
         elif self.op == "group-to-group":
             return build_group_to_group_mask(len(self.groups.map), self.in_group_count, self.out_group_count )
         raise ValueError(f"Unknown ConstraintInfo.op '{self.op}'")

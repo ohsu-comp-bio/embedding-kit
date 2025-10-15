@@ -90,16 +90,18 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
 
     print(f"Feature count {feature_count} latent_size: {group_count}")
 
+    gcounts = [5,2,1]
+
     enc_layers = [
-        LayerInfo(group_count*10, op="masked_linear", constraint=ConstraintInfo("features-to-group")),
-        LayerInfo(group_count*3, op="masked_linear", constraint=ConstraintInfo("group-to-group")),
-        LayerInfo(group_count, op="masked_linear", constraint=ConstraintInfo("group-to-group"))
+        LayerInfo(group_count*gcounts[0], op="masked_linear", constraint=ConstraintInfo("features-to-group", fmap, out_group_count=gcounts[0])),
+        LayerInfo(group_count*gcounts[1], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[0], out_group_count=gcounts[1])),
+        LayerInfo(group_count, op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[1], out_group_count=gcounts[2]))
     ]
 
     dec_layers = [
-        LayerInfo(group_count*3, op="masked_linear", constraint=ConstraintInfo("groups-to-group")),
-        LayerInfo(group_count*10, op="masked_linear", constraint=ConstraintInfo("group-to-group")),
-        LayerInfo(feature_count, op="masked_linear", constraint=ConstraintInfo("group-to-features"), activation="none")
+        LayerInfo(group_count*gcounts[1], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[2], out_group_count=gcounts[1])),
+        LayerInfo(group_count*gcounts[0], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[1], out_group_count=gcounts[0])),
+        LayerInfo(feature_count, op="masked_linear", constraint=ConstraintInfo("group-to-features", fmap, in_group_count=gcounts[0]), activation="none")
     ]
 
     schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]

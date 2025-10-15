@@ -37,7 +37,6 @@ class LayerInfo:
         self.batch_norm = batch_norm
         self.constraint = constraint
         self.bias = bias
-        self.constraint = None
     
     def gen_layer(self, in_features):
         out_features = self.units
