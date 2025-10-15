@@ -9,3 +9,4 @@ umap-learn
 matplotlib
 seaborn
 scipy
+h5py
