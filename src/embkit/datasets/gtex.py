@@ -17,17 +17,17 @@ logger = logging.getLogger(__name__)
 class GTEx(Dataset):
     # pragma: no cover
     BASE_URLS = {
-        "gene_tpm" : "https://storage.googleapis.com/adult-gtex/bulk-gex/v10/rna-seq/GTEx_Analysis_v10_RNASeQCv2.4.2_gene_tpm.gct.gz",
+        "gene_tpm": "https://storage.googleapis.com/adult-gtex/bulk-gex/v10/rna-seq/GTEx_Analysis_v10_RNASeQCv2.4.2_gene_tpm.gct.gz",
         "transcript_tpm": "https://storage.googleapis.com/adult-gtex/bulk-gex/v10/rna-seq/GTEx_Analysis_v10_RSEMv1.3.3_transcripts_tpm.txt.gz"
     }
     NAMES = {
-        "gene_tpm" : "GTEx_Analysis_v10_RNASeQCv2.4.2_gene_tpm.gct.gz",
+        "gene_tpm": "GTEx_Analysis_v10_RNASeQCv2.4.2_gene_tpm.gct.gz",
         "transcript_tpm": "GTEx_Analysis_v10_RSEMv1.3.3_transcripts_tpm.txt.gz"
     }
 
     def __init__(
             self,
-            data_type: str = "gene_tpm", # gene_tpm / transcript_tpm
+            data_type: str = "gene_tpm",
             save_path: Path | str | None = None,
             download: bool = True,
             **kwargs
@@ -39,7 +39,7 @@ class GTEx(Dataset):
         :param download: Whether to immediately download
         """
         self.data_type = data_type
-        super().__init__(save_path=save_path, download=download)
+        super().__init__(save_path=save_path, download=download, name=self.NAMES[data_type])
 
     @property
     def unpacked_file_path(self) -> Path:
@@ -107,4 +107,3 @@ class GTEx(Dataset):
         except requests.RequestException as e:
             logger.error(f"Failed to download GTEx data: {e}")
             raise RuntimeError(f"Failed to download GTEx data: {e}")
-

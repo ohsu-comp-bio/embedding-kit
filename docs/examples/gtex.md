@@ -1,12 +1,19 @@
 
 
 ## Loading GTEx data
-
+**Might take longer to load dataset into memory due to its size.**
 ```python
 from embkit.datasets import GTEx
 from embkit.preprocessing import load_gct
+import logging
 
-gtex_df = load_gct(g.unpacked_file_path)
+logging.basicConfig(level=logging.INFO)
+
+logging.info("Downloading Hugo dataset...")
+g = GTEx()
+logging.info("Loading Hugo dataset...")
+gtex_df = load_gct(g)
+print(gtex_df.head())
 ```
 
 
@@ -16,7 +23,7 @@ gtex_df = load_gct(g.unpacked_file_path)
 
 ```python
 from embkit import dataframe_loader, dataframe_tensor
-from embkit.preprocessing import load_gct
+from embkit.preprocessing import load_gct,load_raw_hugo
 from embkit.losses import bce_with_logits
 from embkit.datasets import GTEx, Hugo
 from embkit.models.vae import VAE
@@ -29,8 +36,8 @@ import numpy as np
 g=GTEx()
 hugo = Hugo()
 
-hugo_df = pd.read_csv(hugo.unpacked_file_path, sep="\t", index_col=0)
-df = load_gct( g )
+hugo_df = load_raw_hugo(hugo)
+df = load_gct(g)
 
 hugo_df["ensembl_gene_id"]
 # select protein coding genes and build a dict that translates from ensembl gene id to Hugo name
