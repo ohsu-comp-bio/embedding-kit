@@ -39,16 +39,46 @@ class LayerInfo:
         self.bias = bias
         self.constraint = None
     
-    def gen_layer(self, in_features):
+    def gen_layer(self, in_features: int):
         out_features = self.units
         if self.op == "masked_linear":
             init_mask = None
             if self.constraint is not None:
-                init_mask = torch.tensor(self.constraint.gen_mask(), dtype=torch.float32)
+                m = self.constraint.gen_mask()
+                # Expect (out_features, in_features)
+                if m.shape != (out_features, in_features):
+                    raise ValueError(
+                        f"Constraint mask shape {m.shape} does not match "
+                        f"(units, in_features)=({out_features}, {in_features})."
+                    )
+                init_mask = torch.as_tensor(m, dtype=torch.float32)
             return MaskedLinear(in_features, out_features, bias=self.bias, mask=init_mask)
         elif self.op == "linear":
             return nn.Linear(in_features, out_features, bias=self.bias)
         raise ValueError(f"Unknown LayerInfo.op '{self.op}'")
+
+    def to_dict(self) -> dict:
+        return {
+            "units": self.units,
+            "op": self.op,
+            "activation": self.activation,
+            "batch_norm": self.batch_norm,
+            "bias": self.bias,
+            "constraint": (self.constraint.to_dict() if self.constraint else None),
+        }
+
+    @staticmethod
+    def from_dict(d: dict) -> "LayerInfo":
+        c = d.get("constraint")
+        constraint = ConstraintInfo.from_dict(c) if c else None
+        return LayerInfo(
+            units=int(d.get("units", d.get("size"))),  # tolerate old files that used "size"
+            op=d.get("op", "linear"),
+            activation=d.get("activation", "relu"),
+            batch_norm=bool(d.get("batch_norm", False)),
+            bias=bool(d.get("bias", True)),
+            constraint=constraint,
+        )
 
 
 
