@@ -14,3 +14,6 @@ from .model import model
 from .matrix import matrix
 from .cbio import cbio_cmd
 from .datasets import datasets
+from .protein import protein
+
+__all__ = ["model", "matrix", "datasets", "protein"]

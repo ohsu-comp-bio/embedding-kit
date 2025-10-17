@@ -18,6 +18,7 @@ src/embkit/commands/cbio.py
 src/embkit/commands/datasets.py
 src/embkit/commands/matrix.py
 src/embkit/commands/model.py
+src/embkit/commands/protein.py
 src/embkit/constraints/__init__.py
 src/embkit/constraints/network_constraint.py
 src/embkit/datasets/__init__.py
@@ -38,6 +39,8 @@ src/embkit/metrics/__init__.py
 src/embkit/metrics/distance/__init__.py
 src/embkit/metrics/distance/metrics.py
 src/embkit/models/__init__.py
+src/embkit/models/hla2vec.py
+src/embkit/models/protein.py
 src/embkit/models/vae/__init__.py
 src/embkit/models/vae/base_vae.py
 src/embkit/models/vae/decoder.py
@@ -48,6 +51,7 @@ src/embkit/models/vae/pytorch.py
 src/embkit/models/vae/vae.py
 src/embkit/preprocessing/__init__.py
 src/embkit/preprocessing/align.py
+src/embkit/preprocessing/csv.py
 src/embkit/preprocessing/loaders.py
 src/embkit/preprocessing/normalize.py
 tests/test_main.py
