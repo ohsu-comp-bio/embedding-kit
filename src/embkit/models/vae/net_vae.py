@@ -79,8 +79,7 @@ class NetVAE(BaseVAE):
         constraint = NetworkConstraint(list(df.columns), latent_index, latent_groups)
         if self.encoder is None or self.decoder is None:
             feature_dim = len(df.columns)
-            self.encoder = BaseVAE.build_encoder(feature_dim=feature_dim, latent_dim=len(latent_index),
-                                             constraint=constraint)
+            self.encoder = BaseVAE.build_encoder(feature_dim=feature_dim, latent_dim=len(latent_index))
             self.decoder = BaseVAE.build_decoder(feature_dim=feature_dim, latent_dim=len(latent_index))
         self.latent_index = list(latent_index)
 

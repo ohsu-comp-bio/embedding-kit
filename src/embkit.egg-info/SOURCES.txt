@@ -28,6 +28,7 @@ src/embkit/datasets/hugo.py
 src/embkit/estimator/__init__.py
 src/embkit/estimator/vae_estimator.py
 src/embkit/layers/__init__.py
+src/embkit/layers/constraint_info.py
 src/embkit/layers/layer_info.py
 src/embkit/layers/masked_linear.py
 src/embkit/layers/pairwise_comparison_layer.py
