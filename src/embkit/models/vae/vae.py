@@ -9,7 +9,7 @@ from ...layers import LayerInfo
 from .base_vae import BaseVAE
 from collections.abc import Callable
 from ... import get_device, dataframe_loader
-
+from torch import nn
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +27,12 @@ class VAE(BaseVAE):
             features: List[str],
             *,
             latent_dim: Optional[int] = None,
-            encoder: Optional[torch.nn.Module] = None,
-            decoder: Optional[torch.nn.Module] = None,
             encoder_layers: Optional[List[LayerInfo]] = None,
             decoder_layers: Optional[List[LayerInfo]] = None,
             batch_norm: bool = False,
             lr: float = 1e-3,
+            encoder: Optional[nn.Module] = None,
+            decoder: Optional[nn.Module] = None,
     ):
         """
         Args:
@@ -45,19 +45,20 @@ class VAE(BaseVAE):
         """
         super().__init__(features=features)
         self.lr = lr
+        self._encoder_layers_cfg = list(encoder_layers or [])
+        self._decoder_layers_cfg = list(decoder_layers or [])
+        self._batch_norm = batch_norm
 
         feature_dim = len(features)
 
         if encoder is not None and decoder is not None:
-            # Loaded path: use provided modules (e.g., open_model)
+            # Loaded path (from BaseVAE.open_model): modules are already built & weight-loaded
             self.encoder = encoder
             self.decoder = decoder
         else:
-            # Fresh build path: need latent_dim
+            # Fresh build path
             if latent_dim is None:
-                raise ValueError(
-                    "latent_dim is required when encoder/decoder are not provided."
-                )
+                raise ValueError("latent_dim is required when encoder/decoder are not provided.")
             self.encoder = self.build_encoder(
                 feature_dim=feature_dim,
                 latent_dim=latent_dim,
@@ -67,7 +68,7 @@ class VAE(BaseVAE):
             self.decoder = self.build_decoder(
                 feature_dim=feature_dim,
                 latent_dim=latent_dim,
-                layers=decoder_layers
+                layers=decoder_layers,
             )
 
         # A place to record simple history if you want
@@ -105,6 +106,9 @@ class VAE(BaseVAE):
             lr = self.lr
         if device is None:
             device = get_device()
+
+        if beta_schedule is not None:
+            logger.info(f"Using beta_schedule: {beta_schedule}")
 
         # Column alignment safety check if a DataFrame is passed
         if hasattr(X, "columns") and self.features is not None:
@@ -191,6 +195,7 @@ class VAE(BaseVAE):
             for beta_value, n_epochs in beta_schedule:
                 last = run_epochs(n_epochs, beta_value)
             return last
+
 
 if __name__ == "__main__":
     # Example usage

@@ -1,7 +1,6 @@
 from typing import List, Optional
 import torch
 from torch import nn
-from ...constraints import NetworkConstraint
 from ...layers import MaskedLinear, LayerInfo, convert_activation
 import logging
 
@@ -19,9 +18,12 @@ class Decoder(nn.Module):
                  batch_norm: bool = False,
                  default_activation: str = "relu"):
         super().__init__()
+        self.latent_dim = int(latent_dim)       # <- help BaseVAE.save()
+        self.feature_dim = int(feature_dim)
         self._default_activation = default_activation
         self._global_bn = batch_norm
         self.net = nn.ModuleList()
+
         in_features = latent_dim
 
         if layers:
@@ -32,14 +34,12 @@ class Decoder(nn.Module):
                 layer = li.gen_layer(in_features)
                 self.net.append(layer)
 
-                
-                # 2) BatchNorm (Linear -> BN -> Activation)
+                # BatchNorm (Linear -> BN -> Activation)
                 use_bn = getattr(li, "batch_norm", False)
-                # honor global default if LayerInfo doesn't request BN explicitly
                 if use_bn or self._global_bn:
                     self.net.append(nn.BatchNorm1d(out_features))
 
-                # 3) Activation (fallback to default if not provided)
+                # Activation (fallback to default if None)
                 act_name = li.activation if li.activation is not None else self._default_activation
                 act = convert_activation(act_name)
                 if act is not None:
@@ -48,8 +48,7 @@ class Decoder(nn.Module):
                 in_features = out_features
         else:
             logger.info("Building decoder with no hidden layers")
-
-
+            # No layers means identity mapping; caller should have set layers to end at feature_dim.
 
     def forward(self, z: torch.Tensor) -> torch.Tensor:
         h = z

@@ -42,7 +42,8 @@ def train_vae(input_path: str, latent: int,
     layer_sizes.append(feature_count)
     dec_layers = build_layers( layer_sizes, end_activation="none" )
 
-    schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
+    #schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
+    schedule = [(0.0, 20)]
     vae = VAE(features=df.columns,
               latent_dim=latent,
               encoder_layers=enc_layers,
@@ -53,6 +54,7 @@ def train_vae(input_path: str, latent: int,
     click.echo("Training complete.")
 
     vae.save(out, df)
+    click.echo(f"Model saved, to {out}")
 
 
 @model.command()
@@ -104,7 +106,8 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
         LayerInfo(feature_count, op="masked_linear", constraint=ConstraintInfo("group-to-features", fmap, in_group_count=gcounts[0]), activation="none")
     ]
 
-    schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
+    #schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
+    schedule = [(0.0, 20)]
     vae = VAE(df.columns, latent_dim=group_count, encoder_layers=enc_layers, decoder_layers=dec_layers)
     vae.fit(X=dataloader, beta_schedule=schedule, lr=learning_rate, loss=bce_with_logits)
 
@@ -116,9 +119,9 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
 @click.argument("input_path", type=click.Path(exists=True, dir_okay=False, readable=True, path_type=str))
 @click.argument("model_path", type=click.Path(exists=True, dir_okay=True, readable=True, path_type=str))
 def encode(input_path: str, model_path:str):
+    m = BaseVAE.open_model(model_path, model_cls=VAE)
 
+    print(m)
     df = pd.read_csv(input_path, sep="\t", index_col=0)
 
-    m = BaseVAE.open_model(model_path)
-    
-    print(m)
+
