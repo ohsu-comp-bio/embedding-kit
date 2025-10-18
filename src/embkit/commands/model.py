@@ -119,9 +119,9 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
 @click.argument("input_path", type=click.Path(exists=True, dir_okay=False, readable=True, path_type=str))
 @click.argument("model_path", type=click.Path(exists=True, dir_okay=True, readable=True, path_type=str))
 def encode(input_path: str, model_path:str):
-    m = BaseVAE.open_model(model_path, model_cls=VAE)
+    m = VAE.open_model(path=model_path)
 
     print(m)
-    df = pd.read_csv(input_path, sep="\t", index_col=0)
+    #df = pd.read_csv(input_path, sep="\t", index_col=0)
 
 
