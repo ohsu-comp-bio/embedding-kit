@@ -1,9 +1,7 @@
 import click
 import pandas as pd
-
 from ..preprocessing import load_raw_hugo, load_gct
-
-from ..datasets import GTEx, Hugo
+from ..datasets import GTEx, Hugo, SIF
 
 datasets = click.Group(name="datasets", help="Datasets commands.")
 
@@ -19,6 +17,15 @@ def gtex(data_type: str, output_folder: str):
         return
 
     GTEx(data_type=data_type, save_path=output_folder)
+
+
+
+@datasets.command()
+@click.option("--output_folder", "-f", required=True, type=str, help="The folder to download the dataset into.")
+def sif(output_folder: str):
+    """Download SIF dataset."""
+    SIF(save_path=output_folder)
+
 
 
 @datasets.command()
