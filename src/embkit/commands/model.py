@@ -3,9 +3,13 @@ import click
 import pandas as pd
 import numpy as np
 import torch
-from ..layers import LayerInfo
-from ..models.vae.vae import VAE
-from ..models.hla2vec import fit_hla2vec, load_bigmhc
+
+from .. import dataframe_loader, dataframe_tensor, get_device
+from ..layers import LayerInfo, build_layers, ConstraintInfo
+from ..models.vae.vae import VAE, BaseVAE
+from ..preprocessing import ExpMinMaxScaler
+from ..losses import bce_with_logits
+from ..pathway import extract_pathway_interactions, feature_map_intersect, FeatureGroups
 
 model = click.Group(name="model", help="VAE Model commands.")
 
@@ -116,16 +120,25 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
 @model.command()
 @click.argument("input_path", type=click.Path(exists=True, dir_okay=False, readable=True, path_type=str))
 @click.argument("model_path", type=click.Path(exists=True, dir_okay=True, readable=True, path_type=str))
-def encode(input_path: str, model_path:str):
+@click.option("--normalize", "-n", type=str, default="none")
+@click.option("--out", "-o", type=str, default="embedding.tsv")
+def encode(input_path: str, model_path:str, normalize:str, out:str):
     m = BaseVAE.open_model(model_path, model_cls=VAE)
-
-    print(m)
     df = pd.read_csv(input_path, sep="\t", index_col=0)
 
+    df = df[m.features]
+    if normalize == "expMinMax":
+        norm = ExpMinMaxScaler()
+        norm.fit(df)
+        df = pd.DataFrame( norm.transform(df), index=df.index, columns=df.columns)
 
-    vae.fit(df, epochs=epochs)
-    click.echo("Training complete.")
-
+    df_tensor = dataframe_tensor(df).to(get_device())
+    m.to(get_device())
+    result = m.encoder(df_tensor)
+    
+    martix = result[2].detach().cpu().numpy()
+    out_df = pd.DataFrame(martix, index=df.index)
+    out_df.to_csv(out, sep="\t")
 
 @model.command()
 @click.argument("h5", type=str)
