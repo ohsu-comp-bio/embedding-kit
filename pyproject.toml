@@ -22,7 +22,9 @@ dependencies = [
     "scikit-learn",
     "scipy",
     "gripql",
-    "tqdm"
+    "tqdm",
+    "biopython",
+    "esm"
 ]
 
 [tool.setuptools]
