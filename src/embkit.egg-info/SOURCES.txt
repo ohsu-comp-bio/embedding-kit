@@ -3,6 +3,7 @@ pyproject.toml
 setup.py
 src/embkit/__init__.py
 src/embkit/__main__.py
+src/embkit/align.py
 src/embkit/bmeg.py
 src/embkit/pathway.py
 src/embkit.egg-info/PKG-INFO
@@ -49,7 +50,6 @@ src/embkit/models/vae/net_vae.py
 src/embkit/models/vae/pytorch.py
 src/embkit/models/vae/vae.py
 src/embkit/preprocessing/__init__.py
-src/embkit/preprocessing/align.py
 src/embkit/preprocessing/loaders.py
 src/embkit/preprocessing/normalize.py
 tests/test_main.py
