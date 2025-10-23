@@ -15,6 +15,7 @@ src/embkit.egg-info/top_level.txt
 src/embkit/c_bio/__init__.py
 src/embkit/c_bio/api.py
 src/embkit/commands/__init__.py
+src/embkit/commands/align.py
 src/embkit/commands/cbio.py
 src/embkit/commands/datasets.py
 src/embkit/commands/matrix.py

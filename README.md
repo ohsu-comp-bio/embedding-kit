@@ -11,7 +11,7 @@ pip install embkit
 
 # Training a model
 ```
-python -m embkit model train ./experiments/tcga/tumor.normalized.tsv --epochs 120
+embkit model train-vae ./experiments/tcga/tumor.normalized.tsv --epochs 120
 ```
 
 ## Development
