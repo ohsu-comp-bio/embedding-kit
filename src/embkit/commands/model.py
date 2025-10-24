@@ -8,7 +8,7 @@ from .. import dataframe_loader, dataframe_tensor
 from ..layers import LayerInfo, build_layers, ConstraintInfo
 from ..models.vae.vae import VAE, BaseVAE
 from ..preprocessing import ExpMinMaxScaler
-from ..losses import bce_with_logits
+from ..losses import bce_with_logits, bce, mse
 from ..pathway import extract_pathway_interactions, feature_map_intersect, FeatureGroups
 
 model = click.Group(name="model", help="VAE Model commands.")
@@ -22,10 +22,12 @@ model = click.Group(name="model", help="VAE Model commands.")
 @click.option("--normalize", "-n", type=str, default="none")
 @click.option("--learning-rate", "-r", type=float, default=0.0001)
 @click.option("--out", "-o", type=str, default=None)
+@click.option("--loss", type=click.Choice(["mse", "bce", "bce-logit"]), default="bce-logit")
 def train_vae(input_path: str, latent: int, 
               epochs: int, out: str, normalize:str, 
               encode_layers:str, decode_layers:str,
-              learning_rate: float):
+              learning_rate: float,
+              loss: str):
     """Train VAE model from a TSV file."""
     df = pd.read_csv(input_path, sep="\t", index_col=0)
 
@@ -56,8 +58,14 @@ def train_vae(input_path: str, latent: int,
               encoder_layers=enc_layers,
               decoder_layers=dec_layers)
 
+    loss_func = bce_with_logits
+    if loss == "mse":
+        loss_func = mse
+    elif loss == "bce":
+        loss_func = bce
+
     vae.fit(df, epochs=epochs,
-            beta_schedule=schedule, lr=learning_rate, loss=bce_with_logits)
+            beta_schedule=schedule, lr=learning_rate, loss=loss_func)
     click.echo("Training complete.")
 
     vae.save(out, df)
@@ -73,10 +81,12 @@ def train_vae(input_path: str, latent: int,
 @click.option("--normalize", "-n", type=str, default="none")
 @click.option("--learning-rate", "-r", type=float, default=0.0001)
 @click.option("--out", "-o", type=str, default=None)
+@click.option("--loss", type=click.Choice(["mse", "bce", "bce-logit"]), default="bce-logit")
 def train_netvae(input_path: str, pathway_sif:str, out:str,
                 encode_layers:str, decode_layers:str,
                 epochs: int, normalize: str,
-                learning_rate: float):
+                learning_rate: float,
+                loss:str):
     """Train VAE model from a TSV file."""
     df = pd.read_csv(input_path, sep="\t", index_col=0)
 
@@ -113,10 +123,17 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
         LayerInfo(feature_count, op="masked_linear", constraint=ConstraintInfo("group-to-features", fmap, in_group_count=gcounts[0]), activation="none")
     ]
 
+    loss_func = bce_with_logits
+    if loss == "mse":
+        loss_func = mse
+    elif loss == "bce":
+        loss_func = bce
+
+
     #schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
     schedule = [(0.0, 20)]
     vae = VAE(df.columns, latent_dim=group_count, encoder_layers=enc_layers, decoder_layers=dec_layers)
-    vae.fit(X=dataloader, beta_schedule=schedule, lr=learning_rate, loss=bce_with_logits)
+    vae.fit(X=dataloader, beta_schedule=schedule, lr=learning_rate, loss=loss_func)
 
     click.echo("Training complete.")
 

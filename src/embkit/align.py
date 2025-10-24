@@ -43,12 +43,16 @@ def matrix_spearman_alignment_linear(a,b,cuttoff=0.0):
     # to obtain the maximal set
     mapping = linear_sum_assignment( sdf, True )
     # remap output to dict
-    out = {}
+    out_a = []
+    out_b = []
+    out_score = []
     for k, v in zip(mapping[0], mapping[1]):
         c = sdf.iloc[ k, v ]
         if c >= cuttoff:
-            out[ a.index[v] ] = (b.index[k], c)
-    return out
+            out_a.append( a.index[v] )
+            out_b.append( b.index[k] )
+            out_score.append( c )
+    return out_a, out_b, out_score
 
 def matrix_spearman_alignment_hopkraft(a,b,cuttoff=0.0):
     """
@@ -73,14 +77,17 @@ def matrix_spearman_alignment_hopkraft(a,b,cuttoff=0.0):
         m[k] = row.tolist()
 
     id_map = HopcroftKarp(m).maximum_matching(keys_only=True)
-    out = {}
+    out_a = []
+    out_b = []
+    out_score = []
     for k, v in id_map.items():
         #c = sdf.loc[ k, v ]
         c = sdf.loc[ v, k ]
         if c >= cuttoff:
-            out[ k ] = (v, c)
-
-    return out
+            out_a.append(k)
+            out_b.append(v)
+            out_score.append(c)
+    return out_a, out_b, out_score
 
 
 def procrustes(X, Y):
