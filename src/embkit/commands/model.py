@@ -22,12 +22,14 @@ model = click.Group(name="model", help="VAE Model commands.")
 @click.option("--normalize", "-n", type=str, default="none")
 @click.option("--learning-rate", "-r", type=float, default=0.0001)
 @click.option("--out", "-o", type=str, default=None)
+@click.option("--schedule", "-s", type=str, default=None, help="20:0,20:0.1,40:.3,40:.4")
 @click.option("--loss", type=click.Choice(["mse", "bce", "bce-logit"]), default="bce-logit")
 def train_vae(input_path: str, latent: int, 
-              epochs: int, out: str, normalize:str, 
+              epochs: int, out: str, normalize:str,
               encode_layers:str, decode_layers:str,
               learning_rate: float,
-              loss: str):
+              loss: str,
+              schedule:str):
     """Train VAE model from a TSV file."""
     df = pd.read_csv(input_path, sep="\t", index_col=0)
 
@@ -51,8 +53,12 @@ def train_vae(input_path: str, latent: int,
     layer_sizes.append(feature_count)
     dec_layers = build_layers( layer_sizes, end_activation="none" )
 
-    schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
-    #schedule = [(0.0, 20)]
+    beta_schedule = None
+    if schedule is not None:
+        beta_schedule = [] #[(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
+        for b in schedule.split(","):
+            e, b = b.split(":")
+            beta_schedule.append( (float(b), int(e)) )
     vae = VAE(features=df.columns,
               latent_dim=latent,
               encoder_layers=enc_layers,
@@ -65,7 +71,7 @@ def train_vae(input_path: str, latent: int,
         loss_func = bce
 
     vae.fit(df, epochs=epochs,
-            beta_schedule=schedule, lr=learning_rate, loss=loss_func)
+            beta_schedule=beta_schedule, lr=learning_rate, loss=loss_func)
     click.echo("Training complete.")
 
     vae.save(out, df)
