@@ -42,6 +42,7 @@ src/embkit/metrics/__init__.py
 src/embkit/metrics/distance/__init__.py
 src/embkit/metrics/distance/metrics.py
 src/embkit/models/__init__.py
+src/embkit/models/ffnn.py
 src/embkit/models/vae/__init__.py
 src/embkit/models/vae/base_vae.py
 src/embkit/models/vae/decoder.py
