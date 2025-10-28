@@ -24,12 +24,15 @@ model = click.Group(name="model", help="VAE Model commands.")
 @click.option("--out", "-o", type=str, default=None)
 @click.option("--schedule", "-s", type=str, default=None, help="20:0,20:0.1,40:.3,40:.4")
 @click.option("--loss", type=click.Choice(["mse", "bce", "bce-logit"]), default="bce-logit")
+@click.option("--save-stats", is_flag=True)
 def train_vae(input_path: str, latent: int, 
               epochs: int, out: str, normalize:str,
               encode_layers:str, decode_layers:str,
               learning_rate: float,
               loss: str,
-              schedule:str):
+              schedule:str, 
+              save_stats: bool
+              ):
     """Train VAE model from a TSV file."""
     df = pd.read_csv(input_path, sep="\t", index_col=0)
 
@@ -74,7 +77,11 @@ def train_vae(input_path: str, latent: int,
             beta_schedule=beta_schedule, lr=learning_rate, loss=loss_func)
     click.echo("Training complete.")
 
-    vae.save(out, df)
+    if save_stats:
+        vae.save(out, df)
+    else:
+        vae.save(out)
+
     click.echo(f"Model saved, to {out}")
 
 
@@ -88,11 +95,13 @@ def train_vae(input_path: str, latent: int,
 @click.option("--learning-rate", "-r", type=float, default=0.0001)
 @click.option("--out", "-o", type=str, default=None)
 @click.option("--loss", type=click.Choice(["mse", "bce", "bce-logit"]), default="bce-logit")
+@click.option("--save-stats", is_flag=True)
 def train_netvae(input_path: str, pathway_sif:str, out:str,
                 encode_layers:str, decode_layers:str,
                 epochs: int, normalize: str,
                 learning_rate: float,
-                loss:str):
+                loss:str,
+                save_stats:bool):
     """Train VAE model from a TSV file."""
     df = pd.read_csv(input_path, sep="\t", index_col=0)
 
@@ -143,7 +152,10 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
 
     click.echo("Training complete.")
 
-    vae.save(out, df)
+    if save_stats:
+        vae.save(out, df)
+    else:
+        vae.save(out)
 
 @model.command()
 @click.argument("input_path", type=click.Path(exists=True, dir_okay=False, readable=True, path_type=str))
