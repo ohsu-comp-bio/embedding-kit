@@ -1,8 +1,11 @@
-from typing import Optional, List, Union
+from typing import Optional, List, Union, TYPE_CHECKING
 from torch import nn
 import torch
 from ...layers import MaskedLinear, LayerInfo, convert_activation
 import logging
+
+if TYPE_CHECKING:
+    from ...constraints import NetworkConstraint
 
 logger = logging.getLogger(__name__)
 
@@ -25,13 +28,15 @@ class Encoder(nn.Module):
                  batch_norm: bool = False,
                  default_activation: Union[str, None] = "relu",
                  make_latent_heads: bool = True,
-                 sampling : bool = False):
+                 sampling : bool = False,
+                 constraint: Optional["NetworkConstraint"] = None):
         super().__init__()
         self.feature_dim = int(feature_dim)
         self.latent_dim = int(latent_dim) if latent_dim is not None else None  # <- help BaseVAE.save()
         self._default_activation = default_activation
         self._make_latent_heads = make_latent_heads
         self._sampling = sampling
+        self.constraint = constraint
 
         self.net = nn.ModuleList()
         in_features = feature_dim
@@ -120,3 +125,20 @@ class Encoder(nn.Module):
             return mu, logvar, h
 
         return h
+
+    def refresh_mask(self, device: torch.device) -> None:
+        """
+        Update masks in all MaskedLinear layers using the constraint.
+        This is a no-op if there's no constraint.
+
+        Args:
+            device: The device to move the mask tensor to
+        """
+        if self.constraint is None:
+            return
+        
+        mask_tensor = self.constraint.as_torch(device)
+        
+        for module in self.net:
+            if isinstance(module, MaskedLinear):
+                module.set_mask(mask_tensor)
