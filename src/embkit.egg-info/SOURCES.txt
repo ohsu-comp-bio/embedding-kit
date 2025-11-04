@@ -49,6 +49,7 @@ src/embkit/models/vae/encoder.py
 src/embkit/models/vae/hla2vec.py
 src/embkit/models/vae/net_vae.py
 src/embkit/models/vae/pytorch.py
+src/embkit/models/vae/rna_vae.py
 src/embkit/models/vae/vae.py
 src/embkit/preprocessing/__init__.py
 src/embkit/preprocessing/loaders.py
