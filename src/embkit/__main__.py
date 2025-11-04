@@ -1,5 +1,5 @@
 import click
-from .commands import model, matrix, cbio_cmd, datasets
+from .commands import model, matrix, cbio_cmd, datasets, align
 import logging
 
 @click.group(invoke_without_command=True)
@@ -28,6 +28,7 @@ cli.add_command(model)
 cli.add_command(matrix)
 cli.add_command(cbio_cmd)
 cli.add_command(datasets)
+cli.add_command(align)
 
 
 # ---- 'help' command ----

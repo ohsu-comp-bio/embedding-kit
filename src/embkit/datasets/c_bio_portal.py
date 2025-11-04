@@ -28,7 +28,7 @@ class CBIOPortal(Dataset):
         """
         self.study_id = study_id
         self.__unpacked_file_path: Path = Path()
-        super().__init__(save_path=save_path, download=download)
+        super().__init__(name=study_id, save_path=save_path, download=download)
 
     @property
     def unpacked_file_path(self) -> Path:

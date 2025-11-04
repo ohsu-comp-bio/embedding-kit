@@ -2,6 +2,8 @@
 import click
 import pandas as pd
 
+from sklearn.preprocessing import MinMaxScaler
+
 from .. import dataframe_loader, dataframe_tensor
 from ..layers import LayerInfo, build_layers, ConstraintInfo
 from ..models.vae.vae import VAE, BaseVAE
@@ -31,6 +33,11 @@ def train_vae(input_path: str, latent: int,
         norm = ExpMinMaxScaler()
         norm.fit(df)
         df = pd.DataFrame( norm.transform(df), index=df.index, columns=df.columns)
+    elif normalize == "minMax":
+        norm = MinMaxScaler()
+        norm.fit(df)
+        df = pd.DataFrame( norm.transform(df), index=df.index, columns=df.columns)
+
 
     feature_count = len(df.columns)
 
@@ -42,8 +49,8 @@ def train_vae(input_path: str, latent: int,
     layer_sizes.append(feature_count)
     dec_layers = build_layers( layer_sizes, end_activation="none" )
 
-    #schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
-    schedule = [(0.0, 20)]
+    schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
+    #schedule = [(0.0, 20)]
     vae = VAE(features=df.columns,
               latent_dim=latent,
               encoder_layers=enc_layers,

@@ -14,3 +14,4 @@ from .model import model
 from .matrix import matrix
 from .cbio import cbio_cmd
 from .datasets import datasets
+from .align import align
