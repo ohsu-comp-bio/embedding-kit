@@ -123,3 +123,29 @@ def procrustes(X, Y):
         R = np.dot(U, Vt_corrected)
 
     return R
+
+
+def procrustes_scale(X, Y):
+    """
+    Compute the procrustes transformation (R), then compute a factor (k) to rescale the src matrix. 
+    
+    To apply transformtion:
+    src.dot(R) * k
+
+    
+    Args:
+        X: The first matrix (N_points, N_dims).
+        Y: The second matrix (N_points, N_dims).
+
+    Returns:
+        R: The optimal rotation matrix (guaranteed det(R) = +1).
+        k: Scaling factor
+
+    """
+    R = procrustes(X,Y)
+    A = np.array(X.dot(R))
+    B = np.array(Y)
+    numerators = np.sum(A * B, axis=0)
+    denominators = np.sum(A * A, axis=0)
+    k = np.divide(numerators, denominators, out=np.zeros_like(numerators), where=denominators!=0)
+    return R, k
