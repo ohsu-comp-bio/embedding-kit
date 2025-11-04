@@ -236,6 +236,14 @@ class BaseVAE(nn.Module, ABC):
         recon = self.decoder(z)
         return recon, mu, logvar, z
 
+    def encode(self, x:torch.Tensor):
+        """
+        Run encoder model and return encoded values
+        """
+        with torch.no_grad():
+            _, _, z = self.encoder(x)
+        return z
+
     @abstractmethod
     def fit(self, X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoader], **kwargs):
         raise NotImplementedError("Subclasses must implement fit().")
@@ -291,6 +299,20 @@ class InferenceVAE(BaseVAE):
     """Concrete wrapper when no training container is available. Inference only."""
     def fit(self, X, **kwargs):
         raise RuntimeError("This loaded model is inference-only. Use a concrete VAE subclass to train.")
+
+
+class SimpleEncoder(nn.Module):
+    """
+    Wrapper nn.Module for encoder. Mainly for passing encoder module to shap.DeepExplainer which does 
+    type checking to figure out how to deal with classes
+    """
+    def __init__(self, encoder) -> None:
+        super().__init__()
+        self.encoder = encoder
+
+    def forward(self, x):
+        _, _, z = self.encoder(x)
+        return z
 
 def _import_obj(dotted: str):
     """Import 'pkg.mod.ClassName' -> object."""
