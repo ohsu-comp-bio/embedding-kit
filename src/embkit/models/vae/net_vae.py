@@ -81,6 +81,10 @@ class NetVAE(BaseVAE):
             feature_dim = len(df.columns)
             self.encoder = BaseVAE.build_encoder(feature_dim=feature_dim, latent_dim=len(latent_index))
             self.decoder = BaseVAE.build_decoder(feature_dim=feature_dim, latent_dim=len(latent_index))
+        
+        # Attach the constraint to the encoder
+        self.encoder.constraint = constraint
+        
         self.latent_index = list(latent_index)
 
         # --- data/optim ---
