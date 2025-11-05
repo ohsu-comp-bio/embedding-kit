@@ -15,6 +15,8 @@ Requires-Dist: scikit-learn
 Requires-Dist: scipy
 Requires-Dist: gripql
 Requires-Dist: tqdm
+Requires-Dist: biopython
+Requires-Dist: esm
 
 
 # Embedding Kit
@@ -29,7 +31,7 @@ pip install embkit
 
 # Training a model
 ```
-python -m embkit model train ./experiments/tcga/tumor.normalized.tsv --epochs 120
+embkit model train-vae ./experiments/tcga/tumor.normalized.tsv --epochs 120
 ```
 
 ## Development

@@ -6,3 +6,5 @@ scikit-learn
 scipy
 gripql
 tqdm
+biopython
+esm

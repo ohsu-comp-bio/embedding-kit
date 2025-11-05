@@ -15,5 +15,6 @@ from .matrix import matrix
 from .cbio import cbio_cmd
 from .datasets import datasets
 from .protein import protein
+from .align import align
 
 __all__ = ["model", "matrix", "datasets", "protein"]

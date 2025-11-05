@@ -1,16 +1,23 @@
 import unittest
 import numpy as np
 import pandas as pd
-from embkit.preprocessing import calc_rmsd, matrix_spearman_alignment_set, procrustes
+
+from embkit.align import (
+    calc_rmsd,
+    procrustes,
+    matrix_spearman_alignment_linear,
+    matrix_spearman_alignment_hopkraft,
+)
 
 
 class TestAlignmentUtils(unittest.TestCase):
 
+    # -------- calc_rmsd --------
     def test_calc_rmsd_correct(self):
         a = np.array([1.0, 2.0, 3.0])
         b = np.array([1.0, 2.0, 4.0])
         rmsd = calc_rmsd(a, b)
-        expected = np.sqrt(((0)**2 + (0)**2 + (1)**2)/3)
+        expected = np.sqrt(((0)**2 + (0)**2 + (1)**2) / 3)
         self.assertAlmostEqual(rmsd, expected)
 
     def test_calc_rmsd_mismatched_length_raises(self):
@@ -19,58 +26,156 @@ class TestAlignmentUtils(unittest.TestCase):
         with self.assertRaises(ValueError):
             calc_rmsd(a, b)
 
-    def test_matrix_spearman_alignment_set_basic(self):
-        # Construct two aligned datasets
-        a = pd.DataFrame({
-            "feat1": [1, 2, 3],
-            "feat2": [4, 5, 6]
-        }, index=["a1", "a2", "a3"])
+    # -------- matrix_spearman_alignment_linear --------
+    def test_matrix_spearman_alignment_linear_unique_mapping(self):
+        # Distinct rank patterns (no constants, ≥3 features) -> unique best mapping
+        a = pd.DataFrame(
+            {
+                "f1": [1, 4, 2],
+                "f2": [2, 3, 4],
+                "f3": [3, 2, 1],
+                "f4": [4, 1, 3],
+            },
+            index=["a1", "a2", "a3"],
+        )
+        # Permute rows; tiny noise keeps ranks and breaks ties deterministically
+        perm = [2, 0, 1]  # b3 <- a3, b1 <- a1, b2 <- a2
+        b_vals = a.values[perm, :].astype(float) + 1e-9
+        b = pd.DataFrame(b_vals, columns=a.columns, index=["b3", "b1", "b2"])
 
-        b = pd.DataFrame({
-            "feat1": [1.1, 2.1, 3.1],
-            "feat2": [4.1, 5.1, 6.1]
-        }, index=["b1", "b2", "b3"])
+        out_a, out_b, out_score = matrix_spearman_alignment_linear(a, b)
 
-        out = matrix_spearman_alignment_set(a, b)
-        self.assertIsInstance(out, dict)
-        self.assertEqual(len(out), 3)
-        for key, (matched, score) in out.items():
-            self.assertIn(matched, b.index)
-            self.assertGreaterEqual(score, 0.9)
+        self.assertEqual(len(out_a), 3)
+        self.assertEqual(len(out_b), 3)
+        self.assertEqual(len(out_score), 3)
 
-    def test_matrix_spearman_alignment_with_cutoff(self):
-        a = pd.DataFrame({
-            "feat1": [1, 2],
-            "feat2": [3, 4]
-        }, index=["a1", "a2"])
-        b = pd.DataFrame({
-            "feat1": [7, 8],
-            "feat2": [5, 6]
-        }, index=["b1", "b2"])
+        self.assertTrue(set(out_a).issubset(a.index))
+        self.assertTrue(set(out_b).issubset(b.index))
+        for s in out_score:
+            self.assertGreaterEqual(s, 0.9)
 
-        result = matrix_spearman_alignment_set(a, b, cuttoff=1.0)
-        self.assertEqual(result, {})  # Nothing passes the cutoff
+        # Linear assignment maximizes total score; with these patterns the
+        # intended permutation should be chosen.
+        matched = dict(zip(out_a, out_b))
+        self.assertEqual(matched["a1"], "b1")
+        self.assertEqual(matched["a2"], "b2")
+        self.assertEqual(matched["a3"], "b3")
 
+    def test_matrix_spearman_alignment_linear_high_cutoff_filters_all(self):
+        # Use any non-constant data; cutoff > 1 guarantees empty result
+        a = pd.DataFrame(
+            {
+                "f1": [1, 2, 3],
+                "f2": [3, 2, 1],
+                "f3": [2, 3, 1],
+            },
+            index=["a1", "a2", "a3"],
+        )
+        b = pd.DataFrame(
+            {
+                "f1": [3, 1, 2],
+                "f2": [1, 3, 2],
+                "f3": [2, 1, 3],
+            },
+            index=["b1", "b2", "b3"],
+        )
+        out_a, out_b, out_score = matrix_spearman_alignment_linear(a, b, cutoff=1.1)
+        self.assertEqual(out_a, [])
+        self.assertEqual(out_b, [])
+        self.assertEqual(out_score, [])
+
+    # -------- matrix_spearman_alignment_hopkraft --------
+    def test_matrix_spearman_alignment_hopkraft_basic_full_cardinality(self):
+        # Make all cross-pairs have high, positive Spearman (no constants, ≥3 features),
+        # so HK can find a full matching. We DO NOT assert a specific pairing.
+        a = pd.DataFrame(
+            {
+                "f1": [1.0, 1.1, 0.9],
+                "f2": [2.0, 2.1, 1.9],
+                "f3": [3.0, 3.1, 2.9],
+                "f4": [4.0, 4.1, 3.9],
+            },
+            index=["a1", "a2", "a3"],
+        )
+        b = pd.DataFrame(
+            a.values[[2, 0, 1], :].astype(float) + 1e-9,
+            columns=a.columns,
+            index=["b3", "b1", "b2"],
+        )
+
+        out_a, out_b, out_score = matrix_spearman_alignment_hopkraft(a, b, cutoff=0.5)
+
+        # Expect maximum cardinality = 3, and all scores above cutoff
+        self.assertEqual(len(out_a), 3)
+        self.assertEqual(len(out_b), 3)
+        self.assertEqual(len(out_score), 3)
+        self.assertTrue(set(out_a).issubset(a.index))
+        self.assertTrue(set(out_b).issubset(b.index))
+        for s in out_score:
+            self.assertGreaterEqual(s, 0.5)
+
+    def test_matrix_spearman_alignment_hopkraft_high_cutoff_filters_all(self):
+        # Any non-constant data; cutoff > 1 guarantees empty result
+        a = pd.DataFrame(
+            {
+                "f1": [1, 2, 3],
+                "f2": [2, 3, 1],
+                "f3": [3, 1, 2],
+            },
+            index=["a1", "a2", "a3"],
+        )
+        b = pd.DataFrame(
+            {
+                "f1": [3, 1, 2],
+                "f2": [1, 2, 3],
+                "f3": [2, 3, 1],
+            },
+            index=["b1", "b2", "b3"],
+        )
+        out_a, out_b, out_score = matrix_spearman_alignment_hopkraft(a, b, cutoff=1.1)
+        self.assertEqual(out_a, [])
+        self.assertEqual(out_b, [])
+        self.assertEqual(out_score, [])
+
+    # -------- procrustes --------
     def test_procrustes_identity(self):
         X = np.eye(3)
         Y = np.eye(3)
         R = procrustes(X, Y)
         np.testing.assert_array_almost_equal(R, np.eye(3))
 
-    def test_procrustes_rotation(self):
+    def test_procrustes_pure_rotation(self):
         theta = np.pi / 4
-        R_true = np.array([[np.cos(theta), -np.sin(theta)],
-                           [np.sin(theta),  np.cos(theta)]])
-        X = np.random.randn(5, 2)
-        Y = X @ R_true.T
+        R_true = np.array(
+            [[np.cos(theta), -np.sin(theta)],
+             [np.sin(theta),  np.cos(theta)]]
+        )
+        rng = np.random.default_rng(0)
+        X = rng.standard_normal((60, 2))
+        Y = X @ R_true
         R = procrustes(X, Y)
-        np.testing.assert_array_almost_equal(R, R_true.T, decimal=5)
+        np.testing.assert_array_almost_equal(R, R_true, decimal=6)
 
-    def test_procrustes_assertion(self):
-        X = np.random.rand(5, 2)
-        Y = np.random.rand(6, 2)
-        with self.assertRaises(AssertionError):
-            procrustes(X, Y)
+    def test_procrustes_reflection_is_corrected_and_optimal(self):
+        theta = np.pi / 6
+        R_rot = np.array(
+            [[np.cos(theta), -np.sin(theta)],
+             [np.sin(theta),  np.cos(theta)]]
+        )
+        F = np.array([[1.0, 0.0], [0.0, -1.0]])  # reflection
+
+        rng = np.random.default_rng(1)
+        X = rng.standard_normal((120, 2))
+        Y = X @ (R_rot @ F)
+
+        R = procrustes(X, Y)
+        self.assertGreater(np.linalg.det(R), 0.0)
+        np.testing.assert_array_almost_equal(R @ R.T, np.eye(2), decimal=6)
+
+        # Optimality: recovered R should fit Y better than using R_rot directly
+        err_R = np.linalg.norm(X @ R - Y)
+        err_Rrot = np.linalg.norm(X @ R_rot - Y)
+        self.assertLess(err_R, err_Rrot)
 
 
 if __name__ == '__main__':

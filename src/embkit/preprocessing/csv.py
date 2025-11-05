@@ -59,7 +59,7 @@ class LargeCsvReader:
         """
         Reads the header (if skipping) and determines the key column index.
         """
-        if self.skip_header:
+        if not self.skip_header:
             header_line = f.readline()
             self._header = header_line.strip().split(self.sep)
         else:
@@ -112,7 +112,7 @@ class LargeCsvReader:
             self._index = json.load(f)
         
         # We need the header for dictionary lookups, so re-read it.
-        if self.skip_header:
+        if not self.skip_header:
             with open(self.csv_path, 'r', newline='') as f:
                 self._header = f.readline().strip().split(self.sep)
         
@@ -127,6 +127,25 @@ class LargeCsvReader:
         """Closes the CSV file when exiting a context manager."""
         if self._file:
             self._file.close()
+
+    def __iter__(self):
+        if not self._file or self._file.closed:
+            raise RuntimeError("File not open. Use 'with' statement or manually manage file lifecycle.")
+
+        self._file.seek(0)            
+        key_column_index = self._get_index_column_and_header(self._file)
+        while True:
+            line = self._file.readline()
+            if not line:
+                break
+            reader = csv.reader([line], delimiter=self.sep)
+            row = next(reader)
+            if len(row) > key_column_index:
+                key = row[key_column_index]
+                if self._header:
+                    yield (key, zip(self._header, row))
+                else:
+                    yield (key, row)
 
     def _get(self, key):
         """
