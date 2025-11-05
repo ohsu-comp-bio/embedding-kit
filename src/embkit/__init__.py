@@ -28,11 +28,19 @@ def dataframe_tensor(df: pd.DataFrame,device=None) -> torch.Tensor:
     """
     dataframe_tensor
 
-    
+    take a pandas dataframe, create a tensor    
     """
     if device is None:
         device = get_device()
     return torch.from_numpy(df.values.astype(np.float32)).to(device)
+
+def tensor_dataframe(tn: torch.Tensor, index=None, columns=None) -> pd.DataFrame:
+    """
+    dataframe_tensor
+
+    take a torch tensor, create a pandas dataframe
+    """
+    return pd.DataFrame(tn.cpu().detach().numpy(), index=index, columns=columns)
 
 def dataframe_loader(df: pd.DataFrame,
                      batch_size = 256, shuffle=True,

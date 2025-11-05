@@ -28,12 +28,14 @@ class Encoder(nn.Module):
                  batch_norm: bool = False,
                  default_activation: Union[str, None] = "relu",
                  make_latent_heads: bool = True,
+                 sampling : bool = False,
                  constraint: Optional["NetworkConstraint"] = None):
         super().__init__()
         self.feature_dim = int(feature_dim)
         self.latent_dim = int(latent_dim) if latent_dim is not None else None  # <- help BaseVAE.save()
         self._default_activation = default_activation
         self._make_latent_heads = make_latent_heads
+        self._sampling = sampling
         self.constraint = constraint
 
         self.net = nn.ModuleList()
@@ -115,10 +117,12 @@ class Encoder(nn.Module):
         if self._make_latent_heads and (self.z_mean is not None) and (self.z_log_var is not None):
             mu = self.z_mean(h)
             logvar = self.z_log_var(h)
-            std = torch.exp(0.5 * logvar)
-            eps = torch.randn_like(std)
-            z = mu + eps * std
-            return mu, logvar, z
+            if self._sampling:
+                std = torch.exp(0.5 * logvar)
+                eps = torch.randn_like(std)
+                z = mu + eps * std
+                return mu, logvar, z
+            return mu, logvar, h
 
         return h
 
