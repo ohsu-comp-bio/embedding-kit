@@ -77,6 +77,10 @@ def train_vae(input_path: str, latent: int,
             beta_schedule=beta_schedule, lr=learning_rate, loss=loss_func)
     click.echo("Training complete.")
 
+    if out is None:
+        click.echo(f"No output path provided, using default naming.")
+        out = f"vae_latent{latent}_epochs{epochs}.model"
+
     if save_stats:
         vae.save(out, df)
     else:
@@ -122,7 +126,7 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
     group_count = len(fmap)
     feature_count = len(isect)
 
-    print(f"Feature count {feature_count} latent_size: {group_count}")
+    click.echo(f"Feature count {feature_count} latent_size: {group_count}")
 
     gcounts = [5,2,1]
 
