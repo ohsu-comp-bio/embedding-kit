@@ -17,7 +17,6 @@ from tqdm.autonotebook import tqdm
 from ..layers import LayerInfo, convert_activation
 from .. import get_device, dataframe_loader
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -25,13 +24,13 @@ class FFNN(nn.Module):
     """
     FeedForward Neural Network
     """
-    def __init__(self, input_dim:int, output_dim:int, 
-                 layers: Optional[List[LayerInfo]] = None, 
+
+    def __init__(self, input_dim: int, output_dim: int,
+                 layers: Optional[List[LayerInfo]] = None,
                  batch_norm: bool = False,
                  lr: float = 1e-3):
-        #super(FFNN).__init__()
+        # super(FFNN).__init__()
         super().__init__()
-        self.input_dim = input_dim
 
         self.layers = nn.ModuleList()
         self.input_dim = input_dim
@@ -68,17 +67,18 @@ class FFNN(nn.Module):
         if in_features != self.output_dim:
             raise Exception(f"Layer issue")
 
-    def fit(self, X: Union[torch.Tensor], 
-            y:Union[torch.Tensor], **kwargs):
+    def fit(self, X: Union[torch.Tensor],
+            y: Union[torch.Tensor], **kwargs):
 
         epochs: int = int(kwargs.pop("epochs", 20))
         lr: Optional[float] = kwargs.pop("lr", None)
         beta: float = float(kwargs.pop("beta", 1.0))
         optimizer: Optional[torch.optim.Optimizer] = kwargs.pop("optimizer", None)
-        #loss: Optional[Callable] = kwargs.pop("loss", None)
+        # loss: Optional[Callable] = kwargs.pop("loss", None)
         reset_optimizer: bool = bool(kwargs.pop("reset_optimizer", False))
         device: Optional[torch.device] = kwargs.pop("device", None)
         progress: bool = bool(kwargs.pop("progress", True))
+        pin_memory: bool = bool(kwargs.pop("pin_memory", True))
 
         # --- setup ---
         if lr is None:
@@ -101,8 +101,8 @@ class FFNN(nn.Module):
         opt = self._optimizer
         critereon = nn.MSELoss()
 
-        dataset = TensorDataset(X,y)
-        dataloader = DataLoader(dataset, batch_size=256, shuffle=True)
+        dataset = TensorDataset(X, y)
+        dataloader = DataLoader(dataset, batch_size=256, shuffle=True, pin_memory=pin_memory)
 
         # --- epoch runner (epoch-only progress) ---
         def run_epochs(n_epochs: int, beta_value: float) -> float:
@@ -111,10 +111,14 @@ class FFNN(nn.Module):
             epoch_bar = tqdm(range(n_epochs), disable=not progress, desc=f"β={beta_value:.2f}")
             for epoch_idx in epoch_bar:
                 epoch_loss_sum = 0.0
+                epoch_batches = 0
 
                 for inputs, outputs in dataloader:
+                    inputs = inputs.to(device, non_blocking=pin_memory)
+                    outputs = outputs.to(device, non_blocking=pin_memory)
+
                     predictions = self(inputs)
-                    loss = critereon(outputs, predictions)
+                    loss = critereon(predictions, outputs)
 
                     # Backprop
                     opt.zero_grad()
@@ -140,9 +144,8 @@ class FFNN(nn.Module):
 
         return run_epochs(epochs, beta)
 
-
     def forward(self, x):
         h = x
         for layer in self.layers:
-            h = layer(h)  
+            h = layer(h)
         return h
