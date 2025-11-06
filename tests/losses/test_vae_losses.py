@@ -1,6 +1,6 @@
 import unittest
 import torch
-from embkit.losses import vae_loss, net_vae_loss  # adjust to your path
+from embkit.losses import bce, net_vae_loss  # bce is the standard VAE loss function
 
 
 class DummyVAE:
@@ -34,14 +34,14 @@ class TestVAELoss(unittest.TestCase):
         self.logvar = torch.zeros(self.batch_size, 4)
 
     def test_vae_loss_output_shapes(self):
-        total, recon, kl = vae_loss(self.recon_x, self.x, self.mu, self.logvar)
+        total, recon, kl = bce(self.recon_x, self.x, self.mu, self.logvar)
         self.assertIsInstance(total, torch.Tensor)
         self.assertEqual(total.shape, ())
         self.assertEqual(recon.shape, ())
         self.assertEqual(kl.shape, ())
 
     def test_vae_loss_outputs_positive(self):
-        total, recon, kl = vae_loss(self.recon_x, self.x, self.mu, self.logvar)
+        total, recon, kl = bce(self.recon_x, self.x, self.mu, self.logvar)
         self.assertGreaterEqual(total.item(), 0)
         self.assertGreaterEqual(recon.item(), 0)
         self.assertGreaterEqual(kl.item(), 0)
