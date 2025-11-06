@@ -7,6 +7,20 @@ VAE loss functions
 import torch
 import torch.nn.functional as F
 
+# ---------- regression VAE loss (MSE + β·KL) ----------
+def mse(recon, x, mu, logvar, beta=1.0, reduction="mean"):
+    """
+    Calculate the VAE loss.
+    Uses Mean Squared Error
+
+    """
+    recon_loss = F.mse_loss(recon, x, reduction=reduction)
+    # KL( q(z|x) || N(0, I) )
+    # mean over batch for stability; fit() averages per-epoch across batches
+    kl = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
+    total = recon_loss + beta * kl
+    return total, recon_loss, kl
+
 
 def bce(recon_x, x, mu, logvar, beta=1.0):
     """Calculate the VAE loss.
