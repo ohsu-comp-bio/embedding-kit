@@ -40,6 +40,8 @@ def batch_iterable(iterable, batch_size):
 
 
 class ProteinEncoder:
+    MODELS = ["t6", "t12", "t30", "t33", "t36", "t48"]
+
     def __init__(self, batch_size, model="t33"):
         if model == "t48":
             model, alphabet = esm.pretrained.esm2_t48_15B_UR50D()
