@@ -29,6 +29,7 @@ src/embkit/datasets/dataset.py
 src/embkit/datasets/gtex.py
 src/embkit/datasets/hugo.py
 src/embkit/datasets/sif.py
+src/embkit/datasets/util.py
 src/embkit/estimator/__init__.py
 src/embkit/estimator/vae_estimator.py
 src/embkit/layers/__init__.py

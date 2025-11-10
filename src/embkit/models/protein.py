@@ -1,4 +1,5 @@
 
+from typing import Literal
 import esm
 import torch
 from tqdm import tqdm
@@ -42,7 +43,7 @@ def batch_iterable(iterable, batch_size):
 class ProteinEncoder:
     MODELS = ["t6", "t12", "t30", "t33", "t36", "t48"]
 
-    def __init__(self, batch_size, model="t33"):
+    def __init__(self, model="t33", batch_size=100):
         if model == "t48":
             model, alphabet = esm.pretrained.esm2_t48_15B_UR50D()
             self.out_layer = 48
@@ -76,7 +77,7 @@ class ProteinEncoder:
         self.batch_size = batch_size
         self.batch_converter = batch_converter
     
-    def encode(self, data):
+    def encode(self, data, output:Literal["vector","mean-pool","sum-pool"] = "sum-pool"):
         for block in tqdm( batch_iterable(data, self.batch_size) ):
             batch_labels, batch_strs, batch_tokens = self.batch_converter(block)
             if torch.cuda.is_available():
@@ -85,5 +86,10 @@ class ProteinEncoder:
             results = self.model(batch_tokens, repr_layers=[self.out_layer], return_contacts=True)
             token_representations = results["representations"][self.out_layer]
             for i, tokens_len in enumerate(batch_lens):
-                vec = token_representations[i, 1 : tokens_len - 1].mean(0).to(device="cpu")
-                yield block[i][1], vec
+                vec = token_representations[i, 1 : tokens_len - 1]
+                if output == "mean-pool":
+                    yield block[i][1], vec.mean(0).to(device="cpu")
+                elif output == "sum-pool":
+                    yield block[i][1], vec.sum(0).to(device="cpu")
+                else:
+                    yield block[i][1], vec.to(device="cpu")
