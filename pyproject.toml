@@ -24,7 +24,7 @@ dependencies = [
     "gripql",
     "tqdm",
     "biopython",
-    "esm"
+    "fair-esm"
 ]
 
 [tool.setuptools]
