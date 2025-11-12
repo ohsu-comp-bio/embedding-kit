@@ -7,4 +7,4 @@ scipy
 gripql
 tqdm
 biopython
-esm
+fair-esm

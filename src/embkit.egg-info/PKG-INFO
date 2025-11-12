@@ -16,7 +16,7 @@ Requires-Dist: scipy
 Requires-Dist: gripql
 Requires-Dist: tqdm
 Requires-Dist: biopython
-Requires-Dist: esm
+Requires-Dist: fair-esm
 
 
 # Embedding Kit

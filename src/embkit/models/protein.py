@@ -76,12 +76,17 @@ class ProteinEncoder:
         self.alphabet = alphabet
         self.batch_size = batch_size
         self.batch_converter = batch_converter
+        self.device = None
+    
+    def to(self, device):
+        self.dev = device
+        self.model.to(self.device)
     
     def encode(self, data, output:Literal["vector","mean-pool","sum-pool"] = "sum-pool"):
         for block in tqdm( batch_iterable(data, self.batch_size) ):
             batch_labels, batch_strs, batch_tokens = self.batch_converter(block)
-            if torch.cuda.is_available():
-                batch_tokens = batch_tokens.to(device="cuda", non_blocking=True)
+            if self.device is not None:
+                batch_tokens = batch_tokens.to(device=self.device, non_blocking=True)
             batch_lens = (batch_tokens != self.alphabet.padding_idx).sum(1)
             results = self.model(batch_tokens, repr_layers=[self.out_layer], return_contacts=True)
             token_representations = results["representations"][self.out_layer]
