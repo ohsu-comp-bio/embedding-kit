@@ -1,6 +1,7 @@
 import click
-from .commands import model, matrix, cbio_cmd, datasets, align
 import logging
+
+from .commands import model, matrix, cbio_cmd, protein, datasets, align
 
 @click.group(invoke_without_command=True)
 @click.option('--verbose', is_flag=True, help="Enable verbose logging")
@@ -27,6 +28,7 @@ def cli(ctx, verbose):
 cli.add_command(model)
 cli.add_command(matrix)
 cli.add_command(cbio_cmd)
+cli.add_command(protein)
 cli.add_command(datasets)
 cli.add_command(align)
 
