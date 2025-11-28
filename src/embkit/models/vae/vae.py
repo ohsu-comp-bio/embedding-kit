@@ -33,6 +33,7 @@ class VAE(BaseVAE):
             lr: float = 1e-3,
             encoder: Optional[nn.Module] = None,
             decoder: Optional[nn.Module] = None,
+            device: None
     ):
         """
         Args:
@@ -64,11 +65,13 @@ class VAE(BaseVAE):
                 latent_dim=latent_dim,
                 layers=encoder_layers,
                 batch_norm=batch_norm,
+                device=device,
             )
             self.decoder = self.build_decoder(
                 feature_dim=feature_dim,
                 latent_dim=latent_dim,
                 layers=decoder_layers,
+                device=device,
             )
 
         # A place to record simple history if you want

@@ -13,7 +13,7 @@ class MaskedLinear(nn.Module):
     - `set_mask()` updates the existing buffer (no rebind), preserving state_dict compatibility.
     """
 
-    def __init__(self, in_features: int, out_features: int, bias: bool = True, mask: Optional[torch.Tensor] = None):
+    def __init__(self, in_features: int, out_features: int, bias: bool = True, mask: Optional[torch.Tensor] = None, device=None):
         """
         Args:
             in_features: size of each input sample
@@ -28,7 +28,7 @@ class MaskedLinear(nn.Module):
 
         """
         super().__init__()
-        self.linear = nn.Linear(in_features, out_features, bias=bias)
+        self.linear = nn.Linear(in_features, out_features, bias=bias, device=device)
 
         # Create/validate mask and register as buffer (moves with .to(), saved in state_dict)
         if mask is None:
