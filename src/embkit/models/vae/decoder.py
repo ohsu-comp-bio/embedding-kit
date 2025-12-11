@@ -16,7 +16,8 @@ class Decoder(nn.Module):
                  feature_dim: int,
                  layers: Optional[List[LayerInfo]] = None,
                  batch_norm: bool = False,
-                 default_activation: str = "relu"):
+                 default_activation: str = "relu",
+                 device=None):
         super().__init__()
         self.latent_dim = int(latent_dim)       # <- help BaseVAE.save()
         self.feature_dim = int(feature_dim)
@@ -31,13 +32,13 @@ class Decoder(nn.Module):
             for i, li in enumerate(layers):
                 out_features = li.units
 
-                layer = li.gen_layer(in_features)
+                layer = li.gen_layer(in_features, device=device)
                 self.net.append(layer)
 
                 # BatchNorm (Linear -> BN -> Activation)
                 use_bn = getattr(li, "batch_norm", False)
                 if use_bn or self._global_bn:
-                    self.net.append(nn.BatchNorm1d(out_features))
+                    self.net.append(nn.BatchNorm1d(out_features, device=device))
 
                 # Activation (fallback to default if None)
                 act_name = li.activation if li.activation is not None else self._default_activation

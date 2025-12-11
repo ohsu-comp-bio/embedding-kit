@@ -38,7 +38,7 @@ class LayerInfo:
         self.constraint = constraint
         self.bias = bias
     
-    def gen_layer(self, in_features: int):
+    def gen_layer(self, in_features: int, device=None):
         out_features = self.units
         if self.op == "masked_linear":
             init_mask = None
@@ -50,10 +50,10 @@ class LayerInfo:
                         f"Constraint mask shape {m.shape} does not match "
                         f"(units, in_features)=({out_features}, {in_features})."
                     )
-                init_mask = torch.as_tensor(m, dtype=torch.float32)
-            return MaskedLinear(in_features, out_features, bias=self.bias, mask=init_mask)
+                init_mask = torch.as_tensor(m, dtype=torch.float32, device=device)
+            return MaskedLinear(in_features, out_features, bias=self.bias, mask=init_mask, device=device)
         elif self.op == "linear":
-            return nn.Linear(in_features, out_features, bias=self.bias)
+            return nn.Linear(in_features, out_features, bias=self.bias, device=device)
         raise ValueError(f"Unknown LayerInfo.op '{self.op}'")
 
     def to_dict(self) -> dict:

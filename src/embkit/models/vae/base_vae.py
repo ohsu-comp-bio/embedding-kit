@@ -30,23 +30,27 @@ class BaseVAE(nn.Module, ABC):
     @staticmethod
     def build_encoder(feature_dim: int, latent_dim: int,
                       layers: Optional[List[LayerInfo]] = None,
-                      batch_norm: bool = False) -> Encoder:
+                      batch_norm: bool = False,
+                      device=None) -> Encoder:
         return Encoder(
             feature_dim=feature_dim,
             latent_dim=latent_dim,
             layers=layers,
-            batch_norm=batch_norm
+            batch_norm=batch_norm,
+            device=device
         )
 
     @staticmethod
     def build_decoder(feature_dim: int, latent_dim: int,
                       layers: Optional[List[LayerInfo]] = None,
-                      batch_norm: bool = False) -> Decoder:
+                      batch_norm: bool = False,
+                      device=None) -> Decoder:
         return Decoder(
             latent_dim=latent_dim,
             feature_dim=feature_dim,
             layers=layers,
-            batch_norm=batch_norm
+            batch_norm=batch_norm,
+            device=device,
         )
 
     @overload
