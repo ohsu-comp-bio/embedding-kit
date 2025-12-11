@@ -33,7 +33,7 @@ class VAE(BaseVAE):
             lr: float = 1e-3,
             encoder: Optional[nn.Module] = None,
             decoder: Optional[nn.Module] = None,
-            device: None
+            device= None
     ):
         """
         Args:
