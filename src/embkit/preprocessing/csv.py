@@ -19,7 +19,7 @@ class LargeCsvReader:
             csv_path (str): The path to the large CSV file.
             index_column (str or int): The name or 0-based index of the column to use as a key.
             index_path (str, optional): The path to store the index file.
-                                        Defaults to a .json file next to the CSV.
+                                        Defaults to a .index JSON file next to the CSV.
             sep (str, optional): The delimiter used in the CSV file. Defaults to ','.
             skip_header (bool, optional): Whether to skip the first line as a header.
                                           Defaults to False.
@@ -31,7 +31,7 @@ class LargeCsvReader:
         self.sep = sep
         self.skip_header = skip_header
         self.save_index = save_index
-        self.index_path = index_path or f"{csv_path}.index.json"
+        self.index_path = index_path or f"{csv_path}.index"
 
         if cache_size is None:
             self.get = self._get
