@@ -27,9 +27,5 @@ jobs:
       run: |
         python -m build
 
-    - name: Publish to PyPI
-      env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      run: |
-        twine upload dist/*
+    - name: Publish distribution to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
