@@ -11,3 +11,4 @@ seaborn
 scipy
 h5py
 hopcroftkarp
+faiss
