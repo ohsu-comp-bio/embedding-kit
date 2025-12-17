@@ -2,6 +2,9 @@ import csv
 import json
 import os
 import functools
+import numpy as np
+
+from tqdm import tqdm
 
 
 class LargeCsvReader:
@@ -190,6 +193,15 @@ class LargeCsvReader:
             return None
         
         return dict(zip(self._header, row_list))
+    
+    def read(self, show_progress=False):
+        with self:
+            if show_progress:
+                for k, v in tqdm(self, total=self.shape[0]):
+                    yield np.array(v[1:], dtype=np.float32)
+            else:
+                for k, v in self:
+                    yield np.array(v[1:], dtype=np.float32)
 
 # Example Usage
 if __name__ == '__main__':
@@ -229,4 +241,12 @@ if __name__ == '__main__':
         # Re-creating the object triggers another index generation.
         row = reader.get('501')
         print(f"Another in-memory index lookup: {row}")
+        
+    
+    # check csv reader read function
+    print("\n--- Reading all rows ---")
+    with LargeCsvReader(dummy_csv_path, index_column='user_id', save_index=False) as reader:
+        for arr in reader.read(show_progress=True):
+            pass
+        print("Completed reading all rows.")
 
