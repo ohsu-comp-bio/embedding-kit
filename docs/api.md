@@ -3,8 +3,6 @@
 ::: embkit.commands
 
 ::: embkit.commands.cbio
-    options:
-      show_root_full_help: true
 
 ---
 
