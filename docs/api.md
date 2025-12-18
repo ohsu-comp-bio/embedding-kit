@@ -4,7 +4,7 @@
 
 ::: embkit.commands.cbio
     options:
-      show-root-full-help: true
+      show_root_full_help: true
 
 ---
 
