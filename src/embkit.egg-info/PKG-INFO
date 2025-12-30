@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: embkit
-Version: 0.1.2
+Version: 0.2
 Summary: Embedding Kit for embedding models
 Author-email: Kyle Ellrott <ellrott@ohsu.edu>, Raphael Kirchgaessner <kirchgae@ohsu.edu>
 License: MIT
@@ -17,6 +17,7 @@ Requires-Dist: gripql
 Requires-Dist: tqdm
 Requires-Dist: biopython
 Requires-Dist: fair-esm
+Requires-Dist: h5py
 
 
 # Embedding Kit

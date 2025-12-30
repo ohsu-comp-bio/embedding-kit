@@ -1,5 +1,5 @@
 from pathlib import Path
-from ..file_readers import LargeCsvReader
+from ..files import LargeCsvReader
 import numpy as np
 import faiss
 import pandas as pd
