@@ -17,11 +17,13 @@ model = click.Group(name="model", help="VAE Model commands.")
 
 @model.command()
 @click.argument("input_path", type=click.Path(exists=True, dir_okay=False, readable=True, path_type=str))
+@click.option("--group", "-g", default=None, help="HD5F group name")
 @click.option("--latent", "-l", type=int, default=256, show_default=True, help="Latent dimension size.")
 @click.option("--epochs", "-e", type=int, default=20, show_default=True, help="Training epochs.")
 @click.option("--encode-layers", type=str, default="400,200")
 @click.option("--decode-layers", type=str, default="200,400")
 @click.option("--normalize", "-n", type=str, default="none")
+@click.option("--final-activation", default="none", type=click.Choice(["none", "sigmoid"]))
 @click.option("--learning-rate", "-r", type=float, default=0.0001)
 @click.option("--out", "-o", type=str, default=None)
 @click.option("--schedule", "-s", type=str, default=None, help="20:0,20:0.1,40:.3,40:.4")
@@ -31,6 +33,7 @@ def train_vae(input_path: str, latent: int,
               epochs: int, out: str, normalize:str,
               encode_layers:str, decode_layers:str,
               learning_rate: float,
+              final_activation: str,
               loss: str,
               schedule:str, 
               save_stats: bool
@@ -56,7 +59,7 @@ def train_vae(input_path: str, latent: int,
 
     layer_sizes = list( int(i) for i in decode_layers.split(",") )
     layer_sizes.append(feature_count)
-    dec_layers = build_layers( layer_sizes, end_activation="none" )
+    dec_layers = build_layers( layer_sizes, end_activation=final_activation )
 
     beta_schedule = None
     if schedule is not None:

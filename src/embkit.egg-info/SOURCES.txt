@@ -34,6 +34,7 @@ src/embkit/estimator/__init__.py
 src/embkit/estimator/vae_estimator.py
 src/embkit/files/__init__.py
 src/embkit/files/h5.py
+src/embkit/files/loaders.py
 src/embkit/files/read_csv.py
 src/embkit/layers/__init__.py
 src/embkit/layers/constraint_info.py
@@ -60,7 +61,7 @@ src/embkit/models/vae/pytorch.py
 src/embkit/models/vae/rna_vae.py
 src/embkit/models/vae/vae.py
 src/embkit/preprocessing/__init__.py
-src/embkit/preprocessing/loaders.py
+src/embkit/preprocessing/dataset.py
 src/embkit/preprocessing/normalize.py
 src/embkit/utilities/__init__.py
 src/embkit/utilities/kmeans.py
