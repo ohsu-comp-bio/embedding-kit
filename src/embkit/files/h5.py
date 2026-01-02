@@ -23,9 +23,9 @@ class H5Reader(Dataset):
         self.dest_device = dev
 
     def __getitem__(self, idx):
-        X_sample = np.nan_to_num( self.data[idx] )
-        X_tensor = torch.from_numpy(X_sample).float()
-        return X_tensor.to(self.dest_device)
+        x_sample = np.nan_to_num( self.data[idx] )
+        x_tensor = torch.from_numpy(x_sample).float()
+        return (x_tensor.to(self.dest_device), )
 
 class H5Writer:
     def __init__(self, filename, group, index, columns):

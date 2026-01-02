@@ -42,6 +42,24 @@ def tensor_dataframe(tn: torch.Tensor, index=None, columns=None) -> pd.DataFrame
     """
     return pd.DataFrame(tn.cpu().detach().numpy(), index=index, columns=columns)
 
+def dataframe_dataset(df: pd.DataFrame, device=None) -> torch.utils.data.Dataset:
+    """
+    dataframe_dataset
+    
+    take a pandas dataframe and return a pytorch dataset
+
+    :param df: Input pandas Dataframe
+    :type df: pd.DataFrame
+    :param device: Device to put torch tensors on
+    :return: Description
+    :rtype: Dataset
+    """
+    if device is None:
+        device = get_device()
+    x = torch.from_numpy(df.values.astype(np.float32)).to(device)
+    dataset = TensorDataset(x)
+    return dataset
+
 def dataframe_loader(df: pd.DataFrame,
                      batch_size = 256, shuffle=True,
                      device=None) -> torch.utils.data.DataLoader:
@@ -54,9 +72,6 @@ def dataframe_loader(df: pd.DataFrame,
     :param device: Device the where tensor should be moved. If None, use get_device 
     """
 
-    if device is None:
-        device = get_device()
-    x = torch.from_numpy(df.values.astype(np.float32)).to(device)
-    dataset = TensorDataset(x)
+    dataset = dataframe_dataset(df, device=device)
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
     return data_loader

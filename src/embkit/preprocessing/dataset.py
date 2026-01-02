@@ -6,27 +6,21 @@ class DatasetMask(Dataset):
 
     Given an input dataset, return a subset of the values of a row based on a mask
     """
-    def __init__(self, dataset, mask):
+    def __init__(self, dataset, mask, device=None):
         self.dataset = dataset
         self.mask = mask
+        self.device = device
+        self.dim = len(mask)
 
     def __len__(self):
         return len(self.dataset)
 
     def __getitem__(self, idx):
-        return self.dataset[idx][self.mask]
-
-class DatasetArray(Dataset):
-    """
-    DatasetArray
-
-    Given an input dataset, return all the values wrapped as an array
-    """
-    def __init__(self, dataset):
-        self.dataset = dataset
-
-    def __len__(self):
-        return len(self.dataset)
-
-    def __getitem__(self, idx):
-        return [ self.dataset[idx] ]
+        o = []
+        x = self.dataset[idx]
+        for i in range( self.dim ):
+            if self.device is not None:
+                o.append( x[i][self.mask[i]].to(self.device) )
+            else:
+                o.append( x[i][self.mask[i]] )
+        return o
