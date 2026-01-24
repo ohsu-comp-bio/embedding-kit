@@ -1,8 +1,24 @@
 import subprocess
+try:
+    from importlib.metadata import version, PackageNotFoundError
+except ImportError:
+    # Python < 3.8 fallback
+    from importlib_metadata import version, PackageNotFoundError
+
+
+def get_package_version():
+    """Get the package version from installed metadata."""
+    try:
+        return version("embkit")
+    except PackageNotFoundError:
+        return "unknown"
 
 
 def get_version():
     """Get version information including git details."""
+    pkg_version = get_package_version()
+    base_version = f"embedding-kit version {pkg_version}"
+    
     try:
         commit_hash = (
             subprocess.check_output(
@@ -40,7 +56,7 @@ def get_version():
 ├── branch: {branch}
 └── remote: {remote_url}"""
 
-        return f"embedding-kit version 0.1\n{git_info}"
+        return f"{base_version}\n{git_info}"
 
     except (subprocess.CalledProcessError, FileNotFoundError):
-        return "embedding-kit version 0.1"
+        return base_version

@@ -60,6 +60,35 @@ class TestCLI(unittest.TestCase):
         # Force-triggers line 52: ctx.parent.get_help()
         self.assertTrue(result.output.count("model") > 0 or result.output.count("matrix") > 0)
 
+    def test_version_flag(self):
+        """Test that --version flag shows version information."""
+        result = self.runner.invoke(cli_main, ['--version'])
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("embedding-kit version", result.output)
+        # Should include version number from package metadata
+        self.assertRegex(result.output, r'embedding-kit version \d+\.\d+')
+
+    def test_version_flag_with_git_info(self):
+        """Test that --version includes git metadata when available."""
+        result = self.runner.invoke(cli_main, ['--version'])
+        self.assertEqual(result.exit_code, 0)
+        # When running in a git repo, should include commit, branch, and remote
+        if "commit:" in result.output:
+            self.assertIn("commit:", result.output)
+            self.assertIn("branch:", result.output)
+            self.assertIn("remote:", result.output)
+
+    def test_version_entrypoint(self):
+        """Test `python -m embkit --version` entrypoint."""
+        result = subprocess.run(
+            [sys.executable, "-m", "embkit", "--version"],
+            capture_output=True,
+            text=True
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("embedding-kit version", result.stdout)
+        self.assertRegex(result.stdout, r'embedding-kit version \d+\.\d+')
+
 
 if __name__ == '__main__':
     unittest.main()
