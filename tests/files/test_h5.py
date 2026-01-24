@@ -37,9 +37,10 @@ class TestH5(unittest.TestCase):
 
         # Check data
         for i in range(len(reader)):
-            row_tensor = reader[i]
+            row_tensor, *_ = reader[i]  # Unpack the tuple
             expected_tensor = torch.from_numpy(self.data[i])
             self.assertTrue(torch.allclose(row_tensor, expected_tensor))
+
 
     def test_writer_set_row_by_name(self):
         writer = H5Writer(self.filename, self.group, self.index, self.columns)
@@ -49,9 +50,12 @@ class TestH5(unittest.TestCase):
         writer.close()
 
         reader = H5Reader(self.filename, self.group)
-        self.assertTrue(torch.allclose(reader[0], torch.from_numpy(self.data[0])))
-        self.assertTrue(torch.allclose(reader[1], torch.from_numpy(self.data[1])))
-        self.assertTrue(torch.allclose(reader[2], torch.from_numpy(self.data[2])))
+        row_tensor, *_ = reader[0]
+        self.assertTrue(torch.allclose(row_tensor, torch.from_numpy(self.data[0])))
+        row_tensor, *_ = reader[1]
+        self.assertTrue(torch.allclose(row_tensor, torch.from_numpy(self.data[1])))
+        row_tensor, *_ = reader[2]
+        self.assertTrue(torch.allclose(row_tensor, torch.from_numpy(self.data[2])))
 
 if __name__ == "__main__":
     unittest.main()
