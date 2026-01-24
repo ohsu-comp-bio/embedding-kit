@@ -16,3 +16,4 @@ tmp_data.csv
 /site
 /build
 /data
+*.egg-info
