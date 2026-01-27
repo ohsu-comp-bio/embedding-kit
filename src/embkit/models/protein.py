@@ -145,15 +145,15 @@ class ProteinEncoder:
 
         if device is not None:
             model.to(device)
+        self.device = device
 
         self.model = model
         self.alphabet = alphabet
         self.batch_size = batch_size
         self.batch_converter = batch_converter
-        self.device = None
     
     def to(self, device):
-        self.dev = device
+        self.device = device
         self.model.to(self.device)
     
     def encode(self, data, output:Literal["vector","mean-pool","sum-pool"] = "sum-pool"):
