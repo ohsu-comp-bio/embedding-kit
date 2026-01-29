@@ -50,7 +50,39 @@ class H5Writer:
                                 data=columns,
                                 dtype=h5py.string_dtype())
 
-        self.dataset = base_group.create_dataset("X", (len(index),len(columns)), dtype='f', compression='gzip')
+        self.dataset = base_group.create_dataset("X", (len(index),len(columns)), dtype='f')
+
+    def set_row(self, name, row):
+        i = self.index.get_loc(name)
+        self.dataset[i] = row
+
+    def set_irow(self, i, row):
+        self.dataset[i] = row
+    
+    def close(self):
+        self.h5f.close()
+
+class H5CubeWriter:
+    """
+    H5CubeWriter
+
+    Specialized wrapper for storing datasets of matrices. Example usage:
+    storing a dataset of encoded sequences
+    """
+    def __init__(self, filename, group, index, xsize:int, ysize:int):
+        self.h5f = h5py.File(filename, "w")
+
+        self.index = pd.Index(index)
+        self.shape = (len(index), xsize, ysize)
+
+        base_group = self.h5f.create_group(group)
+
+        obs_group = base_group.create_group("obs")
+        obs_group.create_dataset("_index",
+                                data=index,
+                                dtype=h5py.string_dtype())
+
+        self.dataset = base_group.create_dataset("X", (len(index), xsize, ysize), dtype='f')
 
     def set_row(self, name, row):
         i = self.index.get_loc(name)

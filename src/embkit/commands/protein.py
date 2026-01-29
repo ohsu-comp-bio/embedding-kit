@@ -5,7 +5,11 @@ import re
 import sys
 from typing import List
 import click
+import json
+from ..files.json import StringTrimEncoder
 from Bio import SeqIO
+
+import torch
 
 from .. import get_device
 from ..models.protein import ProteinEncoder
@@ -37,9 +41,10 @@ def stringify(l:List[float], trim=None) -> List[str]:
 @click.option("--batch-size", type=int, default=128)
 @click.option("--trim", type=int, default=None)
 @click.option("--model", "-m", type=click.Choice(['t6', 't12', 't30', 't33', 't36', 't48']), default="t33")
-@click.option("--pool", "-p", type=click.Choice(["mean", "sum"]), default="mean")
+@click.option("--pool", "-p", type=click.Choice(["mean", "sum", "none"]), default="mean")
 @click.option("--output", "-o", type=str, default=None)
-def encode(fasta: str, filter:str, batch_size:int, model:str, trim:int, pool:str, output:str):
+@click.option("--fix-len", type=int, default=None)
+def encode(fasta: str, filter:str, batch_size:int, model:str, trim:int, pool:str, output:str, fix_len):
     pool_map = {
         "mean" : "mean-pool",
         "sum" : "sum-pool"
@@ -50,7 +55,17 @@ def encode(fasta: str, filter:str, batch_size:int, model:str, trim:int, pool:str
 
     enc = ProteinEncoder(batch_size=batch_size, model=model)
     enc.to(get_device())
-    for i, emb in enc.encode(fasta_reader(fasta, filter=filter), output=pool_map[pool]):
-        out.write( f"{i}\t" + "\t".join(stringify(emb.tolist(), trim)))
-        out.write("\n")
+    if pool == "none":
+        for i, emb in enc.encode(fasta_reader(fasta, filter=filter), output="vector", fix_len=fix_len):
+            out.write(f"{i}\t")
+            if trim:
+                out.write(json.dumps(emb, cls=StringTrimEncoder, trim=trim ))
+            else:
+                out.write(json.dumps(emb.tolist()))
+            #out.write( f"{i}\t" + "\t".join(stringify(emb.tolist(), trim)))
+            out.write("\n")
+    else:
+        for i, emb in enc.encode(fasta_reader(fasta, filter=filter), output=pool_map[pool]):
+            out.write( f"{i}\t" + "\t".join(stringify(emb.tolist(), trim)))
+            out.write("\n")
     out.close()
