@@ -10,4 +10,5 @@ matplotlib
 seaborn
 scipy
 h5py
+fair-esm
 faiss-cpu

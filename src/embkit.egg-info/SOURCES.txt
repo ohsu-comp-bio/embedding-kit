@@ -34,6 +34,7 @@ src/embkit/estimator/__init__.py
 src/embkit/estimator/vae_estimator.py
 src/embkit/files/__init__.py
 src/embkit/files/h5.py
+src/embkit/files/json.py
 src/embkit/files/loaders.py
 src/embkit/files/read_csv.py
 src/embkit/layers/__init__.py
