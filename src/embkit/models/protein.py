@@ -157,12 +157,19 @@ class ProteinEncoder:
         self.device = device
         self.model.to(self.device)
     
-    def encode(self, data, output:Literal["vector","mean-pool","sum-pool"] = "sum-pool", fix_len=None):
-        for block in tqdm( batch_iterable(data, self.batch_size) ):
+    def get_embed_dim(self):
+        return self.model.embed_dim
+    
+    def encode(self, data, output:Literal["vector","mean-pool","sum-pool"] = "sum-pool", fix_len=None, verbose=False):
+        if verbose:
+            iter = tqdm( batch_iterable(data, self.batch_size) )
+        else:
+            iter = batch_iterable(data, self.batch_size)
+        for block in iter:
             _, _, batch_tokens = self.batch_converter(block)
             if fix_len is not None:
                 #if they have defined that the tokenization will be a fixed length
-                batch_tokens = self.pad(batch_tokens, fix_len)
+                batch_tokens = self.pad(batch_tokens, fix_len+1) # length plus start token
             if self.device is not None:
                 batch_tokens = batch_tokens.to(device=self.device, non_blocking=True)
             if fix_len is None:
@@ -170,13 +177,15 @@ class ProteinEncoder:
             else:
                 batch_lens = [fix_len] * len(block)
             with torch.no_grad():
-                results = self.model(batch_tokens, repr_layers=[self.out_layer], return_contacts=True)
+                results = self.model(batch_tokens,
+                                     repr_layers=[self.out_layer],
+                                     return_contacts=True)
             token_representations = results["representations"][self.out_layer]
             for i, tokens_len in enumerate(batch_lens):
                 if fix_len:
-                    vec = token_representations[i, 1 : fix_len+1]
+                    vec = token_representations[i, 1 : fix_len+2] # include fix_len + start_token
                 else:
-                    vec = token_representations[i, 1 : tokens_len - 1]
+                    vec = token_representations[i, 1 : tokens_len - 1] # remove padding
                 if output == "mean-pool":
                     yield block[i][0], vec.mean(0).to(device="cpu")
                 elif output == "sum-pool":
