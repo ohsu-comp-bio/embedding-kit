@@ -31,25 +31,33 @@ class H5Writer:
     def __init__(self, filename, group, index, columns):
         self.h5f = h5py.File(filename, "w")
 
-        self.index = pd.Index(index)
-        self.columns = pd.Index(columns)
-
-        self.h5f.attrs['encoding-type'] = 'anndata'.encode('utf8')
-        self.h5f.attrs['encoding-version'] = '0.1.0'.encode('utf8')
-
         base_group = self.h5f.create_group(group)
 
+        self.index = pd.Index(index)
         obs_group = base_group.create_group("obs")
         obs_group.create_dataset("_index",
                                 data=index,
                                 dtype=h5py.string_dtype())
 
-        var_group = base_group.create_group("var")
-        var_group.create_dataset("_index",
-                                data=columns,
-                                dtype=h5py.string_dtype())
 
-        self.dataset = base_group.create_dataset("X", (len(index),len(columns)), dtype='f')
+        if isinstance(columns, int):
+            self.columns = pd.RangeIndex(columns)
+            var_group = base_group.create_group("var")
+            var_group.create_dataset("_index",
+                                    data=columns,
+                                    dtype=int)
+            self.dataset = base_group.create_dataset("X", (len(index),columns), dtype='f')
+        else:
+            self.columns = pd.Index(columns)
+            var_group = base_group.create_group("var")
+            var_group.create_dataset("_index",
+                                    data=columns,
+                                    dtype=h5py.string_dtype())
+            self.dataset = base_group.create_dataset("X", (len(index),len(columns)), dtype='f')
+
+        self.h5f.attrs['encoding-type'] = 'anndata'.encode('utf8')
+        self.h5f.attrs['encoding-version'] = '0.1.0'.encode('utf8')
+
 
     def set_row(self, name, row):
         i = self.index.get_loc(name)
