@@ -6,7 +6,6 @@ from embkit.align import (
     calc_rmsd,
     procrustes,
     matrix_spearman_alignment_linear,
-    matrix_spearman_alignment_hopkraft,
 )
 
 
@@ -84,58 +83,6 @@ class TestAlignmentUtils(unittest.TestCase):
         self.assertEqual(out_b, [])
         self.assertEqual(out_score, [])
 
-    # -------- matrix_spearman_alignment_hopkraft --------
-    def test_matrix_spearman_alignment_hopkraft_basic_full_cardinality(self):
-        # Make all cross-pairs have high, positive Spearman (no constants, ≥3 features),
-        # so HK can find a full matching. We DO NOT assert a specific pairing.
-        a = pd.DataFrame(
-            {
-                "f1": [1.0, 1.1, 0.9],
-                "f2": [2.0, 2.1, 1.9],
-                "f3": [3.0, 3.1, 2.9],
-                "f4": [4.0, 4.1, 3.9],
-            },
-            index=["a1", "a2", "a3"],
-        )
-        b = pd.DataFrame(
-            a.values[[2, 0, 1], :].astype(float) + 1e-9,
-            columns=a.columns,
-            index=["b3", "b1", "b2"],
-        )
-
-        out_a, out_b, out_score = matrix_spearman_alignment_hopkraft(a, b, cutoff=0.5)
-
-        # Expect maximum cardinality = 3, and all scores above cutoff
-        self.assertEqual(len(out_a), 3)
-        self.assertEqual(len(out_b), 3)
-        self.assertEqual(len(out_score), 3)
-        self.assertTrue(set(out_a).issubset(a.index))
-        self.assertTrue(set(out_b).issubset(b.index))
-        for s in out_score:
-            self.assertGreaterEqual(s, 0.5)
-
-    def test_matrix_spearman_alignment_hopkraft_high_cutoff_filters_all(self):
-        # Any non-constant data; cutoff > 1 guarantees empty result
-        a = pd.DataFrame(
-            {
-                "f1": [1, 2, 3],
-                "f2": [2, 3, 1],
-                "f3": [3, 1, 2],
-            },
-            index=["a1", "a2", "a3"],
-        )
-        b = pd.DataFrame(
-            {
-                "f1": [3, 1, 2],
-                "f2": [1, 2, 3],
-                "f3": [2, 3, 1],
-            },
-            index=["b1", "b2", "b3"],
-        )
-        out_a, out_b, out_score = matrix_spearman_alignment_hopkraft(a, b, cutoff=1.1)
-        self.assertEqual(out_a, [])
-        self.assertEqual(out_b, [])
-        self.assertEqual(out_score, [])
 
     # -------- procrustes --------
     def test_procrustes_identity(self):

@@ -1,12 +1,15 @@
 import click
 import logging
 
+from embkit.version import get_version
+
 from .commands import model, matrix, cbio_cmd, protein, datasets, align
 
 @click.group(invoke_without_command=True)
 @click.option('--verbose', is_flag=True, help="Enable verbose logging")
+@click.option('--version', is_flag=True, help="Show version information")
 @click.pass_context
-def cli(ctx, verbose):
+def cli(ctx, verbose, version):
     """Embedding Kit CLI.
 
     Use 'embkit help [COMMAND]' for details on a specific command.
@@ -20,6 +23,10 @@ def cli(ctx, verbose):
     ctx.ensure_object(dict)
     ctx.obj["VERBOSE"] = verbose
 
+    if version:
+        click.echo(get_version())
+        ctx.exit()
+    
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
 
@@ -62,11 +69,14 @@ def help_cmd(ctx, path):
     info_name = []
     parent = ctx.parent  # start from top-level context
     for part in path:
-        if not hasattr(cmd, "get_command"):
+        if not isinstance(cmd, click.Group):
             click.echo(cli.get_help(ctx)) # pragma: no cover
+            return
+
         nxt_cmd = cmd.get_command(parent, part)
         if nxt_cmd is None:
             raise click.UsageError(f"Unknown command: {' '.join(path)}")
+
         info_name.append(part)
         cmd = nxt_cmd
         parent = click.Context(cmd, info_name=part, parent=parent)

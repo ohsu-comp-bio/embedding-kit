@@ -1,6 +1,6 @@
 import click
 import pandas as pd
-from ..preprocessing import load_raw_hugo, load_gct
+from ..files import load_raw_hugo, load_gct
 from ..datasets import GTEx, Hugo, SIF
 
 datasets = click.Group(name="datasets", help="Datasets commands.")

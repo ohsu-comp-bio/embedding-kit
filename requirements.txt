@@ -10,5 +10,5 @@ matplotlib
 seaborn
 scipy
 h5py
-hopcroftkarp
-faiss
+fair-esm
+faiss-cpu

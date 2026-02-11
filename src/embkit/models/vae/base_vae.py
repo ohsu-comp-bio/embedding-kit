@@ -12,6 +12,7 @@ import torch
 from .encoder import Encoder
 from .decoder import Decoder
 from ...layers import LayerInfo
+from ... import get_device
 import importlib
 import inspect
 
@@ -67,6 +68,7 @@ class BaseVAE(nn.Module, ABC):
     def open_model(cls,
                    path: str,
                    device: Optional[str] = None,
+                   dtype = None,
                    model_cls: Optional[Type[T]] = None,
                    model_kwargs: Optional[Dict[str, Any]] = None
                    ) -> T:
@@ -83,8 +85,9 @@ class BaseVAE(nn.Module, ABC):
         """
         # ---------- device ----------
         if device is None:
-            device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        device = torch.device(device)
+            device = get_device()
+        else:
+            device = torch.device(device)
 
         model_kwargs = dict(model_kwargs or {})
 
@@ -164,8 +167,8 @@ class BaseVAE(nn.Module, ABC):
 
         enc.load_state_dict(torch.load(Path(path, "model.enc.pt"), map_location=device), strict=True)
         dec.load_state_dict(torch.load(Path(path, "model.dec.pt"), map_location=device), strict=True)
-        enc.to(device)
-        dec.to(device)
+        enc.to(device=device, dtype=dtype)
+        dec.to(device=device, dtype=dtype)
 
         # ---------- choose container class ----------
         # precedence: explicit arg > cls > JSON container > InferenceVAE
@@ -232,6 +235,10 @@ class BaseVAE(nn.Module, ABC):
         self.encoder: Optional[Encoder] = encoder
         self.decoder: Optional[Decoder] = decoder
         self.extra_args = kwargs  # for subclasses to stash configs
+
+    def to(self, device=None, dtype=None):
+        self.encoder.to(device=device, dtype=dtype)
+        self.decoder.to(device=device, dtype=dtype)
 
     def forward(self, x: torch.Tensor):
         if self.encoder is None or self.decoder is None:

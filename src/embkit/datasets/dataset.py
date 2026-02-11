@@ -44,7 +44,7 @@ class Dataset(os.PathLike[str]):
             except Exception as e:
                 logger.error(e)
         else:
-            target_file: Path = Path(save_path, self.name)
+            target_file: Path = Path(self.save_path, self.name)
             if target_file.exists():
                 self._unpacked_file_path = target_file
 
@@ -128,7 +128,8 @@ class SingleFileDownloader(Dataset):
                             bar.update(len(chunk))
 
             # Move to final destination after successful download
-            tmp_path.replace(target_file)
+            import shutil
+            shutil.move(str(tmp_path), str(target_file))
             self._unpacked_file_path = target_file
             logger.info(f"Data downloaded and saved to {target_file}")
             return target_file.read_bytes()

@@ -6,6 +6,7 @@ import tempfile
 from tqdm import tqdm
 import tarfile
 import warnings
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +93,7 @@ class CBIOPortal(Dataset):
                             bar.update(len(chunk))
 
             # Move to final destination after successful download
-            tmp_path.replace(target_file)
+            shutil.move(str(tmp_path), str(target_file))
             logger.info(f"Data downloaded and saved to {target_file}")
             return target_file.read_bytes()
 

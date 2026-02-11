@@ -27,7 +27,7 @@ def build_layers(sizes, activation="relu", end_activation="relu"):
         if i < len(sizes)-1:
             l = LayerInfo(s, activation=activation)
         else:
-            print(f"end activation{end_activation}")
+            # print(f"end activation{end_activation}")
             l = LayerInfo(s, activation=end_activation)
         out.append(l)
     return out

@@ -145,14 +145,14 @@ class VAE(BaseVAE):
         # --- epoch runner (epoch-only progress) ---
         def run_epochs(n_epochs: int, beta_value: float) -> float:
             last_loss = 0.0
-            epoch_bar = tqdm(range(n_epochs), disable=not progress, desc=f"β={beta_value:.2f}")
+            epoch_bar = tqdm(range(n_epochs), disable=not progress, desc=f"β={beta_value:.2f}", position=0)
             for epoch_idx in epoch_bar:
                 epoch_loss_sum = 0.0
                 epoch_recon_sum = 0.0
                 epoch_kl_sum = 0.0
                 epoch_batches = 0
 
-                for (x_tensor,) in data_loader:
+                for (x_tensor,) in tqdm(data_loader, position=1):
                     opt.zero_grad(set_to_none=True)
                     x_tensor = x_tensor.to(device).float()
 
