@@ -4,6 +4,9 @@ import esm
 import torch
 from tqdm import tqdm
 import numpy as np
+
+from ..preprocessing import batch_iterable
+
 import torch.nn.functional as F
 
 
@@ -75,41 +78,6 @@ def aa_to_one_hot(sequence: str, full_len=None, encode_x=True, encode_pos=False)
     return one_hot_matrix
 
 
-def batch_iterable(iterable, batch_size):
-    """
-    Converts an iterable into a sequence of batched lists.
-
-    Args:
-        iterable: The input iterable (e.g., list, tuple, generator).
-        batch_size: The desired size of each batch.
-
-    Yields:
-        list: A batch (list) of elements from the iterable.
-    """
-    if batch_size <= 0:
-        raise ValueError("batch_size must be a positive integer")
-
-    # Get an iterator from the iterable
-    iterator = iter(iterable)
-
-    # Loop indefinitely, or until StopIteration is raised
-    while True:
-        # Create a generator expression that yields up to batch_size elements
-        # from the iterator. 'next(iterator, _SENTINEL)' attempts to get the 
-        # next item; if it fails (StopIteration), it yields _SENTINEL.
-        _SENTINEL = object()  # Unique sentinel value
-        batch_gen = (next(iterator, _SENTINEL) for _ in range(batch_size))
-        
-        # Filter out the sentinel value(s) and create the list
-        current_batch = [item for item in batch_gen if item is not _SENTINEL]
-
-        # If the batch is empty, we've exhausted the iterable
-        if not current_batch:
-            return  # Stop the generator
-
-        yield current_batch
-
-
 
 class ProteinEncoder:
     """
@@ -157,12 +125,19 @@ class ProteinEncoder:
         self.device = device
         self.model.to(self.device)
     
-    def encode(self, data, output:Literal["vector","mean-pool","sum-pool"] = "sum-pool", fix_len=None):
-        for block in tqdm( batch_iterable(data, self.batch_size) ):
+    def get_embed_dim(self):
+        return self.model.embed_dim
+    
+    def encode(self, data, output:Literal["vector","mean-pool","sum-pool"] = "sum-pool", fix_len=None, verbose=False):
+        if verbose:
+            iter = tqdm( batch_iterable(data, self.batch_size) )
+        else:
+            iter = batch_iterable(data, self.batch_size)
+        for block in iter:
             _, _, batch_tokens = self.batch_converter(block)
             if fix_len is not None:
                 #if they have defined that the tokenization will be a fixed length
-                batch_tokens = self.pad(batch_tokens, fix_len)
+                batch_tokens = self.pad(batch_tokens, fix_len+1) # length plus start token
             if self.device is not None:
                 batch_tokens = batch_tokens.to(device=self.device, non_blocking=True)
             if fix_len is None:
@@ -170,13 +145,15 @@ class ProteinEncoder:
             else:
                 batch_lens = [fix_len] * len(block)
             with torch.no_grad():
-                results = self.model(batch_tokens, repr_layers=[self.out_layer], return_contacts=True)
+                results = self.model(batch_tokens,
+                                     repr_layers=[self.out_layer],
+                                     return_contacts=True)
             token_representations = results["representations"][self.out_layer]
             for i, tokens_len in enumerate(batch_lens):
                 if fix_len:
-                    vec = token_representations[i, 1 : fix_len+1]
+                    vec = token_representations[i, 1 : fix_len+2] # include fix_len + start_token
                 else:
-                    vec = token_representations[i, 1 : tokens_len - 1]
+                    vec = token_representations[i, 1 : tokens_len - 1] # remove padding
                 if output == "mean-pool":
                     yield block[i][0], vec.mean(0).to(device="cpu")
                 elif output == "sum-pool":

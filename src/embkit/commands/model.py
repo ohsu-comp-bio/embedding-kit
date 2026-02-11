@@ -4,6 +4,7 @@ import pandas as pd
 
 from sklearn.preprocessing import MinMaxScaler
 
+import torch
 from torch.utils.data import DataLoader
 
 from .. import dataframe_loader, dataframe_tensor, get_device, dataframe_dataset
@@ -32,6 +33,7 @@ model = click.Group(name="model", help="VAE Model commands.")
 @click.option("--loss", type=click.Choice(["mse", "bce", "bce-logit"]), default="bce-logit")
 @click.option("--save-stats", is_flag=True)
 @click.option("--zero-mask", default=None, type=float)
+@click.option("--seed", default=42, type=int)
 def train_vae(input_path: str,
               group: str,
               latent: int,
@@ -44,13 +46,14 @@ def train_vae(input_path: str,
               loss: str,
               schedule:str,
               zero_mask: float,
-              save_stats: bool
+              save_stats: bool,
+              seed: int
               ):
     """
     Train VAE model from a TSV file.
     """
     device = get_device()
-
+    torch.manual_seed(seed)
     if group is not None:
         dataset = H5Reader(input_path, group)
         #TODO add normalization here
