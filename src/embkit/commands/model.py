@@ -54,6 +54,7 @@ def train_vae(input_path: str,
     """
     device = get_device()
     torch.manual_seed(seed)
+    df = None
     if group is not None:
         dataset = H5Reader(input_path, group)
         #TODO add normalization here
@@ -119,8 +120,8 @@ def train_vae(input_path: str,
         click.echo(f"No output path provided, using default naming.")
         out = f"vae_latent{latent}_epochs{epochs}.model"
 
-    if save_stats:
-        vae.save(out, dataset)
+    if save_stats and df is not None:
+        vae.save(out, df)
     else:
         vae.save(out)
 

@@ -6,6 +6,7 @@ Lightweight mappings for nn module, designed to
 provide a consistant way to do to_dict and from_dict methods for nn modules.
 """
 
+from typing import Optional
 
 from torch import nn
 
@@ -57,6 +58,26 @@ class BatchNorm1d(nn.BatchNorm1d):
         return self._params | {"__class__" : Linear.NAME}
 
 
+class Sequential(nn.Sequential):
+    NAME = "Sequential"
+    def __init__(self, *args):
+        super().__init__(*args)
+        self._params = {"args": args}
+    
+    @classmethod
+    def from_dict(cls, params):
+        args = params["args"]
+        modules = []
+        for a in args:
+            modules.append( classMap[a["__class__"]].from_dict(a ) )
+        return cls(*modules)
+    
+    def to_dict(self):
+        args = self._params["args"]
+        out = []
+        for a in args:
+            out.append( a.to_dict() )
+        return { "args": out, "__class__": Sequential.NAME }
 
 def convert_activation(name: Optional[str]) -> Optional[nn.Module]:
     """
@@ -85,5 +106,6 @@ def convert_activation(name: Optional[str]) -> Optional[nn.Module]:
 
 
 classMap = {
-    Linear.NAME: Linear
+    Linear.NAME: Linear,
+    Sequential.NAME: Sequential
 }

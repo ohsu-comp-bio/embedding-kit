@@ -12,4 +12,4 @@ from .core import build
 
 from .mapping import Linear
 
-
+from .layers import Layer, LayerList
