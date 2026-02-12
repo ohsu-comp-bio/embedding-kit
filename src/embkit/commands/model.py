@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 
 from .. import dataframe_loader, dataframe_tensor, get_device, dataframe_dataset
 from ..files import H5Reader
-from ..layers import LayerInfo, build_layers, ConstraintInfo
+from ..factory.layers import Layer, LayerList, ConstraintInfo
 from ..models.vae.vae import VAE
 from ..preprocessing import ExpMinMaxScaler, get_dataset_nonzero_mask, DatasetMask
 from ..losses import bce_with_logits, bce, mse
@@ -84,15 +84,17 @@ def train_vae(input_path: str,
         dataset = dataframe_dataset(df, device=device)
     
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-      
+    
 
     layer_sizes = list( int(i) for i in encode_layers.split(",") )
     layer_sizes.append(latent)
-    enc_layers = build_layers( layer_sizes )
+    encode_layer_list = LayerList( layer_sizes )
+    enc_layers = encode_layer_list.build( feature_count, latent )
 
     layer_sizes = list( int(i) for i in decode_layers.split(",") )
     layer_sizes.append(feature_count)
-    dec_layers = build_layers( layer_sizes, end_activation=final_activation )
+    decode_layer_list = LayerList( layer_sizes )
+    dec_layers = decode_layer_list.build( latent, feature_count, end_activation=final_activation )
 
     beta_schedule = None
     if schedule is not None:

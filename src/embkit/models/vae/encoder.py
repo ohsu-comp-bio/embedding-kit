@@ -1,7 +1,10 @@
 from typing import Optional, List, Union, TYPE_CHECKING
 from torch import nn
 import torch
-from ...layers import MaskedLinear, LayerInfo, convert_activation
+from ...layers import MaskedLinear
+from ...factory.layers import Layer, LayerList
+from ...factory.mapping import convert_activation
+
 import logging
 
 if TYPE_CHECKING:
@@ -24,7 +27,7 @@ class Encoder(nn.Module):
     def __init__(self,
                  feature_dim: int,
                  latent_dim: Optional[int] = None,
-                 layers: Optional[List[LayerInfo]] = None,
+                 layers: Optional[LayerList] = None,
                  batch_norm: bool = False,
                  default_activation: Union[str, None] = "relu",
                  make_latent_heads: bool = True,

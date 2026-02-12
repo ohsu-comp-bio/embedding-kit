@@ -16,7 +16,7 @@ from torch.utils.data import TensorDataset, DataLoader
 
 from .base_vae import BaseVAE
 from .encoder import Encoder
-from ...layers import LayerInfo
+from ...factory.layers import Layer
 from ... import get_device
 from ...losses import bce_kl_weighted
 
@@ -42,7 +42,7 @@ class RNAEncoder(Encoder):
     """
     
     def __init__(self, feature_dim: int, latent_dim: int, 
-                 layers: Optional[List[LayerInfo]] = None,
+                 layers: Optional[List[Layer]] = None,
                  batch_norm: bool = False):
         # Initialize parent without making latent heads
         super().__init__(
@@ -115,8 +115,8 @@ class RNAVAE(BaseVAE):
 
         # Build encoder: feature_dim -> feature_dim//2 -> feature_dim//3
         enc_layers = [
-            LayerInfo(units=feature_dim // 2, activation="relu"),
-            LayerInfo(units=feature_dim // 3, activation="relu"),
+            Layer(units=feature_dim // 2, activation="relu"),
+            Layer(units=feature_dim // 3, activation="relu"),
         ]
         
         # Use custom RNAEncoder with BatchNorm + ReLU on latent heads
@@ -129,7 +129,7 @@ class RNAVAE(BaseVAE):
 
         # Build decoder: latent_dim -> feature_dim with sigmoid
         dec_layers = [
-            LayerInfo(units=feature_dim, activation="sigmoid"),
+            Layer(units=feature_dim, activation="sigmoid"),
         ]
         
         self.decoder = self.build_decoder(

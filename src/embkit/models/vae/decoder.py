@@ -1,7 +1,9 @@
 from typing import List, Optional
 import torch
 from torch import nn
-from ...layers import MaskedLinear, LayerInfo, convert_activation
+from ...layers import MaskedLinear
+from ...factory.layers import Layer, LayerList
+from ...factory.mapping import convert_activation
 import logging
 
 logger = logging.getLogger(__name__)
@@ -16,7 +18,7 @@ class Decoder(nn.Module):
         self,
         latent_dim: int,
         feature_dim: int,
-        layers: Optional[List[LayerInfo]] = None,
+        layers: Optional[LayerList] = None,
         batch_norm: bool = False,
         default_activation: str = "relu",
         device=None,

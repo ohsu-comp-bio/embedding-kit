@@ -2,7 +2,9 @@ import unittest
 import torch
 from torch import nn
 
-from embkit.layers import MaskedLinear, LayerInfo, convert_activation  # adjust import if needed
+from embkit.layers import MaskedLinear
+from embkit.factory.layers import Layer
+from embkit.factory.mapping import convert_activation  # adjust import if needed
 
 
 class TestLayerPrimitives(unittest.TestCase):
@@ -24,7 +26,7 @@ class TestLayerPrimitives(unittest.TestCase):
 
 class TestLayerInfoDataclass(unittest.TestCase):
     def test_layerinfo_defaults(self):
-        li = LayerInfo(units=64)
+        li = Layer(units=64)
         self.assertEqual(li.units, 64)
         self.assertEqual(li.op, "linear")
         self.assertEqual(li.activation, "relu")
@@ -32,7 +34,7 @@ class TestLayerInfoDataclass(unittest.TestCase):
         self.assertTrue(li.bias)
 
     def test_layerinfo_none_activation(self):
-        li = LayerInfo(units=32, activation=None)
+        li = Layer(units=32, activation=None)
         self.assertIsNone(li.activation)
 
 

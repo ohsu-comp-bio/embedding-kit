@@ -3,7 +3,7 @@ import torch
 from torch import nn
 
 from embkit.models.vae.decoder import Decoder
-from embkit.layers import LayerInfo, MaskedLinear
+from embkit.factory.layers import Layer, MaskedLinear
 
 
 class TestDecoder(unittest.TestCase):
@@ -21,8 +21,8 @@ class TestDecoder(unittest.TestCase):
 
     def test_linear_stack_with_activation_and_bn(self):
         layers = [
-            LayerInfo(units=8, op="linear", activation="relu", batch_norm=True),
-            LayerInfo(units=10, op="linear", activation="tanh", batch_norm=False),
+            Layer(units=8, op="linear", activation="relu", batch_norm=True),
+            Layer(units=10, op="linear", activation="tanh", batch_norm=False),
         ]
         dec = Decoder(latent_dim=5, feature_dim=6, layers=layers)
 
@@ -39,8 +39,8 @@ class TestDecoder(unittest.TestCase):
 
     def test_supports_none_activation(self):
         layers = [
-            LayerInfo(units=5, op="linear", activation=None),
-            LayerInfo(units=5, op="linear", activation=None, batch_norm=True),
+            Layer(units=5, op="linear", activation=None),
+            Layer(units=5, op="linear", activation=None, batch_norm=True),
         ]
         dec = Decoder(latent_dim=3, feature_dim=4, layers=layers)
 
@@ -55,8 +55,8 @@ class TestDecoder(unittest.TestCase):
 
     def test_masked_linear_present_and_runs(self):
         layers = [
-            LayerInfo(units=6, op="masked_linear", activation="relu"),
-            LayerInfo(units=5, op="linear", activation=None),
+            Layer(units=6, op="masked_linear", activation="relu"),
+            Layer(units=5, op="linear", activation=None),
         ]
         dec = Decoder(latent_dim=4, feature_dim=3, layers=layers)
 
@@ -69,7 +69,7 @@ class TestDecoder(unittest.TestCase):
 
     def test_invalid_layer_op_raises_value_error(self):
         layers = [
-            LayerInfo(units=5, op="foo_bar", activation="relu")  # Invalid op
+            Layer(units=5, op="foo_bar", activation="relu")  # Invalid op
         ]
         with self.assertRaises(ValueError) as context:
             Decoder(latent_dim=3, feature_dim=4, layers=layers)

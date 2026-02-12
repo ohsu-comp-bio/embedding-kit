@@ -11,15 +11,13 @@ from torch import nn
 import torch
 from .encoder import Encoder
 from .decoder import Decoder
-from ...layers import LayerInfo
+from ...factory.layers import Layer, LayerList
 from ... import get_device
 import importlib
 import inspect
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
-
-
 
 
 class BaseVAE(nn.Module, ABC):
@@ -30,7 +28,7 @@ class BaseVAE(nn.Module, ABC):
 
     @staticmethod
     def build_encoder(feature_dim: int, latent_dim: int,
-                      layers: Optional[List[LayerInfo]] = None,
+                      layers: Optional[LayerList] = None,
                       batch_norm: bool = False,
                       device=None) -> Encoder:
         return Encoder(
@@ -43,7 +41,7 @@ class BaseVAE(nn.Module, ABC):
 
     @staticmethod
     def build_decoder(feature_dim: int, latent_dim: int,
-                      layers: Optional[List[LayerInfo]] = None,
+                      layers: Optional[LayerList] = None,
                       batch_norm: bool = False,
                       device=None) -> Decoder:
         return Decoder(
@@ -101,8 +99,8 @@ class BaseVAE(nn.Module, ABC):
 
         # ---------- architecture & container meta ----------
         arch_path = Path(path, "model.arch.json")
-        enc_layers: Optional[List[LayerInfo]] = None
-        dec_layers: Optional[List[LayerInfo]] = None
+        enc_layers: Optional[List[Layer]] = None
+        dec_layers: Optional[List[Layer]] = None
         batch_norm = False
         container_dotted: Optional[str] = None
 
@@ -111,8 +109,8 @@ class BaseVAE(nn.Module, ABC):
                 arch = json.load(fh)
             latent_dim = int(arch["latent_dim"])
             container_dotted = arch.get("container")
-            enc_layers = [LayerInfo.from_dict(d) for d in arch.get("encoder_layers", [])]
-            dec_layers = [LayerInfo.from_dict(d) for d in arch.get("decoder_layers", [])]
+            enc_layers = [Layer.from_dict(d) for d in arch.get("encoder_layers", [])]
+            dec_layers = [Layer.from_dict(d) for d in arch.get("decoder_layers", [])]
             batch_norm = bool(arch.get("batch_norm", False))
         else:
             # fallback: infer latent from encoder weights (never from names)
