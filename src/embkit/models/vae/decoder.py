@@ -11,15 +11,18 @@ class Decoder(nn.Module):
     """
     z -> [LayerInfo...] -> recon(features)
     """
-    def __init__(self,
-                 latent_dim: int,
-                 feature_dim: int,
-                 layers: Optional[List[LayerInfo]] = None,
-                 batch_norm: bool = False,
-                 default_activation: str = "relu",
-                 device=None):
+
+    def __init__(
+        self,
+        latent_dim: int,
+        feature_dim: int,
+        layers: Optional[List[LayerInfo]] = None,
+        batch_norm: bool = False,
+        default_activation: str = "relu",
+        device=None,
+    ):
         super().__init__()
-        self.latent_dim = int(latent_dim)       # <- help BaseVAE.save()
+        self.latent_dim = int(latent_dim)  # <- help BaseVAE.save()
         self.feature_dim = int(feature_dim)
         self._default_activation = default_activation
         self._global_bn = batch_norm
@@ -29,19 +32,20 @@ class Decoder(nn.Module):
 
         if layers:
             logger.info("Building decoder with %d layers", len(layers))
-            for i, li in enumerate(layers):
+            for li in layers:
                 out_features = li.units
 
+                # Create layer with appropriate in_features
                 layer = li.gen_layer(in_features, device=device)
                 self.net.append(layer)
 
-                # Activation (don't fall back to default if explicitly None)
+                # Activation (skip if None)
                 if li.activation is not None:
                     act = convert_activation(li.activation)
                     if act is not None:
                         self.net.append(act)
 
-                # BatchNorm (Linear -> Activation -> BN)
+                # BatchNorm (after activation)
                 use_bn = getattr(li, "batch_norm", False)
                 if use_bn or self._global_bn:
                     self.net.append(nn.BatchNorm1d(out_features, device=device))
@@ -58,7 +62,9 @@ class Decoder(nn.Module):
             # assuming the last layer in self.net that is a Linear/MaskedLinear is 'out'
             # But the tests seem to expect a dedicated .out attribute
             # Let's find the last Linear-like layer if it exists
-            linear_layers = [m for m in self.net if isinstance(m, (nn.Linear, MaskedLinear))]
+            linear_layers = [
+                m for m in self.net if isinstance(m, (nn.Linear, MaskedLinear))
+            ]
             if linear_layers:
                 self.out = linear_layers[-1]
             else:
