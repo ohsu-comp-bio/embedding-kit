@@ -9,12 +9,12 @@ import requests
 
 from tqdm import tqdm
 
-from .dataset import Dataset
+from .resource import Resource
 
 logger = logging.getLogger(__name__)
 
 
-class GTEx(Dataset):
+class GTEx(Resource):
     # pragma: no cover
     BASE_URLS = {
         "gene_tpm": "https://storage.googleapis.com/adult-gtex/bulk-gex/v10/rna-seq/GTEx_Analysis_v10_RNASeQCv2.4.2_gene_tpm.gct.gz",

@@ -1,12 +1,12 @@
 import click
 import pandas as pd
 from ..files import load_raw_hugo, load_gct
-from ..datasets import GTEx, Hugo, SIF
+from ..resources import GTEx, Hugo, SIF
 
-datasets = click.Group(name="datasets", help="Datasets commands.")
+resources = click.Group(name="resources", help="Resource commands.")
 
 
-@datasets.command()
+@resources.command()
 @click.option("--data_type", "-t", required=False, type=str, help="Name of the dataset to download.")
 @click.option("--output_folder", "-f", required=True, type=str, help="The folder to download the dataset into.")
 def gtex(data_type: str, output_folder: str):
@@ -20,7 +20,7 @@ def gtex(data_type: str, output_folder: str):
 
 
 
-@datasets.command()
+@resources.command()
 @click.option("--output_folder", "-f", required=True, type=str, help="The folder to download the dataset into.")
 def sif(output_folder: str):
     """Download SIF dataset."""
@@ -28,7 +28,7 @@ def sif(output_folder: str):
 
 
 
-@datasets.command()
+@resources.command()
 @click.option("--output_folder", "-f", required=True, type=str, help="The folder to download the dataset into.")
 @click.option("--gtex_conversion", "-gtex", required=False, is_flag=True, type=bool, default=False,
               help="Whether to convert the hugo data to a gtex version.")

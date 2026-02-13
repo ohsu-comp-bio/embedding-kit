@@ -2,7 +2,7 @@
 Human Genome Organisation (HUGO)
 """
 
-from .dataset import SingleFileDownloader
+from .resource import SingleFileDownloader
 from pathlib import Path
 
 

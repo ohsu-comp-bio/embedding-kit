@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 REPO_DIR = ".embkit"
 
 
-class Dataset(os.PathLike[str]):
+class Resource(os.PathLike[str]):
     def __init__(
         self, name: str, save_path: Path | str | None, download: bool = True
     ) -> None:
@@ -65,7 +65,7 @@ class Dataset(os.PathLike[str]):
         pass  # pragma: no cover
 
 
-class SingleFileDownloader(Dataset):
+class SingleFileDownloader(Resource):
     def __init__(self, url: str, name: str, save_path=None, download=True):
         """
         :param save_path: Path to save the dataset

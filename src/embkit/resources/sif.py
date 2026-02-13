@@ -2,7 +2,7 @@
 Pathway Commons SIF file downloader
 """
 
-from .dataset import SingleFileDownloader
+from .resource import SingleFileDownloader
 from pathlib import Path
 
 
