@@ -3,7 +3,7 @@ import logging
 
 from embkit.version import get_version
 
-from .commands import model, matrix, cbio_cmd, protein, datasets, align
+from .commands import model, matrix, cbio_cmd, protein, resources, align
 
 @click.group(invoke_without_command=True)
 @click.option('--verbose', is_flag=True, help="Enable verbose logging")
@@ -36,7 +36,7 @@ cli.add_command(model)
 cli.add_command(matrix)
 cli.add_command(cbio_cmd)
 cli.add_command(protein)
-cli.add_command(datasets)
+cli.add_command(resources)
 cli.add_command(align)
 
 

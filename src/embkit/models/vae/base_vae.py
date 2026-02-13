@@ -253,10 +253,6 @@ class BaseVAE(nn.Module, ABC):
             _, _, z = self.encoder(x)
         return z
 
-    @abstractmethod
-    def fit(self, X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoader], **kwargs):
-        raise NotImplementedError("Subclasses must implement fit().")
-
     def save(self, path: str, normal_df: Optional[pd.DataFrame] = None):
         """Save VAE model with associated elements."""
         p = Path(path)

@@ -192,26 +192,38 @@ class Layer:
             constraint=c,
         )
 
-
 class LayerList:
-    def __init__(self, layers: Optional[List[Layer]] = None):
-        self.layers = layers
+    def __init__(self, layers: Optional[List[Layer]] = None, activation="relu", end_activation="relu"):
+        if layers is not None:
+            new_layers = []
+            for i, l in enumerate(layers):
+                if isinstance(l, int):
+                    if i < len(layers)-1:
+                        new_layers.append( Layer(l, activation=activation) )
+                    else:
+                        new_layers.append( Layer(l, activation=end_activation))
+                else:
+                    new_layers.append(l)
+        self.layers = new_layers
 
-    def build(self, input_dim, output_dim) -> nn.Module:
+    def build(self, input_dim:int, output_dim:int, device=None) -> nn.Module:
         if not self.layers:
-            return Linear(in_features=input_dim, out_features=output_dim)
+            return Linear(in_features=input_dim, out_features=output_dim, device=device)
         
         cur_dim = input_dim
         layers = []
         for layer in self.layers:
             if isinstance(layer, Layer):
-                layers.append( layer.gen_layer(cur_dim) )
+                layers.append( layer.gen_layer(cur_dim, device=device) )
                 cur_dim = layer.units
             elif isinstance(layer, int):
-                layers.append( layer.gen_layer(Linear(in_features=cur_dim, out_features=layer)) )
+                layers.append( layer.gen_layer(Linear(in_features=cur_dim, out_features=layer, device=device)) )
                 cur_dim = layer.units
             else:
                 raise ValueError(f"Unsupported layer type: {type(layer)}")
 
-        layers.append( Linear(in_features=cur_dim, out_features=output_dim) )
+        layers.append( Linear(in_features=cur_dim, out_features=output_dim, device=device) )
         return Sequential(*layers)
+
+    def __len__(self):
+        return len(self.layers)

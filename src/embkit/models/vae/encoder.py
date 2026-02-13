@@ -51,21 +51,10 @@ class Encoder(nn.Module):
 
         if layers:
             logger.info("Building encoder with %d layers", len(layers))
-            for li in layers:
-                out_features = li.units
+            enc_net = layers.build( input_dim=in_features, output_dim=self.latent_dim, device=device)
+            self.net.extend(enc_net)
 
-                layer = li.gen_layer(in_features, device=device)
-                self.net.append(layer)
-
-                if li.activation is not None:
-                    act = convert_activation(li.activation)
-                    if act is not None:
-                        self.net.append(act)
-
-                if li.batch_norm:
-                    self.net.append(nn.BatchNorm1d(out_features, device=device))
-
-                in_features = out_features
+            in_features = enc_net[-1].out_features
 
             # Latent heads requirement
             self.z_mean = None

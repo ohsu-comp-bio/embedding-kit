@@ -20,13 +20,11 @@ class Decoder(nn.Module):
         feature_dim: int,
         layers: Optional[LayerList] = None,
         batch_norm: bool = False,
-        default_activation: str = "relu",
         device=None,
     ):
         super().__init__()
         self.latent_dim = int(latent_dim)  # <- help BaseVAE.save()
         self.feature_dim = int(feature_dim)
-        self._default_activation = default_activation
         self._global_bn = batch_norm
         self.net = nn.ModuleList()
 
@@ -34,26 +32,10 @@ class Decoder(nn.Module):
 
         if layers:
             logger.info("Building decoder with %d layers", len(layers))
-            for li in layers:
-                out_features = li.units
-
-                # Create layer with appropriate in_features
-                layer = li.gen_layer(in_features, device=device)
-                self.net.append(layer)
-
-                # Activation (skip if None)
-                if li.activation is not None:
-                    act = convert_activation(li.activation)
-                    if act is not None:
-                        self.net.append(act)
-
-                # BatchNorm (after activation)
-                use_bn = getattr(li, "batch_norm", False)
-                if use_bn or self._global_bn:
-                    self.net.append(nn.BatchNorm1d(out_features, device=device))
-
-                in_features = out_features
-
+            dec_net = layers.build( latent_dim, feature_dim, device=device )
+            self.net.extend(dec_net)
+            in_features = dec_net[-1].out_features
+            
         # Final projection to feature_dim if not already there
         if in_features != self.feature_dim or not layers:
             logger.info("Adding final projection layer to %d units", self.feature_dim)

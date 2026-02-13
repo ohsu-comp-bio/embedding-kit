@@ -10,8 +10,10 @@ from torch.utils.data import DataLoader
 from .. import dataframe_loader, dataframe_tensor, get_device, dataframe_dataset
 from ..files import H5Reader
 from ..factory.layers import Layer, LayerList, ConstraintInfo
+from ..optimize import fit_vae
 from ..models.vae.vae import VAE
-from ..preprocessing import ExpMinMaxScaler, get_dataset_nonzero_mask, DatasetMask
+from ..preprocessing import ExpMinMaxScaler, get_dataset_nonzero_mask
+from ..datasets import DatasetMask
 from ..losses import bce_with_logits, bce, mse
 from ..pathway import extract_pathway_interactions, feature_map_intersect, FeatureGroups
 
@@ -88,13 +90,13 @@ def train_vae(input_path: str,
 
     layer_sizes = list( int(i) for i in encode_layers.split(",") )
     layer_sizes.append(latent)
-    encode_layer_list = LayerList( layer_sizes )
-    enc_layers = encode_layer_list.build( feature_count, latent )
+    enc_layers_list = LayerList( layer_sizes )
+    #enc_layers = encode_layer_list.build( feature_count, latent )
 
     layer_sizes = list( int(i) for i in decode_layers.split(",") )
     layer_sizes.append(feature_count)
-    decode_layer_list = LayerList( layer_sizes )
-    dec_layers = decode_layer_list.build( latent, feature_count, end_activation=final_activation )
+    dec_layers_list = LayerList( layer_sizes, end_activation=final_activation )
+    #dec_layers = decode_layer_list.build( latent, feature_count )
 
     beta_schedule = None
     if schedule is not None:
@@ -104,8 +106,8 @@ def train_vae(input_path: str,
             beta_schedule.append( (float(b), int(e)) )
     vae = VAE(features=features,
               latent_dim=latent,
-              encoder_layers=enc_layers,
-              decoder_layers=dec_layers,
+              encoder_layers=enc_layers_list,
+              decoder_layers=dec_layers_list,
               device=device)
 
     loss_func = bce_with_logits
@@ -114,7 +116,7 @@ def train_vae(input_path: str,
     elif loss == "bce":
         loss_func = bce
 
-    vae.fit(dataloader, epochs=epochs,
+    fit_vae(vae, dataloader, epochs=epochs,
             beta_schedule=beta_schedule, lr=learning_rate, loss=loss_func)
     click.echo("Training complete.")
 
@@ -172,15 +174,15 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
     gcounts = [5,2,1]
 
     enc_layers = [
-        LayerInfo(group_count*gcounts[0], op="masked_linear", constraint=ConstraintInfo("features-to-group", fmap, out_group_count=gcounts[0])),
-        LayerInfo(group_count*gcounts[1], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[0], out_group_count=gcounts[1])),
-        LayerInfo(group_count, op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[1], out_group_count=gcounts[2]))
+        Layer(group_count*gcounts[0], op="masked_linear", constraint=ConstraintInfo("features-to-group", fmap, out_group_count=gcounts[0])),
+        Layer(group_count*gcounts[1], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[0], out_group_count=gcounts[1])),
+        Layer(group_count, op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[1], out_group_count=gcounts[2]))
     ]
 
     dec_layers = [
-        LayerInfo(group_count*gcounts[1], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[2], out_group_count=gcounts[1])),
-        LayerInfo(group_count*gcounts[0], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[1], out_group_count=gcounts[0])),
-        LayerInfo(feature_count, op="masked_linear", constraint=ConstraintInfo("group-to-features", fmap, in_group_count=gcounts[0]), activation="none")
+        Layer(group_count*gcounts[1], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[2], out_group_count=gcounts[1])),
+        Layer(group_count*gcounts[0], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[1], out_group_count=gcounts[0])),
+        Layer(feature_count, op="masked_linear", constraint=ConstraintInfo("group-to-features", fmap, in_group_count=gcounts[0]), activation="none")
     ]
 
     loss_func = bce_with_logits

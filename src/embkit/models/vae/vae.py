@@ -1,15 +1,16 @@
+
+import numpy as np
+import pandas as pd
+
 import logging
 from typing import Dict, List, Optional, Union
-import numpy as np
-import torch
-import pandas as pd
-from tqdm.autonotebook import tqdm
-from torch.optim import Adam
-from ...factory.layers import Layer, LayerList
-from .base_vae import BaseVAE
 from collections.abc import Callable
-from ... import get_device, dataframe_loader
+
 from torch import nn
+
+from .base_vae import BaseVAE
+from ...factory.layers import Layer, LayerList
+from ... import get_device, dataframe_loader
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +47,8 @@ class VAE(BaseVAE):
         """
         super().__init__(features=features)
         self.lr = lr
-        self._encoder_layers_cfg = list(encoder_layers or [])
-        self._decoder_layers_cfg = list(decoder_layers or [])
+        self._encoder_layers_cfg = encoder_layers
+        self._decoder_layers_cfg = decoder_layers
         self._batch_norm = batch_norm
 
         feature_dim = len(features)
