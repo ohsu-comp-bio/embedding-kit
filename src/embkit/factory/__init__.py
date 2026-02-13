@@ -13,3 +13,5 @@ from .core import build
 from .mapping import Linear
 
 from .layers import Layer, LayerList
+
+from .registery import register_nn_module
