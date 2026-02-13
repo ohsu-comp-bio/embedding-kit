@@ -5,10 +5,10 @@ import tempfile
 from pathlib import Path
 from unittest import mock
 
-from embkit.datasets.dataset import Dataset, SingleFileDownloader
+from embkit.resources.resource import Resource, SingleFileDownloader
 
 
-class DummyDataset(Dataset):
+class DummyDataset(Resource):
     def download(self):
         # No‑op for base‑class test
         pass

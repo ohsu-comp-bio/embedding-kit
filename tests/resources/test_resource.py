@@ -2,14 +2,14 @@ import unittest
 import tempfile
 import logging
 from pathlib import Path
-from embkit.datasets.dataset import Dataset, REPO_DIR
+from embkit.resources.resource import Resource, REPO_DIR
 
-class DummyDataset(Dataset):
+class DummyDataset(Resource):
     def download(self) -> None:
         self._was_downloaded = True
 
 
-class FailingDataset(Dataset):
+class FailingDataset(Resource):
     def download(self) -> None:
         raise RuntimeError("Failed to download")
 

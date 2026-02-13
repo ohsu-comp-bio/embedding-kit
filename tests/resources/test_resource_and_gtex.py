@@ -6,11 +6,11 @@ import os
 from pathlib import Path
 from unittest import mock
 
-from embkit.datasets.dataset import Dataset, SingleFileDownloader
-from embkit.datasets.gtex import GTEx
+from embkit.resources.resource import Resource, SingleFileDownloader
+from embkit.resources.gtex import GTEx
 
 
-class DummyDataset(Dataset):
+class DummyDataset(Resource):
     def download(self):
         # No actual download
         pass

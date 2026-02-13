@@ -6,8 +6,8 @@ from requests.exceptions import RequestException
 import tarfile
 import shutil
 
-from embkit.datasets import CBIOPortal
-from embkit.datasets.dataset import REPO_DIR
+from embkit.resources import CBIOPortal
+from embkit.resources.resource import REPO_DIR
 
 class TestCBIOPortal(unittest.TestCase):
 

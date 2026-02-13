@@ -13,7 +13,7 @@ embkit cbio <> : cBIO methods for data querying and download
 from .model import model
 from .matrix import matrix
 from .cbio import cbio_cmd
-from .resources import datasets
+from .resources import resources
 from .protein import protein
 from .align import align
 
