@@ -5,6 +5,7 @@ from typing import Dict, Optional, List, Union
 from collections.abc import Callable
 
 import torch
+from torch import nn
 from torch.optim import Adam
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm.autonotebook import tqdm
@@ -93,7 +94,7 @@ def fit(self, X: Union[torch.Tensor],
     return run_epochs(epochs, beta)
 
 
-def fit_vae(self, X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoader], **kwargs):
+def fit_vae(model, X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoader], **kwargs):
     """
     Training loop using vae_loss(recon, x, mu, logvar).
 
@@ -119,7 +120,7 @@ def fit_vae(self, X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoad
 
     # --- setup ---
     if lr is None:
-        lr = self.lr
+        lr = model.lr
     if device is None:
         device = get_device()
 
@@ -127,16 +128,16 @@ def fit_vae(self, X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoad
         logger.info(f"Using beta_schedule: {beta_schedule}")
 
     # Column alignment safety check if a DataFrame is passed
-    if hasattr(X, "columns") and self.features is not None:
-        if list(X.columns) != list(self.features):
+    if hasattr(X, "columns") and model.features is not None:
+        if list(X.columns) != list(model.features):
             raise ValueError(
                 "Input DataFrame columns do not match model features.\n"
                 f"Data columns: {list(X.columns)[:5]}... (n={len(X.columns)})\n"
-                f"Model features: {self.features[:5]}... (n={len(self.features)})"
+                f"Model features: {model.features[:5]}... (n={len(model.features)})"
             )
 
-    self.to(device)
-    self.train()
+    model.to(device)
+    model.train()
 
     # Build dataloader once
     if isinstance(X, pd.DataFrame):
@@ -146,14 +147,14 @@ def fit_vae(self, X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoad
 
     # --- persistent optimizer (reuse momentum/velocity across phases) ---
     if optimizer is not None:
-        self._optimizer = optimizer
-    elif reset_optimizer or not hasattr(self, "_optimizer") or self._optimizer is None:
-        self._optimizer = Adam(self.parameters(), lr=lr)
+        model._optimizer = optimizer
+    elif reset_optimizer or not hasattr(model, "_optimizer") or model._optimizer is None:
+        model._optimizer = Adam(model.parameters(), lr=lr)
     else:
         # Reuse existing optimizer but refresh LR if changed
-        for g in self._optimizer.param_groups:
+        for g in model._optimizer.param_groups:
             g["lr"] = lr
-    opt = self._optimizer
+    opt = model._optimizer
 
     # --- epoch runner (epoch-only progress) ---
     def run_epochs(n_epochs: int, beta_value: float) -> float:
@@ -170,7 +171,7 @@ def fit_vae(self, X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoad
                 x_tensor = x_tensor.to(device).float()
 
                 # Forward
-                recon, mu, logvar, _ = self(x_tensor)
+                recon, mu, logvar, _ = model(x_tensor)
 
                 total_loss, recon_loss, kl_loss = loss(recon, x_tensor, mu, logvar, beta=beta_value)
 
@@ -191,9 +192,9 @@ def fit_vae(self, X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoad
                 ep_loss = epoch_loss_sum / epoch_batches
                 ep_recon = epoch_recon_sum / epoch_batches
                 ep_kl = epoch_kl_sum / epoch_batches
-                self.history["loss"].append(ep_loss)
-                self.history["recon"].append(ep_recon)
-                self.history["kl"].append(ep_kl)
+                model.history["loss"].append(ep_loss)
+                model.history["recon"].append(ep_recon)
+                model.history["kl"].append(ep_kl)
 
                 # Update the epoch progress bar once per epoch (no jitter)
                 if progress:

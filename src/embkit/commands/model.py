@@ -36,6 +36,7 @@ model = click.Group(name="model", help="VAE Model commands.")
 @click.option("--save-stats", is_flag=True)
 @click.option("--zero-mask", default=None, type=float)
 @click.option("--seed", default=42, type=int)
+@click.option("--bfloat16", is_flag=True)
 def train_vae(input_path: str,
               group: str,
               latent: int,
@@ -49,12 +50,17 @@ def train_vae(input_path: str,
               schedule:str,
               zero_mask: float,
               save_stats: bool,
-              seed: int
+              seed: int,
+              bfloat16: bool
               ):
     """
     Train VAE model from a TSV file.
     """
     device = get_device()
+    dtype=torch.float32
+    if bfloat16:
+        dtype=torch.bfloat16
+
     torch.manual_seed(seed)
     df = None
     if group is not None:
@@ -83,7 +89,7 @@ def train_vae(input_path: str,
             df = pd.DataFrame( norm.transform(df), index=df.index, columns=df.columns)
         features = df.columns
         feature_count = len(df.columns)
-        dataset = dataframe_dataset(df, device=device)
+        dataset = dataframe_dataset(df, device=device, dtype=dtype)
     
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     
@@ -108,7 +114,7 @@ def train_vae(input_path: str,
               latent_dim=latent,
               encoder_layers=enc_layers_list,
               decoder_layers=dec_layers_list,
-              device=device)
+              device=device, dtype=dtype)
 
     loss_func = bce_with_logits
     if loss == "mse":

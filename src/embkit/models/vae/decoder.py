@@ -20,7 +20,7 @@ class Decoder(nn.Module):
         feature_dim: int,
         layers: Optional[LayerList] = None,
         batch_norm: bool = False,
-        device=None,
+        device=None, dtype=None
     ):
         super().__init__()
         self.latent_dim = int(latent_dim)  # <- help BaseVAE.save()
@@ -32,14 +32,14 @@ class Decoder(nn.Module):
 
         if layers:
             logger.info("Building decoder with %d layers", len(layers))
-            dec_net = layers.build( latent_dim, feature_dim, device=device )
+            dec_net = layers.build( latent_dim, feature_dim, device=device, dtype=dtype )
             self.net.extend(dec_net)
             in_features = dec_net[-1].out_features
             
         # Final projection to feature_dim if not already there
         if in_features != self.feature_dim or not layers:
             logger.info("Adding final projection layer to %d units", self.feature_dim)
-            self.out = nn.Linear(in_features, self.feature_dim, device=device)
+            self.out = nn.Linear(in_features, self.feature_dim, device=device, dtype=dtype)
             self.net.append(self.out)
         else:
             # If the last layer matches feature_dim, identify it as self.out
@@ -53,7 +53,7 @@ class Decoder(nn.Module):
                 self.out = linear_layers[-1]
             else:
                 # Fallback: create identity or just set it
-                self.out = nn.Identity()
+                self.out = nn.Identity(dtype=dtype)
 
     def forward(self, z: torch.Tensor) -> torch.Tensor:
         h = z

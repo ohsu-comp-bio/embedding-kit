@@ -33,7 +33,7 @@ class Encoder(nn.Module):
                  make_latent_heads: bool = True,
                  sampling : bool = False,
                  constraint: Optional["NetworkConstraint"] = None,
-                 device=None):
+                 device=None, dtype=None):
         super().__init__()
         self.feature_dim = int(feature_dim)
         self.latent_dim = int(latent_dim) if latent_dim is not None else None  # <- help BaseVAE.save()
@@ -47,11 +47,11 @@ class Encoder(nn.Module):
 
         # Optional global BN on input
         if batch_norm:
-            self.net.append(nn.BatchNorm1d(in_features, device=device))
+            self.net.append(nn.BatchNorm1d(in_features, device=device, dtype=dtype))
 
         if layers:
             logger.info("Building encoder with %d layers", len(layers))
-            enc_net = layers.build( input_dim=in_features, output_dim=self.latent_dim, device=device)
+            enc_net = layers.build( input_dim=in_features, output_dim=self.latent_dim, device=device, dtype=dtype)
             self.net.extend(enc_net)
 
             in_features = enc_net[-1].out_features
@@ -69,8 +69,8 @@ class Encoder(nn.Module):
                         f"Final hidden size: {in_features}  vs  latent_dim: {self.latent_dim}\n"
                         "Fix by setting your last LayerInfo(units=latent_dim)."
                     )
-                self.z_mean = nn.Linear(self.latent_dim, self.latent_dim, device=device)
-                self.z_log_var = nn.Linear(self.latent_dim, self.latent_dim, device=device)
+                self.z_mean = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
+                self.z_log_var = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
 
         else:
             if self.latent_dim is None:
@@ -80,7 +80,7 @@ class Encoder(nn.Module):
             logger.info("No encoder layers provided; inserting auto-projection to latent_dim=%d", self.latent_dim)
 
             # Auto projection to latent size
-            proj = nn.Linear(in_features, self.latent_dim, bias=True, device=device)
+            proj = nn.Linear(in_features, self.latent_dim, bias=True, device=device, dtype=dtype)
             self.net.append(proj)
 
             # Optional default activation after the auto-projection
@@ -89,7 +89,7 @@ class Encoder(nn.Module):
                 self.net.append(act)
 
             # Optional BN after the auto-projection
-            self.net.append(nn.BatchNorm1d(self.latent_dim, device=device))
+            self.net.append(nn.BatchNorm1d(self.latent_dim, device=device, dtype=dtype))
 
             in_features = self.latent_dim
 
@@ -97,8 +97,8 @@ class Encoder(nn.Module):
             self.z_mean = None
             self.z_log_var = None
             if self._make_latent_heads:
-                self.z_mean = nn.Linear(self.latent_dim, self.latent_dim, device=device)
-                self.z_log_var = nn.Linear(self.latent_dim, self.latent_dim, device=device)
+                self.z_mean = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
+                self.z_log_var = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
 
         self._final_width = in_features
 

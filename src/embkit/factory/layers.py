@@ -151,7 +151,7 @@ class Layer:
         self.constraint = constraint
         self.bias = bias
     
-    def gen_layer(self, in_features: int, device=None):
+    def gen_layer(self, in_features: int, device=None, dtype=None):
         out_features = self.units
         if self.op == "masked_linear":
             init_mask = None
@@ -164,9 +164,9 @@ class Layer:
                         f"(units, in_features)=({out_features}, {in_features})."
                     )
                 init_mask = torch.as_tensor(m, dtype=torch.float32, device=device)
-            return MaskedLinear(in_features, out_features, bias=self.bias, mask=init_mask, device=device)
+            return MaskedLinear(in_features, out_features, bias=self.bias, mask=init_mask, device=device, dtype=dtype)
         elif self.op == "linear":
-            return Linear(in_features, out_features, bias=self.bias, device=device)
+            return Linear(in_features, out_features, bias=self.bias, device=device, dtype=dtype)
         raise ValueError(f"Unknown LayerInfo.op '{self.op}'")
 
     def to_dict(self) -> dict:
@@ -206,23 +206,23 @@ class LayerList:
                     new_layers.append(l)
         self.layers = new_layers
 
-    def build(self, input_dim:int, output_dim:int, device=None) -> nn.Module:
+    def build(self, input_dim:int, output_dim:int, device=None, dtype=None) -> nn.Module:
         if not self.layers:
-            return Linear(in_features=input_dim, out_features=output_dim, device=device)
+            return Linear(in_features=input_dim, out_features=output_dim, device=device, dtype=dtype)
         
         cur_dim = input_dim
         layers = []
         for layer in self.layers:
             if isinstance(layer, Layer):
-                layers.append( layer.gen_layer(cur_dim, device=device) )
+                layers.append( layer.gen_layer(cur_dim, device=device, dtype=dtype) )
                 cur_dim = layer.units
             elif isinstance(layer, int):
-                layers.append( layer.gen_layer(Linear(in_features=cur_dim, out_features=layer, device=device)) )
+                layers.append( layer.gen_layer(Linear(in_features=cur_dim, out_features=layer, device=device, dtype=dtype)) )
                 cur_dim = layer.units
             else:
                 raise ValueError(f"Unsupported layer type: {type(layer)}")
 
-        layers.append( Linear(in_features=cur_dim, out_features=output_dim, device=device) )
+        layers.append( Linear(in_features=cur_dim, out_features=output_dim, device=device, dtype=dtype) )
         return Sequential(*layers)
 
     def __len__(self):
