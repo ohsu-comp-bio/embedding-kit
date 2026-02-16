@@ -5,7 +5,7 @@ Exports:
     - Layer – layer description class (formerly LayerInfo)
     - build_encoder(spec, device=None)
     - build_decoder(spec, device=None)
-    - convert_activation – helper to map string names to torch modules
+    - get_activation – helper to map string names to torch modules
 """
 
 from .core import build

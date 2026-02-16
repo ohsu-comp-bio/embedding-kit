@@ -25,9 +25,9 @@ class TestMappingUtilities(unittest.TestCase):
         self.assertFalse(rebuilt.bias)
 
     def test_convert_activation_known(self):
-        self.assertIsInstance(mapping.convert_activation("relu"), nn.ReLU)
-        self.assertIsInstance(mapping.convert_activation("tanh"), nn.Tanh)
-        self.assertIsNone(mapping.convert_activation("unknown"))
+        self.assertIsInstance(mapping.get_activation("relu"), nn.ReLU)
+        self.assertIsInstance(mapping.get_activation("tanh"), nn.Tanh)
+        self.assertIsNone(mapping.get_activation("unknown"))
 
 
 if __name__ == "__main__":

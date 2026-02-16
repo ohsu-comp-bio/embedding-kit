@@ -1,9 +1,9 @@
 from typing import Optional, List, Union, TYPE_CHECKING
 from torch import nn
 import torch
-from ...layers import MaskedLinear
+from ...modules import MaskedLinear
 from ...factory.layers import Layer, LayerList
-from ...factory.mapping import convert_activation
+from ...factory.mapping import get_activation
 
 import logging
 
@@ -26,7 +26,7 @@ class Encoder(nn.Module):
 
     def __init__(self,
                  feature_dim: int,
-                 latent_dim: Optional[int] = None,
+                 latent_dim: int,
                  layers: Optional[LayerList] = None,
                  batch_norm: bool = False,
                  default_activation: Union[str, None] = "relu",
@@ -36,7 +36,7 @@ class Encoder(nn.Module):
                  device=None, dtype=None):
         super().__init__()
         self.feature_dim = int(feature_dim)
-        self.latent_dim = int(latent_dim) if latent_dim is not None else None  # <- help BaseVAE.save()
+        self.latent_dim = int(latent_dim)
         self._default_activation = default_activation
         self._make_latent_heads = make_latent_heads
         self._sampling = sampling
@@ -84,7 +84,7 @@ class Encoder(nn.Module):
             self.net.append(proj)
 
             # Optional default activation after the auto-projection
-            act = convert_activation(self._default_activation)
+            act = get_activation(self._default_activation)
             if act is not None:
                 self.net.append(act)
 

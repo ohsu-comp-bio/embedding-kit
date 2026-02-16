@@ -1,4 +1,4 @@
-from .mapping import convert_activation, Sequential
+from .mapping import get_activation, Sequential
 from .registery import CLASS_REGISTRY
 
 from torch import nn
@@ -19,8 +19,8 @@ def build(desc):
             elements.append(build(element))
         return Sequential(*elements)
     elif isinstance(desc, str):
-        cls = convert_activation(desc)
+        cls = get_activation(desc)
         if cls is not None:
-            return cls
+            return cls()
 
     raise Exception(f"Invalid input for build function: {type(desc)}")

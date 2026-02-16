@@ -3,8 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from embkit.factory.core import build
-from embkit.factory.mapping import convert_activation, Linear, Sequential
-from embkit.layers import MaskedLinear
+from embkit.factory.mapping import Linear, Sequential
 
 class TestBuildFunction(unittest.TestCase):
    

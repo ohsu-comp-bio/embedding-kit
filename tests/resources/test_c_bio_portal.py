@@ -15,7 +15,7 @@ class TestCBIOPortal(unittest.TestCase):
         self.study_id = "test_study"
         self.test_data = b"Fake .tar.gz content"
 
-    @patch("embkit.datasets.c_bio_portal.requests.get")
+    @patch("embkit.resources.c_bio_portal.requests.get")
     def test_download_success(self, mock_get):
         with tempfile.TemporaryDirectory() as tmpdir:
             mock_response = MagicMock()
@@ -36,7 +36,7 @@ class TestCBIOPortal(unittest.TestCase):
             self.assertTrue(expected_file.exists())
             self.assertEqual(data, self.test_data)
 
-    @patch("embkit.datasets.c_bio_portal.requests.get")
+    @patch("embkit.resources.c_bio_portal.requests.get")
     def test_download_warns_on_repeat(self, mock_get):
         with tempfile.TemporaryDirectory() as tmpdir:
             dataset = CBIOPortal(
@@ -47,7 +47,7 @@ class TestCBIOPortal(unittest.TestCase):
             with self.assertWarns(UserWarning):
                 dataset.download()
 
-    @patch("embkit.datasets.c_bio_portal.requests.get")
+    @patch("embkit.resources.c_bio_portal.requests.get")
     def test_download_failure_raises(self, mock_get):
         with tempfile.TemporaryDirectory() as tmpdir:
             mock_get.side_effect = RequestException("Boom!")
@@ -55,7 +55,7 @@ class TestCBIOPortal(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 dataset.download()
 
-    @patch("embkit.datasets.c_bio_portal.tarfile.open")
+    @patch("embkit.resources.c_bio_portal.tarfile.open")
     def test_unpack_success(self, mock_tar_open):
         with tempfile.TemporaryDirectory() as tmpdir:
             tar_path = Path(tmpdir) / f"{self.study_id}.tar.gz"
@@ -85,7 +85,7 @@ class TestCBIOPortal(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):
                 dataset.unpack()
 
-    @patch("embkit.datasets.c_bio_portal.tarfile.open")
+    @patch("embkit.resources.c_bio_portal.tarfile.open")
     def test_unpack_tarfile_error(self, mock_tar_open):
         with tempfile.TemporaryDirectory() as tmpdir:
             tar_path = Path(tmpdir) / f"{self.study_id}.tar.gz"
@@ -117,7 +117,7 @@ class TestCBIOPortal(unittest.TestCase):
             dataset.unpack()
             self.assertEqual(dataset.unpacked_file_path.resolve(), study_folder.resolve())
 
-    @patch("embkit.datasets.c_bio_portal.requests.get")
+    @patch("embkit.resources.c_bio_portal.requests.get")
     def test_download_warns_if_already_called_from_init(self, mock_get):
         mock_response = MagicMock()
         mock_response.iter_content = lambda chunk_size: [b"x" * 10]
@@ -142,7 +142,7 @@ class TestCBIOPortal(unittest.TestCase):
         self.assertEqual(Path(dataset.save_path).resolve(), default_path.resolve())
 
     # ✅ Covers lines 69–70 (target_file and unpacked_folder path logic)
-    @patch("embkit.datasets.c_bio_portal.requests.get")
+    @patch("embkit.resources.c_bio_portal.requests.get")
     def test_download_resolves_expected_paths(self, mock_get):
         with tempfile.TemporaryDirectory() as tmpdir:
             mock_response = MagicMock()
@@ -162,7 +162,7 @@ class TestCBIOPortal(unittest.TestCase):
             self.assertEqual(target_file.name, f"{self.study_id}.tar.gz")
             self.assertEqual(unpack_folder.name, self.study_id)
 
-    @patch("embkit.datasets.c_bio_portal.requests.get")
+    @patch("embkit.resources.c_bio_portal.requests.get")
     def test_default_embkit_path_created_if_missing(self, mock_get):
         default_path = Path.home() / REPO_DIR
 
@@ -188,8 +188,8 @@ class TestCBIOPortal(unittest.TestCase):
         self.assertTrue(default_path.exists())
         self.assertTrue((default_path / f"{self.study_id}.tar.gz").exists())
 
-    @patch("embkit.datasets.c_bio_portal.requests.get")
-    @patch("embkit.datasets.c_bio_portal.logger")
+    @patch("embkit.resources.c_bio_portal.requests.get")
+    @patch("embkit.resources.c_bio_portal.logger")
     def test_skips_download_if_tar_gz_exists(self, mock_logger, mock_get):
         with tempfile.TemporaryDirectory() as tmpdir:
             save_path = Path(tmpdir)
@@ -205,8 +205,8 @@ class TestCBIOPortal(unittest.TestCase):
             self.assertEqual(result, b"")
             mock_logger.info.assert_called_with(f"File {tar_file} already exists. Skipping download.")
 
-    @patch("embkit.datasets.c_bio_portal.requests.get")
-    @patch("embkit.datasets.c_bio_portal.logger")
+    @patch("embkit.resources.c_bio_portal.requests.get")
+    @patch("embkit.resources.c_bio_portal.logger")
     def test_skips_download_if_unpacked_folder_exists(self, mock_logger, mock_get):
         with tempfile.TemporaryDirectory() as tmpdir:
             save_path = Path(tmpdir)
@@ -220,7 +220,7 @@ class TestCBIOPortal(unittest.TestCase):
             self.assertEqual(result, b"")
             mock_logger.info.assert_called_with(f"Unpacked folder {unpacked_folder} already exists. Skipping download.")
 
-    @patch("embkit.datasets.c_bio_portal.tarfile.open")
+    @patch("embkit.resources.c_bio_portal.tarfile.open")
     def test_unpack_returns_correct_path_on_success(self, mock_tar_open):
         with tempfile.TemporaryDirectory() as tmpdir:
             tar_path = Path(tmpdir) / f"{self.study_id}.tar.gz"

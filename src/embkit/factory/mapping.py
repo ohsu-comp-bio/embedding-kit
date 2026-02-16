@@ -79,9 +79,9 @@ class Sequential(nn.Sequential):
             out.append( a.to_dict() )
         return { "args": out, "__class__": Sequential.__name__ }
 
-def convert_activation(name: Optional[str]) -> Optional[nn.Module]:
+def get_activation(name: Optional[str]) -> Optional[nn.Module]:
     """
-    Convert a string name to a PyTorch activation function module.
+    Get a PyTorch activation function module from a string name.
     Args:
         name (Optional[str]): Name of the activation function (e.g., "relu", "
     "tanh", "sigmoid", etc.). If None or empty, returns None.
@@ -94,13 +94,13 @@ def convert_activation(name: Optional[str]) -> Optional[nn.Module]:
         return None
     name = name.lower()
     return {
-        "relu": nn.ReLU(),
-        "tanh": nn.Tanh(),
-        "sigmoid": nn.Sigmoid(),
-        "leaky_relu": nn.LeakyReLU(),
-        "elu": nn.ELU(),
-        "gelu": nn.GELU(),
-        "silu": nn.SiLU(),
+        "relu": nn.ReLU,
+        "tanh": nn.Tanh,
+        "sigmoid": nn.Sigmoid,
+        "leaky_relu": nn.LeakyReLU,
+        "elu": nn.ELU,
+        "gelu": nn.GELU,
+        "silu": nn.SiLU,
         None: None,
     }.get(name, None)
 

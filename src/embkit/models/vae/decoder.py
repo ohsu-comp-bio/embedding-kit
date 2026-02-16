@@ -1,9 +1,8 @@
 from typing import List, Optional
 import torch
 from torch import nn
-from ...layers import MaskedLinear
+from ...modules import MaskedLinear
 from ...factory.layers import Layer, LayerList
-from ...factory.mapping import convert_activation
 import logging
 
 logger = logging.getLogger(__name__)

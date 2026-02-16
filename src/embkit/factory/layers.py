@@ -7,8 +7,8 @@ import numpy as np
 from typing import Optional, List, Literal, Dict, Any
 import torch
 from torch import nn
-from ..layers import MaskedLinear
-from .mapping import Linear, Sequential
+from ..modules import MaskedLinear
+from .mapping import Linear, Sequential, get_activation
 from ..pathway import FeatureGroups
 
 
@@ -151,8 +151,9 @@ class Layer:
         self.constraint = constraint
         self.bias = bias
     
-    def gen_layer(self, in_features: int, device=None, dtype=None):
+    def gen_layer(self, in_features: int, device=None, dtype=None) -> List[nn.Module]:
         out_features = self.units
+        layers = []
         if self.op == "masked_linear":
             init_mask = None
             if self.constraint is not None:
@@ -164,10 +165,19 @@ class Layer:
                         f"(units, in_features)=({out_features}, {in_features})."
                     )
                 init_mask = torch.as_tensor(m, dtype=torch.float32, device=device)
-            return MaskedLinear(in_features, out_features, bias=self.bias, mask=init_mask, device=device, dtype=dtype)
-        elif self.op == "linear":
-            return Linear(in_features, out_features, bias=self.bias, device=device, dtype=dtype)
-        raise ValueError(f"Unknown LayerInfo.op '{self.op}'")
+            layers.append(MaskedLinear(in_features, out_features, bias=self.bias, mask=init_mask, device=device, dtype=dtype))
+        elif self.op ==  "linear":
+            layers.append(Linear(in_features, out_features, bias=self.bias, device=device, dtype=dtype))
+        else:
+            raise ValueError(f"Unknown LayerInfo.op '{self.op}'")
+        
+        if self.activation is not None:
+            act = get_activation(self.activation)
+            if act is not None:
+                layers.append(act())
+        if self.batch_norm:
+            layers.append(nn.BatchNorm1d(out_features))
+        return layers
 
     def to_dict(self) -> dict:
         return {
@@ -214,10 +224,10 @@ class LayerList:
         layers = []
         for layer in self.layers:
             if isinstance(layer, Layer):
-                layers.append( layer.gen_layer(cur_dim, device=device, dtype=dtype) )
+                layers.extend( layer.gen_layer(cur_dim, device=device, dtype=dtype) )
                 cur_dim = layer.units
             elif isinstance(layer, int):
-                layers.append( layer.gen_layer(Linear(in_features=cur_dim, out_features=layer, device=device, dtype=dtype)) )
+                layers.extend( layer.gen_layer(Linear(in_features=cur_dim, out_features=layer, device=device, dtype=dtype)) )
                 cur_dim = layer.units
             else:
                 raise ValueError(f"Unsupported layer type: {type(layer)}")
@@ -227,3 +237,6 @@ class LayerList:
 
     def __len__(self):
         return len(self.layers)
+    
+    def __iter__(self):
+        return iter(self.layers)

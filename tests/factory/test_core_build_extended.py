@@ -4,7 +4,7 @@ import unittest
 from unittest import mock
 
 from embkit.factory import register_nn_module
-from embkit.factory import core, mapping
+from embkit.factory import core
 from torch import nn
 
 
@@ -35,7 +35,7 @@ class TestCoreBuildExtended(unittest.TestCase):
         self.assertIn("Unknown layer type", str(ctx.exception))
 
     def test_build_unknown_str_returns_none(self):
-        # convert_activation returns None for unknown activation, so build should raise
+        # get_activation returns None for unknown activation, so build should raise
         with self.assertRaises(Exception) as ctx:
             core.build("unknown_activation")
         self.assertIn("Invalid input for build function", str(ctx.exception))

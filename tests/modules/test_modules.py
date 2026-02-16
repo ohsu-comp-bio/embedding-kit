@@ -2,9 +2,9 @@ import unittest
 import torch
 from torch import nn
 
-from embkit.layers import MaskedLinear
+from embkit.modules import MaskedLinear
 from embkit.factory.layers import Layer
-from embkit.factory.mapping import convert_activation  # adjust import if needed
+from embkit.factory.mapping import get_activation  # adjust import if needed
 
 
 class TestLayerPrimitives(unittest.TestCase):
@@ -20,8 +20,8 @@ class TestLayerPrimitives(unittest.TestCase):
             ml.set_mask(torch.ones(3, 3))  # wrong shape
 
     def test_convert_activation_including_none(self):
-        self.assertIsInstance(convert_activation("relu"), nn.ReLU)
-        self.assertIsNone(convert_activation(None))
+        self.assertIsInstance(get_activation("relu"), nn.ReLU)
+        self.assertIsNone(get_activation(None))
 
 
 class TestLayerInfoDataclass(unittest.TestCase):
