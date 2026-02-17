@@ -7,7 +7,7 @@ from typing import Dict, Optional, List, Union
 from collections.abc import Callable
 
 from ..factory.mapping import Sequential, Linear, BatchNorm1d
-from ..factory.layers import LayerArray
+from ..factory.layers import LayerList
 
 from torch import nn
 
@@ -21,7 +21,7 @@ class FFNN(nn.Module):
     """
 
     def __init__(self, input_dim: int, output_dim: int,
-                 layers: Optional[LayerArray] = None,
+                 layers: Optional[LayerList] = None,
                  batch_norm: bool = False):
         super().__init__()
 

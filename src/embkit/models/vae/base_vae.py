@@ -26,6 +26,15 @@ class BaseVAE(nn.Module, ABC):
     Allows late-binding of encoder/decoder by subclasses.
     """
 
+    def __init__(self, features: List[str], encoder: Optional[Encoder] = None, decoder: Optional[Decoder] = None,
+                 **kwargs):
+        super().__init__()
+        self.features = list(features)
+        self.encoder: Optional[Encoder] = encoder
+        self.decoder: Optional[Decoder] = decoder
+        self.extra_args = kwargs  # for subclasses to stash configs
+
+
     @staticmethod
     def build_encoder(feature_dim: int, latent_dim: int,
                       layers: Optional[LayerList] = None,
@@ -99,8 +108,8 @@ class BaseVAE(nn.Module, ABC):
 
         # ---------- architecture & container meta ----------
         arch_path = Path(path, "model.arch.json")
-        enc_layers: Optional[List[Layer]] = None
-        dec_layers: Optional[List[Layer]] = None
+        enc_layers: LayerList = None
+        dec_layers: LayerList = None
         batch_norm = False
         container_dotted: Optional[str] = None
 
@@ -109,8 +118,8 @@ class BaseVAE(nn.Module, ABC):
                 arch = json.load(fh)
             latent_dim = int(arch["latent_dim"])
             container_dotted = arch.get("container")
-            enc_layers = [Layer.from_dict(d) for d in arch.get("encoder_layers", [])]
-            dec_layers = [Layer.from_dict(d) for d in arch.get("decoder_layers", [])]
+            enc_layers = LayerList( [Layer.from_dict(d) for d in arch.get("encoder_layers", [])] )
+            dec_layers = LayerList( [Layer.from_dict(d) for d in arch.get("decoder_layers", [])] )
             batch_norm = bool(arch.get("batch_norm", False))
         else:
             # fallback: infer latent from encoder weights (never from names)
@@ -225,14 +234,6 @@ class BaseVAE(nn.Module, ABC):
                 logger.warning(f"Could not read {stats_path}")
 
         return out
-
-    def __init__(self, features: List[str], encoder: Optional[Encoder] = None, decoder: Optional[Decoder] = None,
-                 **kwargs):
-        super().__init__()
-        self.features = list(features)
-        self.encoder: Optional[Encoder] = encoder
-        self.decoder: Optional[Decoder] = decoder
-        self.extra_args = kwargs  # for subclasses to stash configs
 
     def to(self, device=None, dtype=None):
         self.encoder.to(device=device, dtype=dtype)

@@ -204,8 +204,8 @@ class Layer:
 
 class LayerList:
     def __init__(self, layers: Optional[List[Layer]] = None, activation="relu", end_activation="relu"):
+        new_layers = []
         if layers is not None:
-            new_layers = []
             for i, l in enumerate(layers):
                 if isinstance(l, int):
                     if i < len(layers)-1:

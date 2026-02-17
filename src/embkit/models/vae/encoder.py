@@ -86,7 +86,7 @@ class Encoder(nn.Module):
             # Optional default activation after the auto-projection
             act = get_activation(self._default_activation)
             if act is not None:
-                self.net.append(act)
+                self.net.append(act())
 
             # Optional BN after the auto-projection
             self.net.append(nn.BatchNorm1d(self.latent_dim, device=device, dtype=dtype))

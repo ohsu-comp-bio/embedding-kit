@@ -10,7 +10,7 @@ from typing import Optional
 
 from torch import nn
 
-from .registery import register_nn_module, CLASS_REGISTRY
+from .registery import register_nn_module, get_class_name, CLASS_REGISTRY
 
 def clean_params(params):
     out = {}

@@ -8,7 +8,7 @@ Exports:
     - get_activation – helper to map string names to torch modules
 """
 
-from .core import build
+from .core import build, save, load
 
 from .mapping import Linear
 

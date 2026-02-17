@@ -2,7 +2,7 @@ from .mapping import get_activation, Sequential
 from .registery import CLASS_REGISTRY
 
 from torch import nn
-
+import torch
 
 def build(desc):
     if getattr(desc, "to_dict", None) is not None:
@@ -24,3 +24,16 @@ def build(desc):
             return cls()
 
     raise Exception(f"Invalid input for build function: {type(desc)}")
+
+def save(model, path):
+    state = model.state_dict()
+    desc = model.to_dict()    
+    state["__model__"] = desc
+    torch.save(state, path)
+
+def load(path):
+    state_dict = torch.load(path)
+    desc = state_dict.pop("__model__", None)
+    model = build(desc)
+    model.load_state_dict(state_dict)
+    return model
