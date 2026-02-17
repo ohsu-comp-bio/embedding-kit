@@ -156,6 +156,11 @@ def fit_vae(model, X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoa
             g["lr"] = lr
     opt = model._optimizer
 
+    history = {
+        "loss" : [],
+        "recon" : [],
+        "kl" : [],
+    }
     # --- epoch runner (epoch-only progress) ---
     def run_epochs(n_epochs: int, beta_value: float) -> float:
         last_loss = 0.0
@@ -192,9 +197,9 @@ def fit_vae(model, X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoa
                 ep_loss = epoch_loss_sum / epoch_batches
                 ep_recon = epoch_recon_sum / epoch_batches
                 ep_kl = epoch_kl_sum / epoch_batches
-                model.history["loss"].append(ep_loss)
-                model.history["recon"].append(ep_recon)
-                model.history["kl"].append(ep_kl)
+                history["loss"].append(ep_loss)
+                history["recon"].append(ep_recon)
+                history["kl"].append(ep_kl)
 
                 # Update the epoch progress bar once per epoch (no jitter)
                 if progress:

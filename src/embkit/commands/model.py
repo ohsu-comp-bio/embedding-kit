@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 
 from .. import dataframe_loader, dataframe_tensor, get_device, dataframe_dataset
 from ..files import H5Reader
+from ..factory import save, load
 from ..factory.layers import Layer, LayerList, ConstraintInfo
 from ..optimize import fit_vae
 from ..models.vae.vae import VAE
@@ -130,11 +131,11 @@ def train_vae(input_path: str,
         click.echo(f"No output path provided, using default naming.")
         out = f"vae_latent{latent}_epochs{epochs}.model"
 
-    if save_stats and df is not None:
-        vae.save(out, df)
-    else:
-        vae.save(out)
-
+    #if save_stats and df is not None:
+    #    vae.save(out, df)
+    #else:
+    #    vae.save(out)
+    save(vae, out)
     click.echo(f"Model saved, to {out}")
 
 
@@ -216,7 +217,9 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
 @click.option("--normalize", "-n", type=str, default="none")
 @click.option("--out", "-o", type=str, default="embedding.tsv")
 def encode(input_path: str, model_path:str, normalize:str, out:str):
-    m = VAE.open_model(path=model_path)
+
+    m = load(model_path)
+    #m = VAE.open_model(path=model_path)
     df = pd.read_csv(input_path, sep="\t", index_col=0)
 
     # print(m)
