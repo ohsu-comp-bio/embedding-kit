@@ -9,14 +9,14 @@ from collections.abc import Callable
 from torch import nn
 
 from .base_vae import BaseVAE
-from ...factory.mapping import register_nn_module, get_class_name
+from ...factory.mapping import nn_module, get_class_name
 from ...factory.layers import Layer, LayerList
 from ... import get_device, dataframe_loader
 
 logger = logging.getLogger(__name__)
 
 
-@register_nn_module
+@nn_module
 class VAE(BaseVAE):
     """
     Concrete VAE that composes the modular Encoder/Decoder from BaseVAE

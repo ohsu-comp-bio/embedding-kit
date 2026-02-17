@@ -10,7 +10,7 @@ from typing import Optional
 
 from torch import nn
 
-from .registery import register_nn_module, get_class_name, CLASS_REGISTRY
+from .registery import nn_module, get_class_name, CLASS_REGISTRY
 
 def clean_params(params):
     out = {}
@@ -19,7 +19,7 @@ def clean_params(params):
             out[k] = v
     return out
 
-@register_nn_module
+@nn_module
 class Linear(nn.Linear):
     def __init__(self, in_features, out_features, bias = True, device=None, dtype=None):
         super().__init__(in_features=in_features, out_features=out_features, bias=bias, device=device, dtype=dtype)
@@ -38,7 +38,7 @@ class Linear(nn.Linear):
     def to_dict(self):
         return self._params | {"__class__" : Linear.__name__}
 
-@register_nn_module
+@nn_module
 class BatchNorm1d(nn.BatchNorm1d):
     def __init__(self, num_features, eps=1e-05, momentum=0.1, affine=True, device=None, dtype=None):
         super().__init__(num_features=num_features, eps=eps, momentum=momentum, affine=affine, device=device, dtype=dtype)
@@ -58,7 +58,7 @@ class BatchNorm1d(nn.BatchNorm1d):
     def to_dict(self):
         return self._params | {"__class__" : BatchNorm1d.__name__}
 
-@register_nn_module
+@nn_module
 class Sequential(nn.Sequential):
     def __init__(self, *args):
         super().__init__(*args)

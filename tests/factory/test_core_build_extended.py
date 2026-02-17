@@ -3,12 +3,12 @@
 import unittest
 from unittest import mock
 
-from embkit.factory import register_nn_module
+from embkit.factory import nn_module
 from embkit.factory import core
 from torch import nn
 
 
-@register_nn_module
+@nn_module
 class DummyObj(nn.Module):
     def __init__(self, data):
         self._data = data
