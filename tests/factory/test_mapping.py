@@ -18,15 +18,15 @@ class TestMappingUtilities(unittest.TestCase):
         params = {"in_features": 2, "out_features": 3, "bias": False}
         lin = mapping.Linear(**params)
         d = lin.to_dict()
-        self.assertEqual(d["__class__"], mapping.Linear.__name__)
+        self.assertEqual(d["__class__"], mapping.get_class_name(mapping.Linear))
         rebuilt = mapping.Linear.from_dict(d)
         self.assertEqual(rebuilt.in_features, 2)
         self.assertEqual(rebuilt.out_features, 3)
         self.assertFalse(rebuilt.bias)
 
     def test_convert_activation_known(self):
-        self.assertIsInstance(mapping.get_activation("relu"), nn.ReLU)
-        self.assertIsInstance(mapping.get_activation("tanh"), nn.Tanh)
+        self.assertIsInstance(mapping.get_activation("relu")(), nn.ReLU)
+        self.assertIsInstance(mapping.get_activation("tanh")(), nn.Tanh)
         self.assertIsNone(mapping.get_activation("unknown"))
 
 

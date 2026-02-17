@@ -20,7 +20,7 @@ class TestLayerPrimitives(unittest.TestCase):
             ml.set_mask(torch.ones(3, 3))  # wrong shape
 
     def test_convert_activation_including_none(self):
-        self.assertIsInstance(get_activation("relu"), nn.ReLU)
+        self.assertIsInstance(get_activation("relu")(), nn.ReLU)
         self.assertIsNone(get_activation(None))
 
 

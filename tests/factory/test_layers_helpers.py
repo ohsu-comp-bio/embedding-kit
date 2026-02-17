@@ -44,11 +44,11 @@ class TestLayerHelpers(unittest.TestCase):
         # classMap should have Linear registered
         layer_obj = layers.Layer.from_dict(spec)
         self.assertIsInstance(layer_obj, layers.Layer)
-        # gen_layer should produce a torch.nn.Linear
+        # gen_layer should produce a [torch.nn.Linear, torch.nn.Relu]
         mod = layer_obj.gen_layer(in_features=2)
-        self.assertIsInstance(mod, nn.Linear)
-        self.assertEqual(mod.in_features, 2)
-        self.assertEqual(mod.out_features, 3)
+        self.assertIsInstance(mod[0], nn.Linear)
+        self.assertEqual(mod[0].in_features, 2)
+        self.assertEqual(mod[0].out_features, 3)
 
     def test_layer_gen_layer_masked_linear_with_constraint(self):
         # Create a Layer with masked_linear op and dummy constraint
@@ -57,9 +57,9 @@ class TestLayerHelpers(unittest.TestCase):
             units=2, op="masked_linear", constraint=dummy, bias=False
         )
         mod = layer_obj.gen_layer(in_features=3)
-        self.assertIsInstance(mod, layers.MaskedLinear)
+        self.assertIsInstance(mod[0], layers.MaskedLinear)
         # Verify mask applied matches dummy mask (all ones)
-        self.assertTrue(torch.equal(mod.mask, torch.ones((2, 3), dtype=mod.mask.dtype)))
+        self.assertTrue(torch.equal(mod[0].mask, torch.ones((2, 3), dtype=mod[0].mask.dtype)))
 
     def test_layer_gen_layer_unknown_op_raises(self):
         layer_obj = layers.Layer(units=2, op="unknown")
@@ -78,12 +78,13 @@ class TestLayerHelpers(unittest.TestCase):
         l2 = layers.Layer(units=2, op="linear")
         ll = layers.LayerList(layers=[l1, l2])
         net = ll.build(input_dim=5, output_dim=1)
+        print(net)
         # Should be a Sequential with 3 linear layers (2 from list + final output)
         self.assertIsInstance(net, nn.Sequential)
-        self.assertEqual(len(net), 3)
+        self.assertEqual(len(net), 5)
         self.assertEqual(net[0].out_features, 3)
-        self.assertEqual(net[1].out_features, 2)
-        self.assertEqual(net[2].out_features, 1)
+        self.assertEqual(net[2].out_features, 2)
+        self.assertEqual(net[4].out_features, 1)
 
 
 if __name__ == "__main__":

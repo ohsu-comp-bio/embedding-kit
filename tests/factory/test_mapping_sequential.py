@@ -15,7 +15,7 @@ class TestMappingSequential(unittest.TestCase):
         seq = mapping.Sequential(l1, l2)
         d = seq.to_dict()
         # Ensure dict contains class name and args
-        self.assertEqual(d["__class__"], mapping.Sequential.__name__)
+        self.assertEqual(d["__class__"], mapping.get_class_name(mapping.Sequential))
         self.assertEqual(len(d["args"]), 2)
         # Reconstruct from dict
         rebuilt = mapping.Sequential.from_dict(d)
@@ -36,7 +36,7 @@ class TestMappingSequential(unittest.TestCase):
         self.assertEqual(cleaned["out_features"], 2)
 
     def test_convert_activation_unknown(self):
-        self.assertIsNone(mapping.convert_activation("not_a_real_activation"))
+        self.assertIsNone(mapping.get_activation("not_a_real_activation"))
 
 
 if __name__ == "__main__":

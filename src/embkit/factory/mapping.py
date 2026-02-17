@@ -10,7 +10,7 @@ from typing import Optional
 
 from torch import nn
 
-from .registery import nn_module, get_class_name, CLASS_REGISTRY
+from .registery import nn_module, get_class_name, class_dict_wrapper, CLASS_REGISTRY
 
 def clean_params(params):
     out = {}
@@ -79,6 +79,15 @@ class Sequential(nn.Sequential):
             out.append( a.to_dict() )
         return { "args": out, "__class__": Sequential.__name__ }
 
+
+ReLU = class_dict_wrapper(nn.ReLU)
+Tanh = class_dict_wrapper(nn.Tanh)
+Sigmoid = class_dict_wrapper(nn.Sigmoid)
+LeakyReLU = class_dict_wrapper(nn.LeakyReLU)
+ELU = class_dict_wrapper(nn.ELU)
+GELU = class_dict_wrapper(nn.GELU)
+SiLU = class_dict_wrapper(nn.SiLU)
+
 def get_activation(name: Optional[str]) -> Optional[nn.Module]:
     """
     Get a PyTorch activation function module from a string name.
@@ -94,13 +103,13 @@ def get_activation(name: Optional[str]) -> Optional[nn.Module]:
         return None
     name = name.lower()
     return {
-        "relu": nn.ReLU,
-        "tanh": nn.Tanh,
-        "sigmoid": nn.Sigmoid,
-        "leaky_relu": nn.LeakyReLU,
-        "elu": nn.ELU,
-        "gelu": nn.GELU,
-        "silu": nn.SiLU,
+        "relu": ReLU,
+        "tanh": Tanh,
+        "sigmoid": Sigmoid,
+        "leaky_relu": LeakyReLU,
+        "elu": ELU,
+        "gelu": GELU,
+        "silu": SiLU,
         None: None,
     }.get(name, None)
 
