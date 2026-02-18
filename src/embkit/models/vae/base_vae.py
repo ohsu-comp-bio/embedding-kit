@@ -45,7 +45,7 @@ class BaseVAE(nn.Module, ABC):
             latent_dim=latent_dim,
             layers=layers,
             batch_norm=batch_norm,
-            device=device, dtype=None
+            device=device, dtype=dtype
         )
 
     @staticmethod
@@ -58,7 +58,7 @@ class BaseVAE(nn.Module, ABC):
             feature_dim=feature_dim,
             layers=layers,
             batch_norm=batch_norm,
-            device=device, dtype=None
+            device=device, dtype=dtype
         )
 
     def to(self, device=None, dtype=None):
@@ -81,7 +81,7 @@ class BaseVAE(nn.Module, ABC):
         return z
 
     @abstractmethod
-    def to_dict():
+    def to_dict(self):
         pass
 
 

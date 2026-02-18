@@ -1,5 +1,5 @@
 from .mapping import get_activation, Sequential
-from .registery import CLASS_REGISTRY
+from .registry import CLASS_REGISTRY
 
 from torch import nn
 import torch

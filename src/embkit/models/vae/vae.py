@@ -1,17 +1,9 @@
-
-import numpy as np
-import pandas as pd
-
 import logging
-from typing import Dict, List, Optional, Union
-from collections.abc import Callable
-
-from torch import nn
+from typing import List, Optional
 
 from .base_vae import BaseVAE
 from ...factory.mapping import nn_module, get_class_name
 from ...factory.layers import Layer, LayerList
-from ... import get_device, dataframe_loader
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +37,12 @@ class VAE(BaseVAE):
 
         if encoder_layers is None:
             encoder_layers = LayerList()
+        elif isinstance(encoder_layers, list):
+            encoder_layers = LayerList(encoder_layers)
         if decoder_layers is None:
             decoder_layers = LayerList()
+        elif isinstance(decoder_layers, list):
+            decoder_layers = LayerList(decoder_layers)
 
         self._encoder_layers_cfg = encoder_layers
         self._decoder_layers_cfg = decoder_layers
@@ -71,13 +67,21 @@ class VAE(BaseVAE):
             device=device, dtype=dtype
         )
 
+    @staticmethod
+    def _layers_to_dict(layers) -> list:
+        if layers is None:
+            return []
+        if isinstance(layers, LayerList):
+            layers = layers.layers
+        return [li.to_dict() for li in layers]
+
     def to_dict(self):
         return {
             "__class__" : get_class_name(VAE),
             "features": self.features,
             "latent_dim": self.latent_dim,
-            "encoder_layers": [li.to_dict() for li in self._encoder_layers_cfg],
-            "decoder_layers": [li.to_dict() for li in self._decoder_layers_cfg],
+            "encoder_layers": self._layers_to_dict(self._encoder_layers_cfg),
+            "decoder_layers": self._layers_to_dict(self._decoder_layers_cfg),
             "batch_norm": self._batch_norm
         }
 
@@ -86,25 +90,8 @@ class VAE(BaseVAE):
         return VAE(
             features=desc["features"],
             latent_dim=desc["latent_dim"],
-            encoder_layers=LayerList( [Layer.from_dict(li) for li in desc["encoder_layers"]] ),
-            decoder_layers=LayerList( [Layer.from_dict(li) for li in desc["decoder_layers"]] ),
+            encoder_layers=LayerList([Layer.from_dict(li) for li in (desc.get("encoder_layers") or [])]),
+            decoder_layers=LayerList([Layer.from_dict(li) for li in (desc.get("decoder_layers") or [])]),
             batch_norm=desc.get("batch_norm", False)
         )
 
-
-if __name__ == "__main__":
-    # Example usage
-    N = 100
-    df = pd.DataFrame({
-        "feat1": np.random.rand(N),
-        "feat2": np.random.rand(N),
-    })
-
-    vae: VAE = VAE(features=list(df.columns), latent_dim=2)
-    vae.fit(df, epochs=10, lr=0.01)
-
-    # Save the model if needed
-    vae.save("vae_model")
-
-    vae: VAE = VAE.open_model(path="vae_model", model_cls=VAE, device="cpu")
-    print("Model loaded with features:", vae.features)

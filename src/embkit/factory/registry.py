@@ -1,6 +1,5 @@
 
 
-
 # In a module like `registry.py`
 from typing import Dict, Type
 

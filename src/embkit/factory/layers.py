@@ -192,14 +192,14 @@ class Layer:
     @classmethod
     def from_dict(cls, d: dict) -> "Layer":
         c = d.get("constraint", None)
-        # constraint = ConstraintInfo.from_dict(c) if c else None
+        constraint = ConstraintInfo.from_dict(c) if c is not None else None
         return Layer(
             units=int(d.get("units", d.get("size"))),  # tolerate old files that used "size"
             op=d.get("op", "linear"),
             activation=d.get("activation", "relu"),
             batch_norm=bool(d.get("batch_norm", False)),
             bias=bool(d.get("bias", True)),
-            constraint=c,
+            constraint=constraint,
         )
 
 class LayerList:

@@ -3,14 +3,14 @@
 Docstring for embkit.factory.mapping
 
 Lightweight mappings for nn module, designed to 
-provide a consistant way to do to_dict and from_dict methods for nn modules.
+provide a consistent way to do to_dict and from_dict methods for nn modules.
 """
 
 from typing import Optional
 
 from torch import nn
 
-from .registery import nn_module, get_class_name, class_dict_wrapper, CLASS_REGISTRY
+from .registry import nn_module, get_class_name, class_dict_wrapper, CLASS_REGISTRY
 
 def clean_params(params):
     out = {}

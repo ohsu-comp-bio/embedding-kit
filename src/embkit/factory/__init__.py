@@ -14,4 +14,4 @@ from .mapping import Linear
 
 from .layers import Layer, LayerList
 
-from .registery import nn_module, nn_module_named, get_class_name
+from .registry import nn_module, nn_module_named, get_class_name

@@ -98,16 +98,14 @@ def train_vae(input_path: str,
     layer_sizes = list( int(i) for i in encode_layers.split(",") )
     layer_sizes.append(latent)
     enc_layers_list = LayerList( layer_sizes )
-    #enc_layers = encode_layer_list.build( feature_count, latent )
 
     layer_sizes = list( int(i) for i in decode_layers.split(",") )
     layer_sizes.append(feature_count)
     dec_layers_list = LayerList( layer_sizes, end_activation=final_activation )
-    #dec_layers = decode_layer_list.build( latent, feature_count )
 
     beta_schedule = None
     if schedule is not None:
-        beta_schedule = [] #[(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
+        beta_schedule = []
         for b in schedule.split(","):
             e, b = b.split(":")
             beta_schedule.append( (float(b), int(e)) )
@@ -131,10 +129,6 @@ def train_vae(input_path: str,
         click.echo(f"No output path provided, using default naming.")
         out = f"vae_latent{latent}_epochs{epochs}.model"
 
-    #if save_stats and df is not None:
-    #    vae.save(out, df)
-    #else:
-    #    vae.save(out)
     save(vae, out)
     click.echo(f"Model saved, to {out}")
 
@@ -198,8 +192,6 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
     elif loss == "bce":
         loss_func = bce
 
-
-    #schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
     schedule = [(0.0, 20)]
     vae = VAE(df.columns, latent_dim=group_count, encoder_layers=enc_layers, decoder_layers=dec_layers)
     vae.fit(X=dataloader, beta_schedule=schedule, lr=learning_rate, loss=loss_func)
@@ -219,11 +211,7 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
 def encode(input_path: str, model_path:str, normalize:str, out:str):
 
     m = load(model_path)
-    #m = VAE.open_model(path=model_path)
     df = pd.read_csv(input_path, sep="\t", index_col=0)
-
-    # print(m)
-    # df = pd.read_csv(input_path, sep="\t", index_col=0)
 
     df = df[m.features]
     if normalize == "expMinMax":

@@ -52,7 +52,7 @@ class Decoder(nn.Module):
                 self.out = linear_layers[-1]
             else:
                 # Fallback: create identity or just set it
-                self.out = nn.Identity(dtype=dtype)
+                self.out = nn.Identity()
 
     def forward(self, z: torch.Tensor) -> torch.Tensor:
         h = z

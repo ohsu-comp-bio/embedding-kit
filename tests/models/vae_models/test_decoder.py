@@ -1,10 +1,10 @@
-from embkit.factory import LayerList
 import unittest
 import torch
 from torch import nn
 
 from embkit.models.vae.decoder import Decoder
-from embkit.factory.layers import Layer,LayerList, MaskedLinear
+from embkit.factory.layers import Layer, LayerList
+from embkit.modules import MaskedLinear
 
 
 class TestDecoder(unittest.TestCase):
