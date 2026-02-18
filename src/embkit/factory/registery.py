@@ -10,7 +10,13 @@ CLASS_REGISTRY: Dict[str, Type] = {}
 def nn_module(cls: Type) -> Type:
     """A class decorator to register classes in the global registry."""
     name = get_class_name(cls)
-    return nn_module_named(cls, name)
+    return nn_module_wrap_register(cls, name)
+
+class nn_module_named:
+    def __init__(self, name):
+        self.name = name
+    def __call__(self, cls):
+        return nn_module_wrap_register(cls, self.name)
 
 def class_dict_wrapper(base_class):
     new_name = f"embkit.factory.mapping.{base_class.__name__}"
@@ -36,7 +42,7 @@ def class_dict_wrapper(base_class):
     return new_class
 
 
-def nn_module_named(cls: Type, name: str) -> Type:
+def nn_module_wrap_register(cls: Type, name: str) -> Type:
     """A class decorator to register classes with given name"""
     if not hasattr(cls, "to_dict") or not hasattr(cls, "from_dict"):
         raise ValueError("Class must have both `to_dict` and `from_dict` methods.")
