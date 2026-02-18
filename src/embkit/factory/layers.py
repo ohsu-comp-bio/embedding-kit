@@ -224,15 +224,17 @@ class LayerList:
         layers = []
         for layer in self.layers:
             if isinstance(layer, Layer):
-                layers.extend( layer.gen_layer(cur_dim, device=device, dtype=dtype) )
+                layers.extend(layer.gen_layer(cur_dim, device=device, dtype=dtype))
                 cur_dim = layer.units
             elif isinstance(layer, int):
-                layers.extend( layer.gen_layer(Linear(in_features=cur_dim, out_features=layer, device=device, dtype=dtype)) )
-                cur_dim = layer.units
+                # Fallback handling in case raw integers are present in self.layers.
+                # Treat the integer as the number of units for a Linear layer.
+                layers.append(Linear(in_features=cur_dim, out_features=layer, device=device, dtype=dtype))
+                cur_dim = layer
             else:
                 raise ValueError(f"Unsupported layer type: {type(layer)}")
 
-        layers.append( Linear(in_features=cur_dim, out_features=output_dim, device=device, dtype=dtype) )
+        layers.append(Linear(in_features=cur_dim, out_features=output_dim, device=device, dtype=dtype))
         return Sequential(*layers)
 
     def __len__(self):
