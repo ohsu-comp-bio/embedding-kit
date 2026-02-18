@@ -1,5 +1,6 @@
 import logging
 from typing import List, Optional
+import torch
 
 from .base_vae import BaseVAE
 from ...factory.mapping import nn_module, get_class_name
@@ -24,14 +25,18 @@ class VAE(BaseVAE):
             encoder_layers: Optional[LayerList] = None,
             decoder_layers: Optional[LayerList] = None,
             batch_norm: bool = False,
-            device= None, dtype=None
+            device: Optional[torch.device] = None,
+            dtype: Optional[torch.dtype] = None
     ):
         """
         Args:
             features: list[str] feature names (len(features) == input_dim)
             latent_dim: size of latent space
             encoder_layers: list of layer configs for Encoder
-            constraint, batch_norm, activation: forwarded to Encoder builder
+            decoder_layers: list of layer configs for Decoder
+            batch_norm: enable encoder batch normalization blocks
+            device: torch device used for module initialization
+            dtype: torch dtype used for module initialization
         """
         super().__init__(features=features)
 

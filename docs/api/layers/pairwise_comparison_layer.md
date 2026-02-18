@@ -1,1 +1,1 @@
-::: embkit.layers.pairwise_comparison_layer
+::: embkit.modules.pairwise_comparison_layer

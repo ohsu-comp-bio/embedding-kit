@@ -31,7 +31,7 @@ For detailed installation and usage instructions, please refer to our main docum
 
 ## Contributing
 
-We welcome contributions from the open-source community! Please see our [CONTRIBUTING.md](docs/CONTRIBUTING.md) file for details on how you can get involved.
+We welcome contributions from the open-source community. Please open an issue in the project repository to discuss proposed changes.
 
 ## Contact Information
 

@@ -4,8 +4,11 @@ nav:
   - About: about.md
   - Examples:
       - GTEX: examples/gtex.md
+      - HLA2Vec: examples/hla2vec.md
   - API:
       - Overview: api/index.md
+      - Factory:
+          - Overview: api/factory/index.md
       - Commands:
           - Overview: api/commands/index.md
           - cbio: api/commands/cbio.md

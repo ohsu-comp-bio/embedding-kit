@@ -6,9 +6,10 @@ VAE loss functions
 
 import torch
 import torch.nn.functional as F
+from typing import Tuple
 
 # ---------- regression VAE loss (MSE + β·KL) ----------
-def mse(recon, x, mu, logvar, beta=1.0, reduction="mean"):
+def mse(recon, x, mu, logvar, beta=1.0, reduction="mean") -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Calculate the VAE loss.
     Uses Mean Squared Error
@@ -22,7 +23,7 @@ def mse(recon, x, mu, logvar, beta=1.0, reduction="mean"):
     return total, recon_loss, kl
 
 
-def bce(recon_x, x, mu, logvar, beta=1.0):
+def bce(recon_x, x, mu, logvar, beta=1.0) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Calculate the VAE loss.
     Used for classification of class probabilities (e.g., MNIST).
 
@@ -40,7 +41,7 @@ def bce(recon_x, x, mu, logvar, beta=1.0):
     kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp(), dim=1)
     return (reconstruction_loss + beta * kl_loss).mean(), reconstruction_loss.mean(), kl_loss.mean()
 
-def bce_with_logits(recon_logits, x, mu, logvar, beta=1.0):
+def bce_with_logits(recon_logits, x, mu, logvar, beta=1.0) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Calculate the VAE loss using binary cross-entropy with logits.
     This is useful when the decoder outputs raw distributions instead of probabilities.
@@ -64,7 +65,7 @@ def bce_with_logits(recon_logits, x, mu, logvar, beta=1.0):
     return total, recon_loss.mean(), kl_loss.mean()
 
 
-def bce_kl_weighted(recon_x, x, mu, logvar, beta=1.0, kl_weight=1.0):
+def bce_kl_weighted(recon_x, x, mu, logvar, beta=1.0, kl_weight=1.0) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Calculate the VAE loss with configurable KL weight.
     
     This is useful for RNA VAE and other variants that scale the KL term differently.
@@ -88,7 +89,7 @@ def bce_kl_weighted(recon_x, x, mu, logvar, beta=1.0, kl_weight=1.0):
     return total_loss, reconstruction_loss.mean(), kl_loss.mean()
 
 
-def net_vae_loss(model: "BaseVAE", x: torch.Tensor, beta: float = 1.0):
+def net_vae_loss(model: "BaseVAE", x: torch.Tensor, beta: float = 1.0) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Calculate the VAE loss for a given model and input data.
 
     Args:

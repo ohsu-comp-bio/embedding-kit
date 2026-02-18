@@ -1,2 +1,2 @@
 # Layers
-::: embkit.layers
+::: embkit.modules
