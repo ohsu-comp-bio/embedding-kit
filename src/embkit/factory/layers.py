@@ -237,6 +237,15 @@ class LayerList:
         layers.append(Linear(in_features=cur_dim, out_features=output_dim, device=device, dtype=dtype))
         return Sequential(*layers)
 
+    def __str__(self):
+        o = []
+        for i in self.layers:
+            if isinstance(i, Layer):
+                o.append(i.to_dict())
+            else:
+                o.append(str(i))
+        return str(o)
+
     def __len__(self):
         return len(self.layers)
     

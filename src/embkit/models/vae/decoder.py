@@ -30,10 +30,11 @@ class Decoder(nn.Module):
         in_features = latent_dim
 
         if layers:
-            logger.info("Building decoder with %d layers", len(layers))
+            logger.info("Building decoder with %d layers %s", len(layers), layers)
             dec_net = layers.build( latent_dim, feature_dim, device=device, dtype=dtype )
             self.net.extend(dec_net)
             in_features = dec_net[-1].out_features
+            logger.info("Decoder info: %s", dec_net)
             
         # Final projection to feature_dim if not already there
         if in_features != self.feature_dim or not layers:

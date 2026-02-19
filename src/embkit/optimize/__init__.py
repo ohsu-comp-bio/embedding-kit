@@ -1,13 +1,18 @@
+"""
+Docstring for embkit.optimize
+
+"""
+
+import logging
+from typing import Dict, Optional, List, Union, Tuple, Any
+from collections.abc import Callable
 
 import pandas as pd
-import logging
-from typing import Dict, Optional, List, Union
-from collections.abc import Callable
 
 import torch
 from torch import nn
 from torch.optim import Adam
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset, Dataset
 from tqdm.autonotebook import tqdm
 
 from .. import get_device, dataframe_loader
@@ -16,85 +21,211 @@ from .. import get_device, dataframe_loader
 logger = logging.getLogger(__name__)
 
 
-def fit(self, X: Union[torch.Tensor],
-        y: Union[torch.Tensor], **kwargs):
+def _resolve_optimizer(model, lr: float,
+                       optimizer: Optional[torch.optim.Optimizer]) -> torch.optim.Optimizer:
+    if optimizer is not None:
+        return optimizer    
+    return Adam(model.parameters(), lr=lr)
 
-    epochs: int = int(kwargs.pop("epochs", 20))
-    lr: Optional[float] = kwargs.pop("lr", None)
-    beta: float = float(kwargs.pop("beta", 1.0))
-    optimizer: Optional[torch.optim.Optimizer] = kwargs.pop("optimizer", None)
-    # loss: Optional[Callable] = kwargs.pop("loss", None)
-    reset_optimizer: bool = bool(kwargs.pop("reset_optimizer", False))
-    device: Optional[torch.device] = kwargs.pop("device", None)
-    progress: bool = bool(kwargs.pop("progress", True))
-    pin_memory: bool = bool(kwargs.pop("pin_memory", True))
+
+def _loader_length(loader: DataLoader) -> Optional[int]:
+    try:
+        return len(loader)
+    except TypeError:
+        return None
+
+
+def _resolve_phases(epochs: int,
+                    beta: float,
+                    beta_schedule: Optional[List[Tuple[float, int]]]) -> List[Tuple[float, int]]:
+    if beta_schedule is None:
+        return [(beta, epochs)]
+    return [(float(beta_value), int(n_epochs)) for beta_value, n_epochs in beta_schedule]
+
+
+def _ensure_history(model, keys: List[str]) -> Dict[str, List[float]]:
+    history = getattr(model, "history", None)
+    if not isinstance(history, dict):
+        history = {}
+    for key in keys:
+        history.setdefault(key, [])
+    model.history = history
+    return history
+
+
+def _to_float(value: Any) -> float:
+    if isinstance(value, torch.Tensor):
+        return float(value.detach().to(device="cpu"))
+    return float(value)
+
+
+def _run_training_phases(
+                         model,
+                         loader: DataLoader,
+                         optimizer: torch.optim.Optimizer,
+                         phases: List[Tuple[float, int]],
+                         metric_keys: List[str],
+                         step_fn: Callable[[Any, float], Dict[str, torch.Tensor]],
+                         progress: bool,
+                         accumulate_steps: int) -> float:
+    if accumulate_steps < 1:
+        raise ValueError("accumulate_steps must be >= 1")
+
+    total_epochs = sum(n_epochs for _, n_epochs in phases)
+    global_bar = tqdm(total=total_epochs,
+                      disable=not progress,
+                      desc="training",
+                      position=0)
+
+    last_loss = 0.0
+    epoch_number = 0
+
+    for beta_value, n_epochs in phases:
+        for _ in range(n_epochs):
+            epoch_number += 1
+            model.train()
+
+            metric_sums = {key: 0.0 for key in metric_keys}
+            batches = 0
+            optimizer.zero_grad(set_to_none=True)
+
+            epoch_desc = f"epoch {epoch_number}/{total_epochs} β={beta_value:.3f}"
+            batch_bar = tqdm(loader,
+                             total=_loader_length(loader),
+                             disable=not progress,
+                             position=1,
+                             leave=False,
+                             desc=epoch_desc)
+
+            for batch_index, batch in enumerate(batch_bar):
+                metrics = step_fn(batch, beta_value)
+                loss = metrics["loss"]
+                (loss / accumulate_steps).backward()
+
+                if (batch_index + 1) % accumulate_steps == 0:
+                    optimizer.step()
+                    optimizer.zero_grad(set_to_none=True)
+
+                for key in metric_keys:
+                    metric_sums[key] += _to_float(metrics[key])
+                batches += 1
+                last_loss = _to_float(metrics["loss"])
+
+                if progress and batches > 0:
+                    batch_bar.set_postfix({key: f"{metric_sums[key] / batches:.4f}" for key in metric_keys})
+
+            if batches > 0 and (batches % accumulate_steps) != 0:
+                optimizer.step()
+                optimizer.zero_grad(set_to_none=True)
+
+            history = _ensure_history(model, metric_keys)
+            if batches > 0:
+                for key in metric_keys:
+                    history[key].append(metric_sums[key] / batches)
+            else:
+                for key in metric_keys:
+                    history[key].append(float("nan"))
+
+            if "beta" in history:
+                history["beta"].append(beta_value)
+
+            if progress:
+                global_bar.update(1)
+                global_bar.set_postfix({key: f"{history[key][-1]:.4f}" for key in metric_keys})
+
+    global_bar.close()
+    return last_loss
+
+
+def fit(model, X: Union[torch.Tensor, Dataset, DataLoader],
+    y: Optional[torch.Tensor] = None, 
+        epochs: int = 20, 
+        lr: Optional[float] = 1e-3, 
+        beta: float = 1.0,
+        optimizer: Optional[torch.optim.Optimizer] = None, 
+        loss: Optional[Callable] = None, 
+        device: Optional[torch.device] = None, 
+        progress: bool = True, 
+        pin_memory: bool = True, 
+        batch_size: int = 256, shuffle: 
+        bool = True, accumulate_steps: int = 1
+    ):
+    """
+    General training loop for a PyTorch model.
+
+    X: Tensor, Dataset, or DataLoader. If Tensor, y must be provided.
+
+    """
 
     # --- setup ---
     if lr is None:
-        lr = self.lr
+        lr = model.lr
     if device is None:
         device = get_device()
 
-    self.to(device)
-    self.train()
+    model.to(device)
+    model.train()
 
-    # --- persistent optimizer (reuse momentum/velocity across phases) ---
-    if optimizer is not None:
-        self._optimizer = optimizer
-    elif reset_optimizer or not hasattr(self, "_optimizer") or self._optimizer is None:
-        self._optimizer = Adam(self.parameters(), lr=lr)
+    opt = _resolve_optimizer(model=model, lr=lr, optimizer=optimizer)
+    if loss is None:
+        criterion = nn.MSELoss()
     else:
-        # Reuse existing optimizer but refresh LR if changed
-        for g in self._optimizer.param_groups:
-            g["lr"] = lr
-    opt = self._optimizer
-    critereon = nn.MSELoss()
+        criterion = loss
 
-    dataset = TensorDataset(X, y)
-    dataloader = DataLoader(dataset, batch_size=256, shuffle=True, pin_memory=pin_memory)
+    history = _ensure_history(model, ["loss"])
+    history["loss"].clear()
 
-    # --- epoch runner (epoch-only progress) ---
-    def run_epochs(n_epochs: int, beta_value: float) -> float:
-        last_loss = 0.0
-        epoch_batches = 0
-        epoch_bar = tqdm(range(n_epochs), disable=not progress, desc=f"β={beta_value:.2f}")
-        for epoch_idx in epoch_bar:
-            epoch_loss_sum = 0.0
-            epoch_batches = 0
+    if isinstance(X, torch.Tensor):
+        if y is None:
+            raise ValueError("y is required when X is a tensor")
+        dataset = TensorDataset(X, y)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, pin_memory=pin_memory)
+    elif isinstance(X, pd.DataFrame):
+        dataloader = dataframe_loader(X, batch_size=batch_size, shuffle=shuffle, device=device)
+    elif isinstance(X, Dataset):
+        dataloader = DataLoader(X, batch_size=batch_size, shuffle=shuffle, pin_memory=pin_memory)
+    elif isinstance(X, DataLoader):
+        dataloader = X
+    else:
+        raise TypeError("X must be a Tensor, Dataset, or DataLoader")
 
-            for inputs, outputs in dataloader:
-                inputs = inputs.to(device, non_blocking=pin_memory)
-                outputs = outputs.to(device, non_blocking=pin_memory)
+    phases = _resolve_phases(epochs=epochs, beta=beta, beta_schedule=None)
 
-                predictions = self(inputs)
-                loss = critereon(predictions, outputs)
+    def recognizer_step(batch, beta_value: float) -> Dict[str, torch.Tensor]:
+        del beta_value
+        inputs, outputs = batch
+        inputs = inputs.to(device, non_blocking=pin_memory)
+        outputs = outputs.to(device, non_blocking=pin_memory)
 
-                # Backprop
-                opt.zero_grad()
-                loss.backward()
-                opt.step()
+        predictions = model(inputs)
+        loss = criterion(predictions, outputs)
+        return {"loss": loss}
 
-                # Accumulate epoch stats
-                tl = float(loss.detach().cpu())
-                epoch_loss_sum += tl
-                epoch_batches += 1
-                last_loss = tl
-
-            # Compute epoch means
-            if epoch_batches > 0:
-                ep_loss = epoch_loss_sum / epoch_batches
-                self.history["loss"].append(ep_loss)
-
-                # Update the epoch progress bar once per epoch (no jitter)
-                if progress:
-                    epoch_bar.set_postfix(loss=f"{ep_loss:.3f}")
-
-        return last_loss
-
-    return run_epochs(epochs, beta)
+    return _run_training_phases(
+        model=model,
+        loader=dataloader,
+        optimizer=opt,
+        phases=phases,
+        metric_keys=["loss"],
+        step_fn=recognizer_step,
+        progress=progress,
+        accumulate_steps=accumulate_steps,
+    )
 
 
-def fit_vae(model, X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoader], **kwargs):
+def fit_vae(model, 
+            X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoader], 
+            epochs: int = 20, 
+            lr: Optional[float] = 1e-3,
+            beta: float = 1.0,
+            optimizer: Optional[torch.optim.Optimizer] = None,
+            beta_schedule: Optional[List[Tuple[float, int]]] = None,
+            loss: Optional[Callable] = None,
+            device: Optional[torch.device] = None,
+            progress: bool = True,
+            accumulate_steps: int = 1,
+            shuffle: bool = True,
+            batch_size: int = 256,):
     """
     Training loop using vae_loss(recon, x, mu, logvar).
 
@@ -103,17 +234,6 @@ def fit_vae(model, X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoa
     the single-phase (beta, epochs) arguments and runs multiple phases while
     reusing the same optimizer/momentum.
     """
-
-    epochs: int = int(kwargs.pop("epochs", 20))
-    lr: Optional[float] = kwargs.pop("lr", None)
-    beta: float = float(kwargs.pop("beta", 1.0))
-    optimizer: Optional[torch.optim.Optimizer] = kwargs.pop("optimizer", None)
-    loss: Optional[Callable] = kwargs.pop("loss", None)
-    reset_optimizer: bool = bool(kwargs.pop("reset_optimizer", False))
-    device: Optional[torch.device] = kwargs.pop("device", None)
-    progress: bool = bool(kwargs.pop("progress", True))
-    beta_schedule = kwargs.pop("beta_schedule", None)
-    y = kwargs.pop("y", None)  # if you need it, fetch it from kwargs
 
     if loss is None:
         raise ValueError("loss function is required (e.g., from embkit.losses.vae_loss)")
@@ -125,7 +245,7 @@ def fit_vae(model, X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoa
         device = get_device()
 
     if beta_schedule is not None:
-        logger.info(f"Using beta_schedule: {beta_schedule}")
+        logger.info("Using beta_schedule: %s", beta_schedule)
 
     # Column alignment safety check if a DataFrame is passed
     if hasattr(X, "columns") and model.features is not None:
@@ -141,79 +261,72 @@ def fit_vae(model, X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoa
 
     # Build dataloader once
     if isinstance(X, pd.DataFrame):
-        data_loader = dataframe_loader(X, device=device)  # ensure it shuffles in training mode
-    else:
+        data_loader = dataframe_loader(X, batch_size=batch_size, shuffle=shuffle, device=device)
+    elif isinstance(X, torch.Tensor):
+        data_loader = DataLoader(TensorDataset(X), batch_size=batch_size, shuffle=shuffle)
+    elif isinstance(X, DataLoader):
         data_loader = X
-
-    # --- persistent optimizer (reuse momentum/velocity across phases) ---
-    if optimizer is not None:
-        model._optimizer = optimizer
-    elif reset_optimizer or not hasattr(model, "_optimizer") or model._optimizer is None:
-        model._optimizer = Adam(model.parameters(), lr=lr)
     else:
-        # Reuse existing optimizer but refresh LR if changed
-        for g in model._optimizer.param_groups:
-            g["lr"] = lr
-    opt = model._optimizer
+        raise TypeError("X must be DataFrame, Tensor, or DataLoader")
 
-    history = {
-        "loss" : [],
-        "recon" : [],
-        "kl" : [],
-    }
-    # --- epoch runner (epoch-only progress) ---
-    def run_epochs(n_epochs: int, beta_value: float) -> float:
-        last_loss = 0.0
-        epoch_bar = tqdm(range(n_epochs), disable=not progress, desc=f"β={beta_value:.2f}", position=0)
-        for epoch_idx in epoch_bar:
-            epoch_loss_sum = 0.0
-            epoch_recon_sum = 0.0
-            epoch_kl_sum = 0.0
-            epoch_batches = 0
+    opt = _resolve_optimizer(model=model, lr=lr, optimizer=optimizer)
 
-            for (x_tensor,) in tqdm(data_loader, position=1):
-                opt.zero_grad(set_to_none=True)
-                x_tensor = x_tensor.to(device).float()
+    history = _ensure_history(model, ["loss", "recon", "kl", "beta"])
+    history["loss"].clear()
+    history["recon"].clear()
+    history["kl"].clear()
+    history["beta"].clear()
 
-                # Forward
-                recon, mu, logvar, _ = model(x_tensor)
+    phases = _resolve_phases(epochs=epochs, beta=beta, beta_schedule=beta_schedule)
 
-                total_loss, recon_loss, kl_loss = loss(recon, x_tensor, mu, logvar, beta=beta_value)
+    def vae_step(batch, beta_value: float) -> Dict[str, torch.Tensor]:
+        (x_tensor,) = batch
+        x_tensor = x_tensor.to(device).float()
 
-                # Backprop
-                total_loss.backward()
-                opt.step()
+        recon, mu, logvar, _ = model(x_tensor)
+        total_loss, recon_loss, kl_loss = loss(recon, x_tensor, mu, logvar, beta=beta_value)
 
-                # Accumulate epoch stats
-                tl = float(total_loss.detach().cpu())
-                epoch_loss_sum += tl
-                epoch_recon_sum += float(recon_loss.detach().cpu())
-                epoch_kl_sum += float(kl_loss.detach().cpu())
-                epoch_batches += 1
-                last_loss = tl
+        return {
+            "loss": total_loss,
+            "recon": recon_loss,
+            "kl": kl_loss,
+        }
 
-            # Compute epoch means
-            if epoch_batches > 0:
-                ep_loss = epoch_loss_sum / epoch_batches
-                ep_recon = epoch_recon_sum / epoch_batches
-                ep_kl = epoch_kl_sum / epoch_batches
-                history["loss"].append(ep_loss)
-                history["recon"].append(ep_recon)
-                history["kl"].append(ep_kl)
+    return _run_training_phases(
+        model=model,
+        loader=data_loader,
+        optimizer=opt,
+        phases=phases,
+        metric_keys=["loss", "recon", "kl"],
+        step_fn=vae_step,
+        progress=progress,
+        accumulate_steps=accumulate_steps,
+    )
 
-                # Update the epoch progress bar once per epoch (no jitter)
-                if progress:
-                    epoch_bar.set_postfix(loss=f"{ep_loss:.3f}",
-                                            recon=f"{ep_recon:.3f}",
-                                            kl=f"{ep_kl:.3f}")
 
-        return last_loss
 
-    # --- single phase or multi-phase (beta schedule) ---
-    if beta_schedule is None:
-        return run_epochs(epochs, beta)
-    else:
-        last = 0.0
-        for beta_value, n_epochs in beta_schedule:
-            last = run_epochs(n_epochs, beta_value)
-        return last
+def fit_alt(model, loader, lr:float = 1e-5, epochs=32, accumulate_steps=8):
+    optimizer = Adam(model.parameters(), lr=lr)
+    criterion = nn.MSELoss()
+
+    model.history = {"loss": []}
+
+    def step_fn(batch, beta_value: float) -> Dict[str, torch.Tensor]:
+        del beta_value
+        x_tensor, y_tensor = batch
+        predictions = model(x_tensor)
+        loss = criterion(predictions, y_tensor)
+        return {"loss": loss}
+
+    _run_training_phases(
+        model=model,
+        loader=loader,
+        optimizer=optimizer,
+        phases=[(1.0, int(epochs))],
+        metric_keys=["loss"],
+        step_fn=step_fn,
+        progress=True,
+        accumulate_steps=int(accumulate_steps),
+    )
+
+    return [{"epoch": i + 1, "loss": loss} for i, loss in enumerate(model.history["loss"])]

@@ -29,7 +29,7 @@ model = click.Group(name="model", help="VAE Model commands.")
 @click.option("--encode-layers", type=str, default="400,200")
 @click.option("--decode-layers", type=str, default="200,400")
 @click.option("--normalize", "-n", type=str, default="none")
-@click.option("--final-activation", default="none", type=click.Choice(["none", "sigmoid"]))
+@click.option("--final-activation", default="none", type=click.Choice(["none", "sigmoid", "relu"]))
 @click.option("--learning-rate", "-r", type=float, default=0.0001)
 @click.option("--out", "-o", type=str, default=None)
 @click.option("--schedule", "-s", type=str, default=None, help="20:0,20:0.1,40:.3,40:.4")
@@ -68,15 +68,15 @@ def train_vae(input_path: str,
         dataset = H5Reader(input_path, group)
         #TODO add normalization here
         if zero_mask is not None:
-            mask = get_dataset_nonzero_mask(dataset, zero_mask)
-            features = dataset.columns[mask[0]]
-            feature_count = len(features)
-            dataset = DatasetMask(dataset, mask, device)
+            dataset_mask = get_dataset_nonzero_mask(dataset, zero_mask)
+            mask = dataset_mask[0].cpu().numpy()
+            #print(mask)
+            features = dataset.columns[mask]
+            dataset = DatasetMask(dataset, dataset_mask, device)
         else:
             dataset.to(device)
             features = dataset.columns
-            feature_count = len(features)
-
+    
     else:
         df = pd.read_csv(input_path, sep="\t", index_col=0)
 
@@ -89,18 +89,15 @@ def train_vae(input_path: str,
             norm.fit(df)
             df = pd.DataFrame( norm.transform(df), index=df.index, columns=df.columns)
         features = df.columns
-        feature_count = len(df.columns)
         dataset = dataframe_dataset(df, device=device, dtype=dtype)
     
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     
 
     layer_sizes = list( int(i) for i in encode_layers.split(",") )
-    layer_sizes.append(latent)
     enc_layers_list = LayerList( layer_sizes )
 
     layer_sizes = list( int(i) for i in decode_layers.split(",") )
-    layer_sizes.append(feature_count)
     dec_layers_list = LayerList( layer_sizes, end_activation=final_activation )
 
     beta_schedule = None
