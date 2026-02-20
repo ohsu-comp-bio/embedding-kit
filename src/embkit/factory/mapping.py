@@ -36,7 +36,7 @@ class Linear(nn.Linear):
         return cls(**clean_params(params))
     
     def to_dict(self):
-        return self._params | {"__class__" : Linear.__name__}
+        return self._params
 
 @nn_module
 class BatchNorm1d(nn.BatchNorm1d):
@@ -56,7 +56,7 @@ class BatchNorm1d(nn.BatchNorm1d):
         return cls(**clean_params(params))
     
     def to_dict(self):
-        return self._params | {"__class__" : BatchNorm1d.__name__}
+        return self._params
 
 @nn_module
 class Sequential(nn.Sequential):
@@ -77,7 +77,7 @@ class Sequential(nn.Sequential):
         out = []
         for a in args:
             out.append( a.to_dict() )
-        return { "args": out, "__class__": Sequential.__name__ }
+        return { "args": out }
 
 
 ReLU = class_dict_wrapper(nn.ReLU)

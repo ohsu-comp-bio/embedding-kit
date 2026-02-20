@@ -169,7 +169,7 @@ class Layer:
         elif self.op ==  "linear":
             layers.append(Linear(in_features, out_features, bias=self.bias, device=device, dtype=dtype))
         else:
-            raise ValueError(f"Unknown LayerInfo.op '{self.op}'")
+            raise ValueError(f"Unknown Layer.op '{self.op}'")
         
         if self.activation is not None:
             act = get_activation(self.activation)

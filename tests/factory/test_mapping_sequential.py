@@ -1,4 +1,4 @@
-"""Tests for embkit.factory.mapping utilities and Sequential round‑trip."""
+"""Tests for embkit.factory.mapping utilities and Sequential round-trip."""
 
 import unittest
 import numpy as np

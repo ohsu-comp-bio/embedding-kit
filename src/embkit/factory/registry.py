@@ -1,10 +1,12 @@
 
-
-# In a module like `registry.py`
 from typing import Dict, Type
 
 # The global map (registry) where classes will be stored
 CLASS_REGISTRY: Dict[str, Type] = {}
+
+def get_class_name(cls):
+    """Inspect a class to get standard name"""
+    return cls.__module__ + "." + cls.__name__
 
 def nn_module(cls: Type) -> Type:
     """A class decorator to register classes in the global registry."""
@@ -60,7 +62,3 @@ def nn_module_wrap_register(cls: Type, name: str) -> Type:
     # Replace the original to_dict method with the wrapper
     cls.to_dict = to_dict_wrapper
     return cls
-
-def get_class_name(cls):
-    """Inspect a class to get standard name"""
-    return cls.__module__ + "." + cls.__name__

@@ -147,8 +147,9 @@ def fit(model, X: Union[torch.Tensor, Dataset, DataLoader],
         device: Optional[torch.device] = None, 
         progress: bool = True, 
         pin_memory: bool = True, 
-        batch_size: int = 256, shuffle: 
-        bool = True, accumulate_steps: int = 1
+        batch_size: int = 256,
+        shuffle: bool = True,
+        accumulate_steps: int = 1
     ):
     """
     General training loop for a PyTorch model.

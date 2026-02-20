@@ -58,9 +58,9 @@ def train_vae(input_path: str,
     Train VAE model from a TSV file.
     """
     device = get_device()
-    dtype=torch.float32
+    dtype = torch.float32
     if bfloat16:
-        dtype=torch.bfloat16
+        dtype = torch.bfloat16
 
     torch.manual_seed(seed)
     df = None

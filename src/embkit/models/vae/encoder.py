@@ -67,7 +67,7 @@ class Encoder(nn.Module):
                         "Final hidden width must equal latent_dim because the encoder "
                         "does not insert a latent projection when layers are provided.\n"
                         f"Final hidden size: {in_features}  vs  latent_dim: {self.latent_dim}\n"
-                        "Fix by setting your last LayerInfo(units=latent_dim)."
+                        "Fix by setting your last Layer(units=latent_dim)."
                     )
                 self.z_mean = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
                 self.z_log_var = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)

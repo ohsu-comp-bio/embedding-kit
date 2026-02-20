@@ -64,7 +64,7 @@ class TestEncoder(unittest.TestCase):
         layers = LayerList([Layer(units=4, op="unknown_op")])
         with self.assertRaises(ValueError) as ctx:
             Encoder(feature_dim=4, latent_dim=4, layers=layers)
-        self.assertIn("Unknown LayerInfo.op", str(ctx.exception))
+        self.assertIn("Unknown Layer.op", str(ctx.exception))
 
     def test_encoder_auto_projection_without_activation(self):
         enc = Encoder(feature_dim=5, latent_dim=3, layers=None, default_activation=None)

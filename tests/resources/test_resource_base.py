@@ -10,7 +10,7 @@ from embkit.resources.resource import Resource, SingleFileDownloader
 
 class DummyDataset(Resource):
     def download(self):
-        # No‑op for base‑class test
+        # No-op for base‑class test
         pass
 
 

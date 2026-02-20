@@ -10,7 +10,7 @@ This walkthrough shows one way to build embeddings from GTEx expression data usi
 ## 1) Load GTEx data
 
 ```python
-from embkit.datasets import GTEx
+from embkit.resources import GTEx
 from embkit.preprocessing import load_gct
 
 gtex = GTEx()
@@ -23,7 +23,7 @@ print(gtex_df.head())
 ## 2) Prepare and normalize features
 
 ```python
-from embkit.datasets import Hugo
+from embkit.resources import Hugo
 from embkit.preprocessing import load_raw_hugo, ExpMinMaxScaler
 import pandas as pd
 
@@ -53,24 +53,25 @@ print(df_norm.shape)
 from embkit import dataframe_loader
 from embkit.losses import bce_with_logits
 from embkit.models.vae import VAE
-from embkit.layers import LayerInfo
+from embkit.factory.layers import Layer
+from embkit import optimize
 
 dataloader = dataframe_loader(df_norm, batch_size=512)
 
 encoder_layers = [
-    LayerInfo(2048, activation="relu"),
-    LayerInfo(1024, activation="relu"),
-    LayerInfo(128, activation="relu"),
+    Layer(2048, activation="relu"),
+    Layer(1024, activation="relu"),
+    Layer(128, activation="relu"),
 ]
 decoder_layers = [
-    LayerInfo(1024, activation="relu"),
-    LayerInfo(2048, activation="relu"),
+    Layer(1024, activation="relu"),
+    Layer(2048, activation="relu"),
 ]
 
 schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
 
 vae = VAE(df_norm.columns, latent_dim=128, decoder_layers=decoder_layers, encoder_layers=encoder_layers)
-vae.fit(X=dataloader, beta_schedule=schedule, lr=1e-3, loss=bce_with_logits)
+optimize.fit_vae(vae, X=dataloader, beta_schedule=schedule, lr=1e-3, loss=bce_with_logits)
 ```
 
 ## 4) Reconstruct and run quick checks

@@ -75,7 +75,7 @@ class TestDecoder(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             Decoder(latent_dim=3, feature_dim=4, layers=layers)
 
-        self.assertIn("Unknown LayerInfo.op 'foo_bar'", str(context.exception))
+        self.assertIn("Unknown Layer.op 'foo_bar'", str(context.exception))
 
 
 if __name__ == "__main__":

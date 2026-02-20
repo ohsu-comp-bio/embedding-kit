@@ -34,6 +34,11 @@ def save(model, path):
 def load(path):
     state_dict = torch.load(path)
     desc = state_dict.pop("__model__", None)
+    if desc is None:
+        raise KeyError(
+            "Missing '__model__' key in the loaded state dict. "
+            "The file does not contain a model description and cannot be loaded."
+        )
     model = build(desc)
     model.load_state_dict(state_dict)
     return model
