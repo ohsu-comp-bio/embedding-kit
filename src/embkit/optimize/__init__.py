@@ -59,6 +59,20 @@ def _to_float(value: Any) -> float:
     return float(value)
 
 
+def _move_to_device(value: Any,
+                    device: torch.device,
+                    non_blocking: bool = False) -> Any:
+    if isinstance(value, torch.Tensor):
+        return value.to(device, non_blocking=non_blocking)
+    if isinstance(value, tuple):
+        return tuple(_move_to_device(v, device, non_blocking=non_blocking) for v in value)
+    if isinstance(value, list):
+        return [_move_to_device(v, device, non_blocking=non_blocking) for v in value]
+    if isinstance(value, dict):
+        return {k: _move_to_device(v, device, non_blocking=non_blocking) for k, v in value.items()}
+    return value
+
+
 def _run_training_phases(
                          model,
                          loader: DataLoader,
@@ -195,8 +209,8 @@ def fit(model, X: Union[torch.Tensor, Dataset, DataLoader],
     def recognizer_step(batch, beta_value: float) -> Dict[str, torch.Tensor]:
         del beta_value
         inputs, outputs = batch
-        inputs = inputs.to(device, non_blocking=pin_memory)
-        outputs = outputs.to(device, non_blocking=pin_memory)
+        inputs = _move_to_device(inputs, device=device, non_blocking=pin_memory)
+        outputs = _move_to_device(outputs, device=device, non_blocking=pin_memory)
 
         predictions = model(inputs)
         loss = criterion(predictions, outputs)
