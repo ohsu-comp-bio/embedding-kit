@@ -32,7 +32,7 @@ def dataframe_tensor(df: pd.DataFrame, device=None, dtype=torch.float32) -> torc
     """
     if device is None:
         device = get_device()
-    return torch.from_numpy(df.values).to(device=device, dtype=dtype)
+    return torch.from_numpy(df.to_numpy(copy=True)).to(device=device, dtype=dtype)
 
 def tensor_dataframe(tn: torch.Tensor, index=None, columns=None) -> pd.DataFrame:
     """
@@ -56,7 +56,7 @@ def dataframe_dataset(df: pd.DataFrame, device=None, dtype=torch.float32) -> tor
     """
     if device is None:
         device = get_device()
-    x = torch.from_numpy(df.values).to(device=device, dtype=dtype)
+    x = torch.from_numpy(df.to_numpy(copy=True)).to(device=device, dtype=dtype)
     dataset = TensorDataset(x)
     return dataset
 

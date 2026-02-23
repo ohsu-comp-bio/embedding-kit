@@ -84,10 +84,10 @@ if __name__ == "__main__":
 
     # Create non-overlapping pairs within the 20k feature space.
     # This deterministically pairs features across the two halves of the vector.
-    pairs = [(i, 10_000 + i) for i in range(K)]
+    vpairs = [(i, 10_000 + i) for i in range(K)]
 
     # Layer
-    layer = TSPLayer(pairs=pairs, beta=10.0, hard=False, learnable_weights=True)
+    layer = TSPLayer(pairs=vpairs, beta=10.0, hard=False, learnable_weights=True)
 
     # Create a [B, D] tensor
     torch.manual_seed(0)
@@ -95,7 +95,7 @@ if __name__ == "__main__":
 
     votes = layer(x)
     print("x shape:", x.shape)
-    print("num pairs:", len(pairs))
+    print("num pairs:", len(vpairs))
     print("votes shape:", votes.shape)
     print(votes)
 

@@ -1,7 +1,10 @@
 from typing import Optional, List, Union, TYPE_CHECKING
 from torch import nn
 import torch
-from ...layers import MaskedLinear, LayerInfo, convert_activation
+from ...modules import MaskedLinear
+from ...factory.layers import Layer, LayerList
+from ...factory.mapping import get_activation
+
 import logging
 
 if TYPE_CHECKING:
@@ -23,17 +26,17 @@ class Encoder(nn.Module):
 
     def __init__(self,
                  feature_dim: int,
-                 latent_dim: Optional[int] = None,
-                 layers: Optional[List[LayerInfo]] = None,
+                 latent_dim: int,
+                 layers: Optional[LayerList] = None,
                  batch_norm: bool = False,
                  default_activation: Union[str, None] = "relu",
                  make_latent_heads: bool = True,
                  sampling : bool = False,
                  constraint: Optional["NetworkConstraint"] = None,
-                 device=None):
+                 device=None, dtype=None):
         super().__init__()
         self.feature_dim = int(feature_dim)
-        self.latent_dim = int(latent_dim) if latent_dim is not None else None  # <- help BaseVAE.save()
+        self.latent_dim = int(latent_dim)
         self._default_activation = default_activation
         self._make_latent_heads = make_latent_heads
         self._sampling = sampling
@@ -44,25 +47,14 @@ class Encoder(nn.Module):
 
         # Optional global BN on input
         if batch_norm:
-            self.net.append(nn.BatchNorm1d(in_features, device=device))
+            self.net.append(nn.BatchNorm1d(in_features, device=device, dtype=dtype))
 
         if layers:
             logger.info("Building encoder with %d layers", len(layers))
-            for li in layers:
-                out_features = li.units
+            enc_net = layers.build( input_dim=in_features, output_dim=self.latent_dim, device=device, dtype=dtype)
+            self.net.extend(enc_net)
 
-                layer = li.gen_layer(in_features, device=device)
-                self.net.append(layer)
-
-                if li.activation is not None:
-                    act = convert_activation(li.activation)
-                    if act is not None:
-                        self.net.append(act)
-
-                if li.batch_norm:
-                    self.net.append(nn.BatchNorm1d(out_features, device=device))
-
-                in_features = out_features
+            in_features = enc_net[-1].out_features
 
             # Latent heads requirement
             self.z_mean = None
@@ -75,10 +67,10 @@ class Encoder(nn.Module):
                         "Final hidden width must equal latent_dim because the encoder "
                         "does not insert a latent projection when layers are provided.\n"
                         f"Final hidden size: {in_features}  vs  latent_dim: {self.latent_dim}\n"
-                        "Fix by setting your last LayerInfo(units=latent_dim)."
+                        "Fix by setting your last Layer(units=latent_dim)."
                     )
-                self.z_mean = nn.Linear(self.latent_dim, self.latent_dim, device=device)
-                self.z_log_var = nn.Linear(self.latent_dim, self.latent_dim, device=device)
+                self.z_mean = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
+                self.z_log_var = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
 
         else:
             if self.latent_dim is None:
@@ -88,16 +80,16 @@ class Encoder(nn.Module):
             logger.info("No encoder layers provided; inserting auto-projection to latent_dim=%d", self.latent_dim)
 
             # Auto projection to latent size
-            proj = nn.Linear(in_features, self.latent_dim, bias=True, device=device)
+            proj = nn.Linear(in_features, self.latent_dim, bias=True, device=device, dtype=dtype)
             self.net.append(proj)
 
             # Optional default activation after the auto-projection
-            act = convert_activation(self._default_activation)
+            act = get_activation(self._default_activation)
             if act is not None:
-                self.net.append(act)
+                self.net.append(act())
 
             # Optional BN after the auto-projection
-            self.net.append(nn.BatchNorm1d(self.latent_dim, device=device))
+            self.net.append(nn.BatchNorm1d(self.latent_dim, device=device, dtype=dtype))
 
             in_features = self.latent_dim
 
@@ -105,8 +97,8 @@ class Encoder(nn.Module):
             self.z_mean = None
             self.z_log_var = None
             if self._make_latent_heads:
-                self.z_mean = nn.Linear(self.latent_dim, self.latent_dim, device=device)
-                self.z_log_var = nn.Linear(self.latent_dim, self.latent_dim, device=device)
+                self.z_mean = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
+                self.z_log_var = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
 
         self._final_width = in_features
 

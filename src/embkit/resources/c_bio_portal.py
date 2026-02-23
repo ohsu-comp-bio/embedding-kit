@@ -1,6 +1,6 @@
 from pathlib import Path
 import requests
-from .dataset import Dataset
+from .resource import Resource
 import logging
 import tempfile
 from tqdm import tqdm
@@ -11,7 +11,7 @@ import shutil
 logger = logging.getLogger(__name__)
 
 
-class CBIOPortal(Dataset):
+class CBIOPortal(Resource):
     BASE_URL = "https://cbioportal-datahub.s3.amazonaws.com/"
 
     def __init__(

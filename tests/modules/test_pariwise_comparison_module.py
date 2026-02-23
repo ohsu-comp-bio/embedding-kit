@@ -1,6 +1,6 @@
 import unittest
 import torch
-from embkit.layers import PairwiseComparison  # adjust if necessary
+from embkit.modules import PairwiseComparison  # adjust if necessary
 
 
 class TestPairwiseComparison(unittest.TestCase):

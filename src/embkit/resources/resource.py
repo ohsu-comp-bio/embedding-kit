@@ -13,8 +13,10 @@ logger = logging.getLogger(__name__)
 REPO_DIR = ".embkit"
 
 
-class Dataset(os.PathLike[str]):
-    def __init__(self, name: str, save_path: Path | str | None, download: bool = True) -> None:
+class Resource(os.PathLike[str]):
+    def __init__(
+        self, name: str, save_path: Path | str | None, download: bool = True
+    ) -> None:
         """
         Initialize the TMP dataset handler.
         :param save_path: Path to save the dataset.
@@ -27,15 +29,14 @@ class Dataset(os.PathLike[str]):
         self.name = name
 
         if save_path is None:
-            self.save_path: Path = Path(Path.home(), REPO_DIR)
-            if not self.save_path.exists():
-                self.save_path.mkdir(parents=True, exist_ok=True)
-
+            # Use default repository directory under home
+            default_path = Path(Path.home(), REPO_DIR)
+            default_path.mkdir(parents=True, exist_ok=True)
+            self.save_path = default_path
         else:
             logger.debug(f"Using save_path={save_path}")
-            self.save_path: Path = Path(save_path)
-            if not self.save_path.exists():
-                self.save_path.mkdir(parents=True, exist_ok=True)
+            self.save_path = Path(save_path)
+            self.save_path.mkdir(parents=True, exist_ok=True)
 
         if download:
             try:
@@ -44,6 +45,7 @@ class Dataset(os.PathLike[str]):
             except Exception as e:
                 logger.error(e)
         else:
+            # When not downloading, set target file based on the resolved save_path
             target_file: Path = Path(self.save_path, self.name)
             if target_file.exists():
                 self._unpacked_file_path = target_file
@@ -63,7 +65,7 @@ class Dataset(os.PathLike[str]):
         pass  # pragma: no cover
 
 
-class SingleFileDownloader(Dataset):
+class SingleFileDownloader(Resource):
     def __init__(self, url: str, name: str, save_path=None, download=True):
         """
         :param save_path: Path to save the dataset
@@ -91,9 +93,9 @@ class SingleFileDownloader(Dataset):
             warnings.warn(
                 "Download was already triggered during initialization. "
                 "Calling 'download()' again manually is redundant and may be unintended.",
-                stacklevel=2
+                stacklevel=2,
             )
-            return b''
+            return b""
 
         save_path = self.save_path
 
@@ -103,7 +105,7 @@ class SingleFileDownloader(Dataset):
         if target_file.exists():
             self._unpacked_file_path = target_file
             logger.info(f"File {target_file} already exists. Skipping download.")
-            return b''
+            return b""
 
         try:
             profiles_url = self.url
@@ -116,11 +118,11 @@ class SingleFileDownloader(Dataset):
             with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
                 tmp_path = Path(tmp_file.name)
                 with tqdm(
-                        desc=f"Downloading {self.name}",
-                        total=total_size,
-                        unit='B',
-                        unit_scale=True,
-                        unit_divisor=1024,
+                    desc=f"Downloading {self.name}",
+                    total=total_size,
+                    unit="B",
+                    unit_scale=True,
+                    unit_divisor=1024,
                 ) as bar:
                     for chunk in response.iter_content(chunk_size=8192):
                         if chunk:
@@ -129,6 +131,7 @@ class SingleFileDownloader(Dataset):
 
             # Move to final destination after successful download
             import shutil
+
             shutil.move(str(tmp_path), str(target_file))
             self._unpacked_file_path = target_file
             logger.info(f"Data downloaded and saved to {target_file}")

@@ -1,1 +1,1 @@
-::: embkit.layers.masked_linear
+::: embkit.modules.masked_linear

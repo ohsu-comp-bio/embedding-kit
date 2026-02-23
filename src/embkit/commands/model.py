@@ -9,9 +9,12 @@ from torch.utils.data import DataLoader
 
 from .. import dataframe_loader, dataframe_tensor, get_device, dataframe_dataset
 from ..files import H5Reader
-from ..layers import LayerInfo, build_layers, ConstraintInfo
+from ..factory import save, load
+from ..factory.layers import Layer, LayerList, ConstraintInfo
+from ..optimize import fit_vae
 from ..models.vae.vae import VAE
-from ..preprocessing import ExpMinMaxScaler, get_dataset_nonzero_mask, DatasetMask
+from ..preprocessing import ExpMinMaxScaler, get_dataset_nonzero_mask
+from ..datasets import DatasetMask
 from ..losses import bce_with_logits, bce, mse
 from ..pathway import extract_pathway_interactions, feature_map_intersect, FeatureGroups
 
@@ -26,7 +29,7 @@ model = click.Group(name="model", help="VAE Model commands.")
 @click.option("--encode-layers", type=str, default="400,200")
 @click.option("--decode-layers", type=str, default="200,400")
 @click.option("--normalize", "-n", type=str, default="none")
-@click.option("--final-activation", default="none", type=click.Choice(["none", "sigmoid"]))
+@click.option("--final-activation", default="none", type=click.Choice(["none", "sigmoid", "relu"]))
 @click.option("--learning-rate", "-r", type=float, default=0.0001)
 @click.option("--out", "-o", type=str, default=None)
 @click.option("--schedule", "-s", type=str, default=None, help="20:0,20:0.1,40:.3,40:.4")
@@ -34,6 +37,7 @@ model = click.Group(name="model", help="VAE Model commands.")
 @click.option("--save-stats", is_flag=True)
 @click.option("--zero-mask", default=None, type=float)
 @click.option("--seed", default=42, type=int)
+@click.option("--bfloat16", is_flag=True)
 def train_vae(input_path: str,
               group: str,
               latent: int,
@@ -47,26 +51,32 @@ def train_vae(input_path: str,
               schedule:str,
               zero_mask: float,
               save_stats: bool,
-              seed: int
+              seed: int,
+              bfloat16: bool
               ):
     """
     Train VAE model from a TSV file.
     """
     device = get_device()
+    dtype = torch.float32
+    if bfloat16:
+        dtype = torch.bfloat16
+
     torch.manual_seed(seed)
+    df = None
     if group is not None:
         dataset = H5Reader(input_path, group)
         #TODO add normalization here
         if zero_mask is not None:
-            mask = get_dataset_nonzero_mask(dataset, zero_mask)
-            features = dataset.columns[mask[0]]
-            feature_count = len(features)
-            dataset = DatasetMask(dataset, mask, device)
+            dataset_mask = get_dataset_nonzero_mask(dataset, zero_mask)
+            mask = dataset_mask[0].cpu().numpy()
+            #print(mask)
+            features = dataset.columns[mask]
+            dataset = DatasetMask(dataset, dataset_mask, device)
         else:
             dataset.to(device)
             features = dataset.columns
-            feature_count = len(features)
-
+    
     else:
         df = pd.read_csv(input_path, sep="\t", index_col=0)
 
@@ -79,31 +89,28 @@ def train_vae(input_path: str,
             norm.fit(df)
             df = pd.DataFrame( norm.transform(df), index=df.index, columns=df.columns)
         features = df.columns
-        feature_count = len(df.columns)
-        dataset = dataframe_dataset(df, device=device)
+        dataset = dataframe_dataset(df, device=device, dtype=dtype)
     
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-      
+    
 
     layer_sizes = list( int(i) for i in encode_layers.split(",") )
-    layer_sizes.append(latent)
-    enc_layers = build_layers( layer_sizes )
+    enc_layers_list = LayerList( layer_sizes )
 
     layer_sizes = list( int(i) for i in decode_layers.split(",") )
-    layer_sizes.append(feature_count)
-    dec_layers = build_layers( layer_sizes, end_activation=final_activation )
+    dec_layers_list = LayerList( layer_sizes, end_activation=final_activation )
 
     beta_schedule = None
     if schedule is not None:
-        beta_schedule = [] #[(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
+        beta_schedule = []
         for b in schedule.split(","):
             e, b = b.split(":")
             beta_schedule.append( (float(b), int(e)) )
     vae = VAE(features=features,
               latent_dim=latent,
-              encoder_layers=enc_layers,
-              decoder_layers=dec_layers,
-              device=device)
+              encoder_layers=enc_layers_list,
+              decoder_layers=dec_layers_list,
+              device=device, dtype=dtype)
 
     loss_func = bce_with_logits
     if loss == "mse":
@@ -111,7 +118,7 @@ def train_vae(input_path: str,
     elif loss == "bce":
         loss_func = bce
 
-    vae.fit(dataloader, epochs=epochs,
+    fit_vae(vae, dataloader, epochs=epochs,
             beta_schedule=beta_schedule, lr=learning_rate, loss=loss_func)
     click.echo("Training complete.")
 
@@ -119,11 +126,7 @@ def train_vae(input_path: str,
         click.echo(f"No output path provided, using default naming.")
         out = f"vae_latent{latent}_epochs{epochs}.model"
 
-    if save_stats:
-        vae.save(out, dataset)
-    else:
-        vae.save(out)
-
+    save(vae, out)
     click.echo(f"Model saved, to {out}")
 
 
@@ -169,15 +172,15 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
     gcounts = [5,2,1]
 
     enc_layers = [
-        LayerInfo(group_count*gcounts[0], op="masked_linear", constraint=ConstraintInfo("features-to-group", fmap, out_group_count=gcounts[0])),
-        LayerInfo(group_count*gcounts[1], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[0], out_group_count=gcounts[1])),
-        LayerInfo(group_count, op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[1], out_group_count=gcounts[2]))
+        Layer(group_count*gcounts[0], op="masked_linear", constraint=ConstraintInfo("features-to-group", fmap, out_group_count=gcounts[0])),
+        Layer(group_count*gcounts[1], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[0], out_group_count=gcounts[1])),
+        Layer(group_count, op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[1], out_group_count=gcounts[2]))
     ]
 
     dec_layers = [
-        LayerInfo(group_count*gcounts[1], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[2], out_group_count=gcounts[1])),
-        LayerInfo(group_count*gcounts[0], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[1], out_group_count=gcounts[0])),
-        LayerInfo(feature_count, op="masked_linear", constraint=ConstraintInfo("group-to-features", fmap, in_group_count=gcounts[0]), activation="none")
+        Layer(group_count*gcounts[1], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[2], out_group_count=gcounts[1])),
+        Layer(group_count*gcounts[0], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[1], out_group_count=gcounts[0])),
+        Layer(feature_count, op="masked_linear", constraint=ConstraintInfo("group-to-features", fmap, in_group_count=gcounts[0]), activation="none")
     ]
 
     loss_func = bce_with_logits
@@ -186,8 +189,6 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
     elif loss == "bce":
         loss_func = bce
 
-
-    #schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
     schedule = [(0.0, 20)]
     vae = VAE(df.columns, latent_dim=group_count, encoder_layers=enc_layers, decoder_layers=dec_layers)
     vae.fit(X=dataloader, beta_schedule=schedule, lr=learning_rate, loss=loss_func)
@@ -205,11 +206,9 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
 @click.option("--normalize", "-n", type=str, default="none")
 @click.option("--out", "-o", type=str, default="embedding.tsv")
 def encode(input_path: str, model_path:str, normalize:str, out:str):
-    m = VAE.open_model(path=model_path)
-    df = pd.read_csv(input_path, sep="\t", index_col=0)
 
-    # print(m)
-    # df = pd.read_csv(input_path, sep="\t", index_col=0)
+    m = load(model_path)
+    df = pd.read_csv(input_path, sep="\t", index_col=0)
 
     df = df[m.features]
     if normalize == "expMinMax":

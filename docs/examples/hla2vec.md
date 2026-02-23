@@ -1,30 +1,43 @@
+# HLA2Vec Example
 
-# HLA2Vec example
+This example demonstrates a peptide/HLA workflow using Embedding Kit utilities and a custom training script.
 
+## Prerequisites
 
-Prep:
+- BigMHC training/evaluation files available locally
+- Embedding Kit installed with CLI access (`embkit`)
 
-Assumes you have BigMHC data directory from https://data.mendeley.com/datasets/dvmz6pkzvb/4
+The commands below assume a directory named `BigMHC Training and Evaluation Data`.
 
-Generate FASTA file for all peptides in el_train.csv
-```
-cat ./BigMHC\ Training\ and\ Evaluation\ Data/el_train.csv | grep -v mhc | awk -F ',' '{print $2}' | sort | uniq | awk '{print ">"$1 "\n" $1}' > el_train.fa
-```
+## 1) Build a peptide FASTA file
 
-Generate peptide vector file. Trim numbers to 5 significant digits and use the model esm2_t6_8M_UR50D
-```
-embkit protein encode el_train.fa --trim 5  --model t6 > el_train.fa.tsv
-```
-
-Run training script
-```
-python ./hla2vec.py ./BigMHC\ Training\ and\ Evaluation\ Data/el_train.csv ./BigMHC\ Training\ and\ Evaluation\ Data/pseudoseqs.csv el_train.fa.tsv
-```
-
-
-hla2vec.py
+```bash
+cat ./BigMHC\ Training\ and\ Evaluation\ Data/el_train.csv \
+  | grep -v mhc \
+  | awk -F ',' '{print $2}' \
+  | sort \
+  | uniq \
+  | awk '{print ">"$1 "\n" $1}' > el_train.fa
 ```
 
+## 2) Encode peptide sequences
+
+```bash
+embkit protein encode el_train.fa --trim 5 --model t6 > el_train.fa.tsv
+```
+
+## 3) Run HLA2Vec training
+
+```bash
+python ./hla2vec.py \
+  ./BigMHC\ Training\ and\ Evaluation\ Data/el_train.csv \
+  ./BigMHC\ Training\ and\ Evaluation\ Data/pseudoseqs.csv \
+  el_train.fa.tsv
+```
+
+## Reference training script (`hla2vec.py`)
+
+```python
 import sys
 import math
 import itertools
@@ -54,41 +67,35 @@ class PairBindingDataset(IterableDataset):
         self.bigmhc = bigmhc
         self.peptides = peptides
         self.hlaseq = hlaseq
-    
+
     def __iter__(self):
         g = bigmhc.groupby(["pep"])
-        #sums = [0,0]
         with self.peptides as peptides:
             for i in g:
                 if i[1]["mhc"].count() > 1:
-                    #print(i[1]["mhc"].count())
-                    #print(type(i[1]))
                     vec = peptides.get(i[0][0])
                     if vec is not None:
-                        #print(vec, i[0][0])
                         pep_vec = np.fromiter(vec[1:], dtype=np.float32)
-                        for r1, r2 in itertools.permutations( i[1].values, 2 ):
-                            yield ( self.hlaseq.loc[r1[0]].values, self.hlaseq.loc[r2[0]].values, pep_vec, np.array( [r1[2] == r2[2]], dtype=np.float32 ) )
-                            #sums[ r1[2] == r2[2] ] +=1
-                            #print(f"{r1[0]} - {r2[0]} : { r1[2] == r2[2] }")
-                    #print(sums)
+                        for r1, r2 in itertools.permutations(i[1].values, 2):
+                            yield (
+                                self.hlaseq.loc[r1[0]].values,
+                                self.hlaseq.loc[r2[0]].values,
+                                pep_vec,
+                                np.array([r1[2] == r2[2]], dtype=np.float32),
+                            )
                     else:
                         print("Not found, ", i[0][0])
 
 peptides = LargeCsvReader(peptide_file, sep="\t", index_column=0, skip_header=True, cache_size=128)
 
-peptide_dim = peptides.shape[1] - 1 # one column is the name
+peptide_dim = peptides.shape[1] - 1
 hla_dim = hlaseq.shape[1]
 
 print(f"Pepdim: {peptide_dim} HLAdim {hla_dim} EmbDim:{EMBEDDING_SIZE}")
 
 pair_bindings = PairBindingDataset(bigmhc, hlaseq, peptides)
-
-sampler = WeightedRandomSampler([1.0, 0.1], num_samples=1000)
-
 loader = DataLoader(pair_bindings, batch_size=1024)
 
-batch_size: int = 1024
 epochs: int = 4
 lr: float = 1e-3
 device = embkit.get_device()
@@ -99,7 +106,7 @@ model.to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 criterion = torch.nn.BCEWithLogitsLoss()
 
-steps_per_epoch = 2000 # max(1, math.ceil((2 * min(n_pos, n_neg)) / batch_size))
+steps_per_epoch = 2000
 history = []
 
 data_iter = iter(loader)
@@ -137,12 +144,13 @@ for e in range(1, epochs + 1):
         if i and (i % 100 == 0 or i == steps_per_epoch - 1):
             print(f"[Epoch {e}/{epochs}] Step {i+1}/{steps_per_epoch} - Loss: {loss.item():.4f}")
 
-    # Safe divide even if somehow total==0
     epoch_loss = running_loss / max(1, total)
     epoch_acc = correct / max(1, total)
     history.append({"epoch": e, "loss": epoch_loss, "acc": epoch_acc})
-
-#for d in loader:
-#    print(sum(~d[3]), sum(d[3]))
-
 ```
+
+## Notes
+
+- `embkit protein encode` produces peptide embeddings from FASTA input.
+- The script pairs HLA alleles per peptide and trains a binary comparison objective.
+- Start with a smaller `steps_per_epoch` during local testing to validate your pipeline quickly.

@@ -22,7 +22,7 @@ class VAEEstimator(BaseEstimator):
         self.model: Optional[VAE] = None
         self.device = device
 
-    def fit(self, X: pd.DataFrame):
+    def fit(self, X: pd.DataFrame) -> "VAEEstimator":
         """
         Fit the VAE model to the input data.
 
@@ -66,7 +66,7 @@ class VAEEstimator(BaseEstimator):
         self.model = vae
         return self
 
-    def score(self, X: pd.DataFrame):
+    def score(self, X: pd.DataFrame) -> float:
         if self.model is None:
             raise RuntimeError("Model not fitted.")
         self.model.eval()
