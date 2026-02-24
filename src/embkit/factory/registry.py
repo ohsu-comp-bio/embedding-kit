@@ -20,6 +20,11 @@ class nn_module_named:
         return nn_module_wrap_register(cls, self.name)
 
 def class_dict_wrapper(base_class):
+    """
+    A class decorator to wrap a class with to_dict and from_dict methods.
+    Note: to primarily designed for classes with no init args. And is used for a 
+    limited set of classes
+    """
     new_name = f"embkit.factory.mapping.{base_class.__name__}"
 
     def to_dict(self):
@@ -44,7 +49,9 @@ def class_dict_wrapper(base_class):
 
 
 def nn_module_wrap_register(cls: Type, name: str) -> Type:
-    """A class decorator to register classes with given name"""
+    """
+    Internal method for class regiostration. Use nn_module or nn_module_named instead of calling this directly.
+    """
     if not hasattr(cls, "to_dict") or not hasattr(cls, "from_dict"):
         raise ValueError("Class must have both `to_dict` and `from_dict` methods.")
     CLASS_REGISTRY[name] = cls
@@ -56,7 +63,7 @@ def nn_module_wrap_register(cls: Type, name: str) -> Type:
         # Call the original to_dict method
         result = original_to_dict(self)
         # Add class information to the result
-        result['__class__'] = get_class_name(cls)
+        result['__class__'] = name
         return result
 
     # Replace the original to_dict method with the wrapper
