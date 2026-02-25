@@ -16,30 +16,52 @@ class CsvReader:
         csv_path (str): The path to the CSV file.
         index_column (str or int): The name or 0-based index of the column to use as a key.
         sep (str, optional): The delimiter used in the CSV file. Defaults to ','.
-        skip_header (bool, optional): Whether to skip the first line as a header. Defaults to False.
+        header (int or None, optional): Row number to use as column names, similar to
+            pandas.read_csv. If 0 (default), the first row is used as the header and
+            rows are yielded as dicts. If None, there is no header row and rows are
+            yielded as lists.
     """
-    def __init__(self, csv_path, index_column, sep=',', skip_header=False):
+    def __init__(self, csv_path, index_column, sep=',', header=0):
         self.csv_path = csv_path
         self.index_column = index_column
         self.sep = sep
-        self.skip_header = skip_header
+        self.header = header
         self._header = None
 
     def __iter__(self):
         with open(self.csv_path, 'r', newline='') as f:
             reader = csv.reader(f, delimiter=self.sep)
-            skip_header = self.skip_header            
-            for row in reader:
-                if not skip_header:
-                    self._header = row
-                    skip_header = True
+
+            if self.header is not None:
+                # Read the first row as column names
+                try:
+                    self._header = next(reader)
+                except StopIteration:
+                    return
+                # Resolve string column name to integer index
+                if isinstance(self.index_column, str):
+                    try:
+                        key_index = self._header.index(self.index_column)
+                    except ValueError:
+                        raise ValueError(f"Column name '{self.index_column}' not found in CSV header.")
                 else:
-                    if len(row) > self.index_column:
-                        key = row.pop(self.index_column)
-                        if self._header is not None:
-                            yield (key, dict(zip(self._header, row)))
-                        else:
-                            yield (key, row)
+                    key_index = self.index_column
+            else:
+                self._header = None
+                if isinstance(self.index_column, str):
+                    raise ValueError("Cannot use a string column name when header=None.")
+                key_index = self.index_column
+
+            for row in reader:
+                if key_index >= len(row):
+                    continue
+                key = row[key_index]
+                values_without_key = [v for i, v in enumerate(row) if i != key_index]
+                if self._header is not None:
+                    header_without_key = [h for i, h in enumerate(self._header) if i != key_index]
+                    yield (key, dict(zip(header_without_key, values_without_key)))
+                else:
+                    yield (key, values_without_key)
                     
 
 class LargeCsvReader:

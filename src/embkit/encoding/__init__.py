@@ -18,7 +18,7 @@ class OneHotEncoder:
     def __call__(self, x):
         # Support single label or batch of labels
         # Single label (string/key): return precomputed one-hot tensor
-        if isinstance(x, (str,)) or (not isinstance(x, (list, tuple, torch.Tensor, np.ndarray))):
+        if not isinstance(x, (list, tuple, torch.Tensor, np.ndarray)):
             return self.mapping[x]
 
         # Batch input: convert each item to its index and return stacked one-hots
@@ -31,13 +31,13 @@ class OneHotEncoder:
                     item = int(item.item())
                 else:
                     item = item.tolist()
-            if isinstance(item, (int,)):
+            if isinstance(item, int):
                 idx = int(item)
             else:
                 idx = self.class_idx[item]
             indices.append(idx)
 
-        idx_tensor = torch.tensor(indices, device=self.device if hasattr(self, 'device') else None)
+        idx_tensor = torch.tensor(indices, device=self.device)
         return F.one_hot(idx_tensor, num_classes=self.num_classes).to(self.mapping[self.classes[0]].device)
 
     def __len__(self):
@@ -114,7 +114,6 @@ class ProteinOneHotEncoder:
 
     def __call__(self, sequence):
 
-        use_numpy = self._use_numpy_backend()
         is_single = False
         # Fast path for single sequence
         if isinstance(sequence, str):
