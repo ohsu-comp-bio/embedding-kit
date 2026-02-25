@@ -7,6 +7,41 @@ import numpy as np
 from tqdm import tqdm
 
 
+class CsvReader:
+    """
+    A simple CSV reader that yields key-value pairs based on a specified index column. 
+    This class is designed to stream the CSV file one row at a time.
+    
+    Args:
+        csv_path (str): The path to the CSV file.
+        index_column (str or int): The name or 0-based index of the column to use as a key.
+        sep (str, optional): The delimiter used in the CSV file. Defaults to ','.
+        skip_header (bool, optional): Whether to skip the first line as a header. Defaults to False.
+    """
+    def __init__(self, csv_path, index_column, sep=',', skip_header=False):
+        self.csv_path = csv_path
+        self.index_column = index_column
+        self.sep = sep
+        self.skip_header = skip_header
+        self._header = None
+
+    def __iter__(self):
+        with open(self.csv_path, 'r', newline='') as f:
+            reader = csv.reader(f, delimiter=self.sep)
+            skip_header = self.skip_header            
+            for row in reader:
+                if not skip_header:
+                    self._header = row
+                    skip_header = True
+                else:
+                    if len(row) > self.index_column:
+                        key = row.pop(self.index_column)
+                        if self._header is not None:
+                            yield (key, dict(zip(self._header, row)))
+                        else:
+                            yield (key, row)
+                    
+
 class LargeCsvReader:
     """
     A class for performing key-value random access on large CSV files
@@ -202,51 +237,4 @@ class LargeCsvReader:
             else:
                 for k, v in self:
                     yield np.array(v[1:], dtype=np.float32)
-
-# Example Usage
-if __name__ == '__main__':
-    dummy_csv_path = 'large_data.csv'
-    if not os.path.exists(dummy_csv_path):
-        with open(dummy_csv_path, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(['user_id', 'username', 'email'])
-            for i in range(1000):
-                writer.writerow([i, f'user_{i}', f'user_{i}@example.com'])
-    
-    # Example 1: Use persistent index (default behavior)
-    print("--- Using persistent index ---")
-    # This will generate and save the index the first time it runs.
-    with LargeCsvReader(dummy_csv_path, index_column='user_id') as reader:
-        row = reader.get('500')
-        print(f"Persistent index lookup: {row}")
-
-    # Subsequent runs will load the saved index instantly.
-    with LargeCsvReader(dummy_csv_path, index_column='user_id') as reader:
-        row = reader.get('501')
-        print(f"Reloaded persistent index lookup: {row}")
-    
-    # Clean up the persistent index file for the next demo
-    os.remove(dummy_csv_path + ".index.json")
-
-
-    # Example 2: Use in-memory index only (pass save_index=False)
-    print("\n--- Using in-memory index ---")
-    with LargeCsvReader(dummy_csv_path, index_column='user_id', save_index=False) as reader:
-        # This will regenerate the index every time the class is instantiated.
-        # No file will be saved.
-        row = reader.get('500')
-        print(f"In-memory index lookup: {row}")
-
-    with LargeCsvReader(dummy_csv_path, index_column='user_id', save_index=False) as reader:
-        # Re-creating the object triggers another index generation.
-        row = reader.get('501')
-        print(f"Another in-memory index lookup: {row}")
-        
-    
-    # check csv reader read function
-    print("\n--- Reading all rows ---")
-    with LargeCsvReader(dummy_csv_path, index_column='user_id', save_index=False) as reader:
-        for arr in reader.read(show_progress=True):
-            pass
-        print("Completed reading all rows.")
 
