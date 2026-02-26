@@ -66,7 +66,6 @@ class TestProteinOneHotEncoder(unittest.TestCase):
         self.assertEqual(out.shape, (3, len(enc.alphabet) + 1))
         # last column holds position (normalized by full_len)
         pos_col = out[:, -1]
-        print(pos_col)
         expected = torch.tensor([0.0, 1.0 / 3.0, 0.0], dtype=pos_col.dtype)
         self.assertTrue(torch.allclose(pos_col, expected))
 
@@ -78,7 +77,6 @@ class TestProteinOneHotEncoder(unittest.TestCase):
         self.assertEqual(out.shape, (3, len(enc.alphabet) + 1))
         # last column holds position (normalized by full_len)
         pos_col = out[:, -1]
-        print(pos_col)
         expected = np.array([0.0, 1.0 / 3.0, 0.0], dtype=pos_col.dtype)
         self.assertTrue(np.allclose(pos_col, expected))
 
