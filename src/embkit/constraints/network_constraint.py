@@ -52,3 +52,21 @@ class NetworkConstraint:
 
     def as_torch(self, device: torch.device) -> torch.Tensor:
         return torch.tensor(self._mask_np, device=device)
+
+    def to_dict(self) -> dict:
+        return {
+            "feature_index": self.feature_index,
+            "latent_index": self.latent_index,
+            "latent_membership": self.latent_membership,
+            "active": self.active,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "NetworkConstraint":
+        obj = cls(
+            feature_index=d["feature_index"],
+            latent_index=d["latent_index"],
+            latent_membership=d.get("latent_membership"),
+        )
+        obj.set_active(d.get("active", True))
+        return obj
