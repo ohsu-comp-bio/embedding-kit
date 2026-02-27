@@ -1,6 +1,8 @@
 from typing import List, Optional
 import torch
 from torch import nn
+
+from ... import factory
 from ...modules import MaskedLinear
 from ...factory.layers import Layer, LayerList
 import logging
@@ -8,6 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+@factory.nn_module
 class Decoder(nn.Module):
     """
     z -> [LayerInfo...] -> recon(features)
@@ -60,3 +63,21 @@ class Decoder(nn.Module):
         for layer in self.net:
             h = layer(h)
         return h
+
+    def to_dict(self):
+        return {
+            "latent_dim": self.latent_dim,
+            "feature_dim": self.feature_dim,
+            "batch_norm": self._global_bn,
+            "layers": [layer.to_dict() for layer in self.net if hasattr(layer, "to_dict")]
+        }
+
+    @classmethod
+    def from_dict(cls, d):
+        layers = [Layer.from_dict(ld) for ld in d.get("layers", [])]
+        return Decoder(
+            latent_dim=d["latent_dim"],
+            feature_dim=d["feature_dim"],
+            batch_norm=d.get("batch_norm", False),
+            layers=LayerList(layers) if layers else None
+        )

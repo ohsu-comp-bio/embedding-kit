@@ -1,6 +1,8 @@
 from typing import Optional, List, Union, TYPE_CHECKING
 from torch import nn
 import torch
+
+from ... import factory
 from ...modules import MaskedLinear
 from ...factory.layers import Layer, LayerList
 from ...factory.mapping import get_activation
@@ -13,6 +15,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@factory.nn_module
 class Encoder(nn.Module):
     """
     input -> [optional global BN] -> [LayerInfo...] -> (latent heads optional)
@@ -41,6 +44,7 @@ class Encoder(nn.Module):
         self._make_latent_heads = make_latent_heads
         self._sampling = sampling
         self.constraint = constraint
+        self.batch_norm = batch_norm
 
         self.net = nn.ModuleList()
         in_features = feature_dim
@@ -79,9 +83,14 @@ class Encoder(nn.Module):
                 )
             logger.info("No encoder layers provided; inserting auto-projection to latent_dim=%d", self.latent_dim)
 
-            # Auto projection to latent size
-            proj = nn.Linear(in_features, self.latent_dim, bias=True, device=device, dtype=dtype)
-            self.net.append(proj)
+            # Auto projection to latent size (masked when constraint is provided)
+            if self.constraint is not None:
+                proj = MaskedLinear(in_features, self.latent_dim, bias=True, device=device, dtype=dtype)
+                self.net.append(proj)
+                proj.set_mask(self.constraint.as_torch(device=proj.mask.device))
+            else:
+                proj = nn.Linear(in_features, self.latent_dim, bias=True, device=device, dtype=dtype)
+                self.net.append(proj)
 
             # Optional default activation after the auto-projection
             act = get_activation(self._default_activation)
@@ -118,6 +127,30 @@ class Encoder(nn.Module):
             return mu, logvar, h
 
         return h
+    
+    def to_dict(self):
+        return {
+            "feature_dim": self.feature_dim,
+            "latent_dim": self.latent_dim,
+            "batch_norm": self.batch_norm,
+            "default_activation": self._default_activation,
+            "make_latent_heads": self._make_latent_heads,
+            "sampling": self._sampling,
+            "constraint": self.constraint.to_dict() if self.constraint else None,
+        }
+
+    @classmethod
+    def from_dict(cls, d):
+        constraint = NetworkConstraint.from_dict(d["constraint"]) if d.get("constraint") else None
+        return Encoder(
+            feature_dim=d["feature_dim"],
+            latent_dim=d["latent_dim"],
+            batch_norm=d.get("batch_norm", False),
+            default_activation=d.get("default_activation", "relu"),
+            make_latent_heads=d.get("make_latent_heads", True),
+            sampling=d.get("sampling", False),
+            constraint=constraint
+        )
 
     def refresh_mask(self, device: torch.device) -> None:
         """

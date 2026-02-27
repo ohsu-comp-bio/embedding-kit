@@ -4,6 +4,7 @@ Methods for opening and processing Pathway files
 from collections import OrderedDict, defaultdict
 from typing import Dict, List, Tuple, Iterable, Optional
 
+import numpy as np
 import pandas as pd
 
 
@@ -50,6 +51,55 @@ def extract_pathway_interactions(
         fmap[src] = list(od.keys())
 
     return fmap
+
+
+def build_sif_mask(
+        sif_path: str,
+        src_index: Dict[str, int],
+        dst_index: Dict[str, int],
+        *,
+        relation: Optional[str] = "controls-expression-of",
+) -> np.ndarray:
+    """
+    Build a binary mask from a SIF file using explicit source/destination indices.
+
+    The returned mask has shape (len(dst_index), len(src_index)) and is compatible
+    with weight matrices shaped (out_features, in_features) for MaskedLinear layers.
+    Only edges that map from a known source to a known destination are set to 1.
+
+    Parameters
+    ----------
+    sif_path : str
+        Path to the SIF file containing ``src \t relation \t dst`` rows.
+    src_index : Dict[str, int]
+        Mapping from source node name to its column index.
+    dst_index : Dict[str, int]
+        Mapping from destination node name to its row index.
+    relation : Optional[str]
+        If provided, filter rows to only those with the given relation.
+
+    Returns
+    -------
+    np.ndarray
+        Binary mask with shape (len(dst_index), len(src_index)).
+    """
+    pc = pd.read_csv(
+        sif_path,
+        sep="\t",
+        header=None,
+        names=["from", "relation", "to"],
+        dtype=str,
+    ).fillna("")
+
+    if relation is not None:
+        pc = pc.loc[pc["relation"] == relation]
+
+    mask = np.zeros((len(dst_index), len(src_index)), dtype=np.float32)
+    for src, _, dst in pc[["from", "relation", "to"]].itertuples(index=False, name=None):
+        if src in src_index and dst in dst_index:
+            mask[dst_index[dst], src_index[src]] = 1.0
+
+    return mask
 
 
 # ---------- map intersection/subsetting ----------

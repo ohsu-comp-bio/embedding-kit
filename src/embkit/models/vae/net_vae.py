@@ -12,6 +12,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from .base_vae import BaseVAE
 from .encoder import Encoder
 from .decoder import Decoder
+from ... import factory
 from ...losses import net_vae_loss
 from ...constraints import NetworkConstraint
 
@@ -22,6 +23,7 @@ logger = logging.getLogger(__name__)
 # NetVae (training with optional alternating constraint)
 # ---------------------------------------------------------
 
+@factory.nn_module
 class NetVAE(BaseVAE):
     """
     NetVAE
@@ -38,6 +40,26 @@ class NetVAE(BaseVAE):
         self.latent_index: Optional[List[str]] = None
         self.history: Optional[Dict[str, List[float]]] = None
         self.normal_stats: Optional[pd.DataFrame] = None
+
+    def to_dict(self):
+        return {
+            "features": self.features,
+            "encoder": self.encoder.to_dict() if self.encoder else None,
+            "decoder": self.decoder.to_dict() if self.decoder else None,
+            "latent_index": self.latent_index,
+            "latent_groups": self.latent_groups,
+        }
+
+    @classmethod
+    def from_dict(cls, d):
+        model = NetVAE(
+            features=d["features"],
+            encoder=Encoder.from_dict(d["encoder"]) if d.get("encoder") else None,
+            decoder=Decoder.from_dict(d["decoder"]) if d.get("decoder") else None,
+        )
+        model.latent_index = d.get("latent_index")
+        model.latent_groups = d.get("latent_groups")
+        return model
 
     def fit(
             self,
@@ -79,11 +101,11 @@ class NetVAE(BaseVAE):
         constraint = NetworkConstraint(list(df.columns), latent_index, latent_groups)
         if self.encoder is None or self.decoder is None:
             feature_dim = len(df.columns)
-            self.encoder = BaseVAE.build_encoder(feature_dim=feature_dim, latent_dim=len(latent_index))
+            self.encoder = Encoder(feature_dim=feature_dim, latent_dim=len(latent_index), constraint=constraint)
             self.decoder = BaseVAE.build_decoder(feature_dim=feature_dim, latent_dim=len(latent_index))
-        
-        # Attach the constraint to the encoder
-        self.encoder.constraint = constraint
+        else:
+            # Attach the constraint to the encoder
+            self.encoder.constraint = constraint
         
         self.latent_index = list(latent_index)
 
@@ -185,8 +207,10 @@ if __name__ == "__main__":
     net.decoder = BaseVAE.build_decoder(feature_dim=len(df.columns), latent_dim=2)
     net.fit(df, latent_dim=2, epochs=10, learning_rate=0.01, batch_size=16)
     # Save artifacts
-    net.save("net_vae_model")
+    from ...factory import save, load
 
-    model: NetVAE = BaseVAE.open_model(path="net_vae_model", model_cls=NetVAE, device="cpu")
+    save(net, "net_vae_model")
+
+    model: NetVAE = load("net_vae_model", device="cpu")
     print("Model loaded with features:", model.features)
     print(model.decoder)
