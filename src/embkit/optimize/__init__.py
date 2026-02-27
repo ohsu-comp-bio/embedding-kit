@@ -340,6 +340,7 @@ def fit_net_vae(
     from ..losses import net_vae_loss
     from ..models.vae.encoder import Encoder
     from ..models.vae.base_vae import BaseVAE
+    from ..modules import MaskedLinear
 
     if isinstance(X, torch.Tensor):
         if not getattr(model, "features", None):
@@ -389,9 +390,20 @@ def fit_net_vae(
     def start_constrained_phase():
         if grouping_fn is not None and model.encoder is not None:
             with torch.no_grad():
-                weights = model.encoder.pathway.linear.weight.detach().cpu().numpy()
-                new_groups = grouping_fn(weights, list(df.columns))
-                constraint.update_membership(new_groups)
+                weight_tensor = None
+                for module in model.encoder.net:
+                    if isinstance(module, MaskedLinear) and hasattr(module.linear, "weight"):
+                        weight_tensor = module.linear.weight
+                        break
+                if weight_tensor is not None:
+                    weights = weight_tensor.detach().cpu().numpy()
+                    new_groups = grouping_fn(weights, list(df.columns))
+                    constraint.update_membership(new_groups)
+                else:
+                    logger.warning(
+                        "Could not locate encoder projection weights for constrained regrouping; "
+                        "skipping grouping_fn-based membership update."
+                    )
         constraint.set_active(True)
         refresh_mask()
 

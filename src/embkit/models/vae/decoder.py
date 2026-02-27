@@ -28,6 +28,7 @@ class Decoder(nn.Module):
         self.latent_dim = int(latent_dim)  # <- help BaseVAE.save()
         self.feature_dim = int(feature_dim)
         self._global_bn = batch_norm
+        self._layers_cfg = layers
         self.net = nn.ModuleList()
 
         in_features = latent_dim
@@ -69,7 +70,7 @@ class Decoder(nn.Module):
             "latent_dim": self.latent_dim,
             "feature_dim": self.feature_dim,
             "batch_norm": self._global_bn,
-            "layers": [layer.to_dict() for layer in self.net if hasattr(layer, "to_dict")]
+            "layers": [li.to_dict() for li in self._layers_cfg] if self._layers_cfg else []
         }
 
     @classmethod

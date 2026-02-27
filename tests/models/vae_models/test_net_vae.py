@@ -89,10 +89,18 @@ class TestNetVAE(unittest.TestCase):
         total, _, _ = bce_with_logits(recon, x, mu, logvar, beta=1.0)
         opt.zero_grad()
         total.backward()
-        opt.step()
 
-        effective_weight = masked_layer.linear.weight.detach() * masked_layer.mask.detach()
-        self.assertTrue(torch.all(effective_weight[masked_layer.mask == 0] == 0))
+        # Gradients for masked weights should be zero after backward.
+        weight = masked_layer.linear.weight
+        mask = masked_layer.mask
+        self.assertIsNotNone(weight.grad)
+        self.assertTrue(torch.all(weight.grad[mask == 0] == 0))
+
+        # After an optimizer step, masked weights should remain unchanged.
+        weight_before = weight.detach().clone()
+        opt.step()
+        weight_after = weight.detach()
+        self.assertTrue(torch.all(weight_after[mask == 0] == weight_before[mask == 0]))
 
 
 if __name__ == "__main__":

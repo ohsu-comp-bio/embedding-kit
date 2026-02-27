@@ -141,6 +141,7 @@ class Encoder(nn.Module):
 
     @classmethod
     def from_dict(cls, d):
+        from ...constraints import NetworkConstraint
         constraint = NetworkConstraint.from_dict(d["constraint"]) if d.get("constraint") else None
         return Encoder(
             feature_dim=d["feature_dim"],

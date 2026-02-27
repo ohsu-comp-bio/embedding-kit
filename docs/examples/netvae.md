@@ -11,10 +11,10 @@ This example shows how to train a pathway-constrained VAE (`NetVAE`) on gene exp
 A minimal SIF file looks like:
 
 ```
-TP53    activates   CDKN1A
-MYC     activates   CDK4
-MYC     activates   E2F1
-BRCA1   inhibits    CCND1
+TP53    controls-expression-of   CDKN1A
+MYC     controls-expression-of   CDK4
+MYC     controls-expression-of   E2F1
+BRCA1   controls-expression-of   CCND1
 ```
 
 ---
@@ -116,6 +116,8 @@ dec_layers = [
 
 ### 4) Train
 
+This Python API example uses the standard `VAE` class with pathway-constrained masked layers — not the `NetVAE` class. This gives you finer control over layer architecture (multiple depths per group). The `NetVAE` class (used by the CLI) provides a simpler single-projection constraint.
+
 ```python
 from embkit.models.vae.vae import VAE
 from embkit.losses import bce_with_logits
@@ -166,6 +168,6 @@ The embedding has one column per pathway group, making it directly interpretable
 
 ## Notes
 
-- The intersection step (`feature_map_intersect`) silently drops samples whose genes are absent from the pathway file. Check `isect` before training to see how many genes are retained.
+- The intersection step (`feature_map_intersect`) intersects genes/features (columns) with the pathway file and drops genes that are not present there, subsetting the matrix columns accordingly. Check `isect` before training to see how many genes are retained.
 - `gcounts` controls the number of hidden nodes per group at each depth. More nodes = more expressiveness per group but larger model.
-- NetVAE does not currently support `factory.save` / `factory.load` serialization (the masked layer configuration is not yet registered with the factory). Save the model's `state_dict` manually if needed, and rebuild the architecture before loading weights.
+- The `VAE` built above supports `factory.save` / `factory.load` serialization. The `NetVAE` class (used by the CLI) also supports serialization via `factory.save` / `factory.load`.
