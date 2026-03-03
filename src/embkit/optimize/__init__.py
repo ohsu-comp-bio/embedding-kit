@@ -319,6 +319,163 @@ def fit_vae(model,
     )
 
 
+def fit_net_vae(
+    model: nn.Module,
+    X: Union[pd.DataFrame, torch.Tensor],
+    *,
+    latent_dim: Optional[int] = None,
+    latent_index: Optional[List[str]] = None,
+    latent_groups: Optional[Dict[str, List[str]]] = None,
+    learning_rate: float = 1e-3,
+    batch_size: int = 128,
+    epochs: int = 80,
+    phases: Optional[List[int]] = None,
+    device: Optional[str] = None,
+    grouping_fn: Optional[Callable[[Any, List[str]], Dict[str, List[str]]]] = None,
+) -> None:
+    """Train a NetVAE with optional alternating constraint phases."""
+
+    import numpy as np
+    from ..constraints import NetworkConstraint
+    from ..losses import net_vae_loss
+    from ..models.vae.encoder import Encoder
+    from ..models.vae.base_vae import BaseVAE
+    from ..modules import MaskedLinear
+
+    if isinstance(X, torch.Tensor):
+        if not getattr(model, "features", None):
+            raise ValueError("Tensor input requires model.features to be defined.")
+        df = pd.DataFrame(X.detach().cpu().numpy(), columns=model.features)
+    else:
+        df = X
+
+    if latent_index is None:
+        if latent_dim is None:
+            raise ValueError("Provide latent_dim or latent_index.")
+        latent_index = [f"z{i}" for i in range(latent_dim)]
+    else:
+        latent_index = list(latent_index)
+
+    if device is None:
+        if torch.cuda.is_available():
+            device = "cuda"
+        elif torch.backends.mps.is_available():
+            device = "mps"
+        else:
+            device = "cpu"
+    torch_device = torch.device(device)
+
+    constraint = NetworkConstraint(list(df.columns), latent_index, latent_groups)
+    if getattr(model, "encoder", None) is None or getattr(model, "decoder", None) is None:
+        feature_dim = len(df.columns)
+        model.encoder = Encoder(feature_dim=feature_dim, latent_dim=len(latent_index), constraint=constraint)
+        model.decoder = BaseVAE.build_decoder(feature_dim=feature_dim, latent_dim=len(latent_index))
+    else:
+        model.encoder.constraint = constraint
+
+    model.latent_index = list(latent_index)
+
+    model.to(torch_device)
+    x_tensor = torch.tensor(df.values, dtype=torch.float32, device=torch_device)
+    data_loader = DataLoader(TensorDataset(x_tensor), batch_size=batch_size, shuffle=True)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    model.history = {"loss": [], "reconstruction_loss": [], "kl_loss": []}
+
+    def refresh_mask():
+        if model.encoder is None:
+            raise RuntimeError("Encoder must be initialized before refreshing mask.")
+        model.encoder.refresh_mask(torch_device)
+
+    def start_constrained_phase():
+        if grouping_fn is not None and model.encoder is not None:
+            with torch.no_grad():
+                weight_tensor = None
+                for module in model.encoder.net:
+                    if isinstance(module, MaskedLinear) and hasattr(module.linear, "weight"):
+                        weight_tensor = module.linear.weight
+                        break
+                if weight_tensor is not None:
+                    weights = weight_tensor.detach().cpu().numpy()
+                    new_groups = grouping_fn(weights, list(df.columns))
+                    constraint.update_membership(new_groups)
+                else:
+                    logger.warning(
+                        "Could not locate encoder projection weights for constrained regrouping; "
+                        "skipping grouping_fn-based membership update."
+                    )
+        constraint.set_active(True)
+        refresh_mask()
+
+    def start_unconstrained_phase():
+        constraint.set_active(False)
+        refresh_mask()
+
+    constraint.set_active(False)
+    refresh_mask()
+
+    total_epochs = sum(phases) if phases else epochs
+    boundaries = np.cumsum(phases).tolist() if phases else []
+
+    for epoch in range(total_epochs):
+        if boundaries and epoch in boundaries:
+            boundary_index = boundaries.index(epoch)
+            if boundary_index % 2 == 0:
+                start_constrained_phase()
+            else:
+                start_unconstrained_phase()
+
+        model.train()
+        epoch_tot = epoch_rec = epoch_kl = 0.0
+        n_batches = 0
+
+        for (batch_x,) in data_loader:
+            optimizer.zero_grad()
+            total_loss, recon_loss, kl_loss = net_vae_loss(model, batch_x)
+            total_loss.backward()
+            optimizer.step()
+            epoch_tot += float(total_loss.item())
+            epoch_rec += float(recon_loss.item())
+            epoch_kl += float(kl_loss.item())
+            n_batches += 1
+
+        def _append_history(key: str, value: float) -> None:
+            model.history[key].append(value)
+
+        batch_count = max(1, n_batches)
+        _append_history("loss", epoch_tot / batch_count)
+        _append_history("reconstruction_loss", epoch_rec / batch_count)
+        _append_history("kl_loss", epoch_kl / batch_count)
+
+        if epoch % 2 == 0:
+            print(f"Epoch {epoch + 1}/{total_epochs} | ")
+            print(
+                f"loss={model.history['loss'][-1]:.4f} | "
+                f"recon={model.history['reconstruction_loss'][-1]:.4f} | "
+                f"kl={model.history['kl_loss'][-1]:.4f}"
+            )
+            logger.info(
+                "Epoch %d/%d | loss=%.4f | recon=%.4f | kl=%.4f",
+                epoch + 1,
+                total_epochs,
+                model.history["loss"][-1],
+                model.history["reconstruction_loss"][-1],
+                model.history["kl_loss"][-1],
+            )
+
+    model.latent_groups = constraint.latent_membership
+
+    model.eval()
+    with torch.no_grad():
+        if model.encoder is None or model.decoder is None:
+            raise RuntimeError("Encoder and decoder must be initialized before evaluation.")
+        mu, _, _ = model.encoder(x_tensor)
+        recon = model.decoder(mu).cpu().numpy()
+
+    normal_pred = pd.DataFrame(recon, index=df.index, columns=df.columns)
+    resid = normal_pred - df
+    model.normal_stats = pd.DataFrame({"mean": resid.mean(), "std": resid.std(ddof=0)})
+
 
 def fit_alt(model, loader, lr:float = 1e-5, epochs=32, accumulate_steps=8):
     optimizer = Adam(model.parameters(), lr=lr)

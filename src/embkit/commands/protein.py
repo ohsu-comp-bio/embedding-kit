@@ -12,7 +12,7 @@ from Bio import SeqIO
 import torch
 
 from .. import get_device
-from ..models.protein import ProteinEncoder
+from ..encoding.protein import ProteinEncoder
 
 
 protein = click.Group(name="protein", help="Protein commands.")

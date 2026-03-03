@@ -31,8 +31,8 @@ def save(model, path):
     state["__model__"] = desc
     torch.save(state, path)
 
-def load(path):
-    state_dict = torch.load(path)
+def load(path, device=None, dtype=None):
+    state_dict = torch.load(path, map_location=device)
     desc = state_dict.pop("__model__", None)
     if desc is None:
         raise KeyError(
@@ -41,4 +41,6 @@ def load(path):
         )
     model = build(desc)
     model.load_state_dict(state_dict)
+    if device is not None or dtype is not None:
+        model.to(device=device, dtype=dtype)
     return model

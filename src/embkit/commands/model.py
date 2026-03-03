@@ -189,16 +189,24 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
     elif loss == "bce":
         loss_func = bce
 
-    schedule = [(0.0, 20)]
-    vae = VAE(df.columns, latent_dim=group_count, encoder_layers=enc_layers, decoder_layers=dec_layers)
-    vae.fit(X=dataloader, beta_schedule=schedule, lr=learning_rate, loss=loss_func)
+    schedule = [(0.0, epochs)]
+    vae = VAE(list(df.columns), latent_dim=group_count, encoder_layers=enc_layers, decoder_layers=dec_layers)
+    fit_vae(vae, X=dataloader, beta_schedule=schedule, lr=learning_rate, loss=loss_func)
 
     click.echo("Training complete.")
 
+    if out is None:
+        click.echo("No output path provided, using default naming.")
+        out = f"netvae_latent{group_count}_epochs{epochs}.model"
+
+    save(vae, out)
+    click.echo(f"Model saved, to {out}")
+
     if save_stats:
-        vae.save(out, df)
-    else:
-        vae.save(out)
+        stats = pd.DataFrame({"mean": df.mean(), "std": df.std(ddof=0)})
+        stats_path = f"{out}.stats.tsv"
+        stats.to_csv(stats_path, sep="\t")
+        click.echo(f"Stats saved, to {stats_path}")
 
 @model.command()
 @click.argument("input_path", type=click.Path(exists=True, dir_okay=False, readable=True, path_type=str))
