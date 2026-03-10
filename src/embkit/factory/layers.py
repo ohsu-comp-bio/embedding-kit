@@ -176,7 +176,7 @@ class Layer:
             if act is not None:
                 layers.append(act())
         if self.batch_norm:
-            layers.append(nn.BatchNorm1d(out_features))
+            layers.append(nn.BatchNorm1d(out_features, device=device, dtype=dtype))
         return layers
 
     def to_dict(self) -> dict:

@@ -5,9 +5,10 @@ linear transformations followed by an optional non-linear activation function.
 
 Classes:
     MaskedLinear:  Linear layer whose weight is elementwise-multiplied by a mask at forward time.
-    LayerInfo: A data structure to hold information about each layer, including the number of units,
-        activation function, and whether to use batch normalization.
     PairwiseComparison: A layer that performs pairwise comparisons between inputs.
+
+Note:
+    Layer configuration (previously ``LayerInfo``) now lives under ``embkit.factory.layers.Layer``.
 """
 
 from .masked_linear import MaskedLinear

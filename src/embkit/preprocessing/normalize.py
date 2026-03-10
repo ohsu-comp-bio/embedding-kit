@@ -6,6 +6,7 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.base import BaseEstimator
 import numpy as np
 import pandas as pd
+from typing import List
 from torch.utils.data import Dataset
 import torch
 
@@ -47,10 +48,11 @@ class ExpMinMaxScaler(MinMaxScaler, BaseEstimator):
     def inverse_transform(self, X):
         return np.exp2(MinMaxScaler.inverse_transform(self, X))-1
 
-def get_dataset_nonzero_mask(d: Dataset, threshold: float) -> torch.Tensor:
+def get_dataset_nonzero_mask(d: Dataset, threshold: float) -> List[torch.Tensor]:
     """
     Scan a torch Dataset, identify the elements that are non-zero above the threshold
-    percentage. This returns a binary mask that selects those columns.
+    percentage. This returns a list of binary masks (one per feature tensor in a row)
+    that select those columns.
     """
 
     s = None
@@ -59,7 +61,7 @@ def get_dataset_nonzero_mask(d: Dataset, threshold: float) -> torch.Tensor:
         if s is None:
             s = []
             for f in row:
-                s.append( torch.zeros( len(f) ) )
+                s.append(torch.zeros(f.shape, dtype=torch.int32, device=f.device))
         for i, f in enumerate(row):
             s[i] = s[i] + (f == 0.0).int()
         count += 1

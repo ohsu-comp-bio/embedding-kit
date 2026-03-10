@@ -6,7 +6,7 @@ Lightweight mappings for nn module, designed to
 provide a consistent way to do to_dict and from_dict methods for nn modules.
 """
 
-from typing import Optional
+from typing import Optional, Type
 
 from torch import nn
 
@@ -88,16 +88,18 @@ ELU = class_dict_wrapper(nn.ELU)
 GELU = class_dict_wrapper(nn.GELU)
 SiLU = class_dict_wrapper(nn.SiLU)
 
-def get_activation(name: Optional[str]) -> Optional[nn.Module]:
+def get_activation(name: Optional[str]) -> Optional[Type[nn.Module]]:
     """
-    Get a PyTorch activation function module from a string name.
+    Get a PyTorch activation function class from a string name.
     Args:
         name (Optional[str]): Name of the activation function (e.g., "relu", "
     "tanh", "sigmoid", etc.). If None or empty, returns None.
 
 
     Returns:
-        Optional[nn.Module]: Corresponding PyTorch activation function module or None if not found.
+        Optional[Type[nn.Module]]: Corresponding PyTorch activation function class (not an
+            instance) or None if not found. Callers should instantiate the returned class,
+            e.g. ``get_activation("relu")()``.
     """
     if not name:
         return None

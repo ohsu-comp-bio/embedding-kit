@@ -64,8 +64,6 @@ class Encoder(nn.Module):
             self.z_mean = None
             self.z_log_var = None
             if self._make_latent_heads:
-                if self.latent_dim is None:
-                    raise ValueError("latent_dim is required when make_latent_heads=True.")
                 if in_features != self.latent_dim:
                     raise ValueError(
                         "Final hidden width must equal latent_dim because the encoder "
@@ -77,10 +75,6 @@ class Encoder(nn.Module):
                 self.z_log_var = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
 
         else:
-            if self.latent_dim is None:
-                raise ValueError(
-                    "latent_dim is required when no layers are provided (auto-projection)."
-                )
             logger.info("No encoder layers provided; inserting auto-projection to latent_dim=%d", self.latent_dim)
 
             # Auto projection to latent size (masked when constraint is provided)
@@ -124,7 +118,7 @@ class Encoder(nn.Module):
                 eps = torch.randn_like(std)
                 z = mu + eps * std
                 return mu, logvar, z
-            return mu, logvar, h
+            return mu, logvar, mu
 
         return h
     
