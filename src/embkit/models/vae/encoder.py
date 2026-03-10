@@ -118,7 +118,7 @@ class Encoder(nn.Module):
                 eps = torch.randn_like(std)
                 z = mu + eps * std
                 return mu, logvar, z
-            return mu, logvar, mu
+            return mu, logvar, h
 
         return h
     
