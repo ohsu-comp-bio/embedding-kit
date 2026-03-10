@@ -62,8 +62,7 @@ class BaseVAE(nn.Module, ABC):
         )
 
     def to(self, device=None, dtype=None):
-        self.encoder.to(device=device, dtype=dtype)
-        self.decoder.to(device=device, dtype=dtype)
+        return super().to(device=device, dtype=dtype)
 
     def forward(self, x: torch.Tensor):
         if self.encoder is None or self.decoder is None:
