@@ -2,37 +2,48 @@ site_name: Embedding-Kit
 nav:
   - Home: index.md
   - About: about.md
+  - Core Concepts: concepts.md
+  - Training Guide: training.md
+  - CLI Reference: cli.md
   - Examples:
-      - GTEX: examples/gtex.md
+      - GTEx RNA-seq: examples/gtex.md
+      - Protein Encoding: examples/protein.md
+      - NetVAE (Pathway): examples/netvae.md
   - API:
       - Overview: api/index.md
-      - Commands:
-          - Overview: api/commands/index.md
-          - cbio: api/commands/cbio.md
+      - Factory:
+          - Overview: api/factory/index.md
+      - Models:
+          - Overview: api/models/index.md
+          - VAE: api/models/vae.md
+          - RNAVAE: api/models/rna_vae.md
+          - NetVAE: api/models/net_vae.md
+      - Training:
+          - Optimize: api/optimize.md
+      - Preprocessing: api/preprocessing.md
       - Layers:
           - Overview: api/layers/layers.md
           - Layer Info: api/layers/layer_info.md
           - Masked Linear: api/layers/masked_linear.md
           - Pairwise Comparison: api/layers/pairwise_comparison_layer.md
           - Top Scoring Pair: api/layers/tsp.md
-      - Estimator:
-          - Overview: api/estimator/index.md
-          - VAE Estimator: api/estimator/vae_estimator.md
-      - Constraints:
-          - Overview: api/constraints/index.md
-          - NetworkConstraint: api/constraints/network_constraint.md
       - Losses:
           - Overview: api/losses/index.md
           - VAE Loss: api/losses/vae_loss.md
-
+      - Constraints:
+          - Overview: api/constraints/index.md
+          - NetworkConstraint: api/constraints/network_constraint.md
       - Metrics:
           - Distance: api/metrics/distance.md
-
-      - Models:
-          - Overview: api/models/index.md
-          - VAE: api/models/vae.md
+      - Estimator:
+          - Overview: api/estimator/index.md
+          - VAE Estimator: api/estimator/vae_estimator.md
+      - Commands:
+          - Overview: api/commands/index.md
+          - cbio: api/commands/cbio.md
       - BMEG: api/bmeg.md
       - Pathway: api/pathway.md
+
 theme: readthedocs
 
 plugins:
@@ -41,7 +52,7 @@ plugins:
         python:
           paths: [src]
           options:
-            show_source: false # Example option
+            show_source: false
 
 markdown_extensions:
     - mkdocs-click

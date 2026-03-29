@@ -1,41 +1,49 @@
 # Project Overview
 
-Welcome to **Embedding Kit**!
+Embedding Kit (`embkit`) is a toolkit for building latent-space representations of molecular data using Variational Autoencoders (VAEs). It is designed for computational biology workflows where the input is a large tabular matrix of measurements — gene expression, protein levels, methylation — and the goal is a compact, continuous embedding that captures biological variation.
 
-Embedding Kit is a powerful toolkit for creating and working with embeddings, specifically designed for complex data in computational biology. It provides an extensive collection of tools to enable seamless embedding generation, normalization, and analysis.
+## Architecture overview
+
+```
+Raw data
+   │
+   ▼
+Normalization (ExpMinMaxScaler, quantile_max_norm)
+   │
+   ▼
+VAE training (VAE / RNAVAE / NetVAE)
+   │   ├─ Encoder:  features → hidden layers → μ, σ
+   │   └─ Decoder:  z → hidden layers → reconstruction
+   │
+   ▼
+Latent embeddings
+   │
+   ├─ Downstream analysis (clustering, UMAP, classification)
+   └─ Alignment across datasets (align pair)
+```
 
 ## Features
 
-- **VAE (Variational Autoencoder) Module**: Train and utilize VAEs for generating high-quality embeddings from complex biological data.
-- **RNA Data Normalization**: Advanced normalization techniques specifically tailored for RNA-seq data and similar biological datasets.
-- **Vector Distance Calculations**: Prebuilt functionality for calculating distances between embeddings using various metrics.
-- **Embedding Alignment**: Tools to align embedding data across different experiments or conditions.
+- **VAE models** — `VAE` for general tabular data, `RNAVAE` for RNA-seq with biology-specific architecture choices, `NetVAE` for pathway-constrained embeddings
+- **Modular layer system** — build encoder/decoder stacks with `Layer` and `LayerList`; factory serialization stores architecture + weights in a single file
+- **Beta-KL scheduling** — multi-phase annealing to prevent posterior collapse
+- **Normalization** — log2+1 min-max scaling (`ExpMinMaxScaler`), quantile normalization, zero-masking
+- **Protein embeddings** — wraps Meta's ESM2 models for per-sequence or per-residue embeddings from FASTA files
+- **Embedding alignment** — Spearman-based optimal pairing of two embedding spaces via `align pair`
+- **Data loaders** — GTEx (gene TPM and transcript TPM), cBioPortal studies, HUGO gene nomenclature, pathway SIF files
 
-## Key Benefits
+## Who should use this
 
-- **Simplify Embedding Workflows**: Automate the entire embedding generation process from raw data to normalized, aligned embeddings.
-- **Biology-Focused Design**: Specialized tools for computational biology workflows, ensuring compatibility with RNA-seq and similar datasets.
-- **Modular & Extendable**: Use individual components or combine them into custom workflows depending on your needs.
-- **Efficient Processing**: Optimized algorithms for handling large biological datasets with speed and accuracy.
-
-## Who Should Use This Project?
-
-This project is ideal for:
-- Researchers in computational biology working with RNA-seq, proteomics, or similar data types.
-- Data scientists who need to generate and analyze embeddings from complex biological datasets.
-- Developers integrating embedding-based analyses into computational pipelines.
-
-## Getting Started
-
-For detailed installation and usage instructions, please refer to our main documentation (README.md).
+- Computational biologists building multi-modal or pan-cancer embeddings
+- Data scientists integrating embedding-based analysis into genomics pipelines
+- Developers extending the toolkit with custom models via the factory registration system
 
 ## Contributing
 
-We welcome contributions from the open-source community! Please see our [CONTRIBUTING.md](docs/CONTRIBUTING.md) file for details on how you can get involved.
+Open an issue or pull request at [GitHub](https://github.com/ohsu-comp-bio/embedding-kit).
 
-## Contact Information
+## Contact
 
-- **Project Maintainers**: Kyle Ellrott
-- **Issue Tracker**: [GitHub Issues Link](https://github.com/ohsu-comp-bio/embedding-kit/issues)
-- **Code Repository**: [GitHub Repo Link](https://github.com/ohsu-comp-bio/embedding-kit)
+**Maintainers**: Kyle Ellrott (ellrott@ohsu.edu), Raphael Kirchgaessner (kirchgae@ohsu.edu)
 
+**Issue tracker**: [GitHub Issues](https://github.com/ohsu-comp-bio/embedding-kit/issues)

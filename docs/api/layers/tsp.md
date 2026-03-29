@@ -1,1 +1,1 @@
-::: embkit.layers.tsp
+::: embkit.modules.tsp

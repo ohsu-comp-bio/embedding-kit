@@ -1,5 +1,5 @@
 import click
-from ..datasets import CBIOPortal
+from ..resources import CBIOPortal
 from ..c_bio import CBIOAPI
 import logging
 

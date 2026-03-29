@@ -8,7 +8,7 @@ import os
 import pandas as pd
 import torch
 from embkit.models.vae import RNAVAE
-from embkit import get_device
+from embkit import get_device, factory
 
 
 def main():
@@ -66,7 +66,7 @@ def main():
     # Save model
     model_path = "rna_vae_model.pt"
     print(f"\nSaving model to {model_path}...")
-    model.save(model_path)
+    factory.save(model, model_path)
     
     # Generate embeddings for each cancer type
     print("\nGenerating embeddings per cancer type...")

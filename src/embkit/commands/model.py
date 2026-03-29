@@ -1,15 +1,20 @@
 
 import click
 import pandas as pd
-import numpy as np
-import torch
 
 from sklearn.preprocessing import MinMaxScaler
 
-from .. import dataframe_loader, dataframe_tensor, get_device
-from ..layers import LayerInfo, build_layers, ConstraintInfo
-from ..models.vae.vae import VAE, BaseVAE
-from ..preprocessing import ExpMinMaxScaler
+import torch
+from torch.utils.data import DataLoader
+
+from .. import dataframe_loader, dataframe_tensor, get_device, dataframe_dataset
+from ..files import H5Reader
+from ..factory import save, load
+from ..factory.layers import Layer, LayerList, ConstraintInfo
+from ..optimize import fit_vae
+from ..models.vae.vae import VAE
+from ..preprocessing import ExpMinMaxScaler, get_dataset_nonzero_mask
+from ..datasets import DatasetMask
 from ..losses import bce_with_logits, bce, mse
 from ..pathway import extract_pathway_interactions, feature_map_intersect, FeatureGroups
 
@@ -17,57 +22,95 @@ model = click.Group(name="model", help="VAE Model commands.")
 
 @model.command()
 @click.argument("input_path", type=click.Path(exists=True, dir_okay=False, readable=True, path_type=str))
+@click.option("--group", "-g", default=None, help="HD5F group name")
 @click.option("--latent", "-l", type=int, default=256, show_default=True, help="Latent dimension size.")
 @click.option("--epochs", "-e", type=int, default=20, show_default=True, help="Training epochs.")
+@click.option("--batch-size", "-b", type=int, default=256)
 @click.option("--encode-layers", type=str, default="400,200")
 @click.option("--decode-layers", type=str, default="200,400")
 @click.option("--normalize", "-n", type=str, default="none")
+@click.option("--final-activation", default="none", type=click.Choice(["none", "sigmoid", "relu"]))
 @click.option("--learning-rate", "-r", type=float, default=0.0001)
 @click.option("--out", "-o", type=str, default=None)
 @click.option("--schedule", "-s", type=str, default=None, help="20:0,20:0.1,40:.3,40:.4")
 @click.option("--loss", type=click.Choice(["mse", "bce", "bce-logit"]), default="bce-logit")
 @click.option("--save-stats", is_flag=True)
-def train_vae(input_path: str, latent: int, 
-              epochs: int, out: str, normalize:str,
+@click.option("--zero-mask", default=None, type=float)
+@click.option("--seed", default=42, type=int)
+@click.option("--bfloat16", is_flag=True)
+def train_vae(input_path: str,
+              group: str,
+              latent: int,
+              epochs: int,
+              batch_size: int,
+              out: str, normalize:str,
               encode_layers:str, decode_layers:str,
               learning_rate: float,
+              final_activation: str,
               loss: str,
-              schedule:str, 
-              save_stats: bool
+              schedule:str,
+              zero_mask: float,
+              save_stats: bool,
+              seed: int,
+              bfloat16: bool
               ):
-    """Train VAE model from a TSV file."""
-    df = pd.read_csv(input_path, sep="\t", index_col=0)
+    """
+    Train VAE model from a TSV file.
+    """
+    device = get_device()
+    dtype = torch.float32
+    if bfloat16:
+        dtype = torch.bfloat16
 
-    if normalize == "expMinMax":
-        norm = ExpMinMaxScaler()
-        norm.fit(df)
-        df = pd.DataFrame( norm.transform(df), index=df.index, columns=df.columns)
-    elif normalize == "minMax":
-        norm = MinMaxScaler()
-        norm.fit(df)
-        df = pd.DataFrame( norm.transform(df), index=df.index, columns=df.columns)
+    torch.manual_seed(seed)
+    df = None
+    if group is not None:
+        dataset = H5Reader(input_path, group)
+        #TODO add normalization here
+        if zero_mask is not None:
+            dataset_mask = get_dataset_nonzero_mask(dataset, zero_mask)
+            mask = dataset_mask[0].cpu().numpy()
+            #print(mask)
+            features = dataset.columns[mask]
+            dataset = DatasetMask(dataset, dataset_mask, device)
+        else:
+            dataset.to(device)
+            features = dataset.columns
+    
+    else:
+        df = pd.read_csv(input_path, sep="\t", index_col=0)
 
-
-    feature_count = len(df.columns)
+        if normalize == "expMinMax":
+            norm = ExpMinMaxScaler()
+            norm.fit(df)
+            df = pd.DataFrame( norm.transform(df), index=df.index, columns=df.columns)
+        elif normalize == "minMax":
+            norm = MinMaxScaler()
+            norm.fit(df)
+            df = pd.DataFrame( norm.transform(df), index=df.index, columns=df.columns)
+        features = df.columns
+        dataset = dataframe_dataset(df, device=device, dtype=dtype)
+    
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    
 
     layer_sizes = list( int(i) for i in encode_layers.split(",") )
-    layer_sizes.append(latent)
-    enc_layers = build_layers( layer_sizes )
+    enc_layers_list = LayerList( layer_sizes )
 
     layer_sizes = list( int(i) for i in decode_layers.split(",") )
-    layer_sizes.append(feature_count)
-    dec_layers = build_layers( layer_sizes, end_activation="none" )
+    dec_layers_list = LayerList( layer_sizes, end_activation=final_activation )
 
     beta_schedule = None
     if schedule is not None:
-        beta_schedule = [] #[(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
+        beta_schedule = []
         for b in schedule.split(","):
             e, b = b.split(":")
             beta_schedule.append( (float(b), int(e)) )
-    vae = VAE(features=df.columns,
+    vae = VAE(features=features,
               latent_dim=latent,
-              encoder_layers=enc_layers,
-              decoder_layers=dec_layers)
+              encoder_layers=enc_layers_list,
+              decoder_layers=dec_layers_list,
+              device=device, dtype=dtype)
 
     loss_func = bce_with_logits
     if loss == "mse":
@@ -75,7 +118,7 @@ def train_vae(input_path: str, latent: int,
     elif loss == "bce":
         loss_func = bce
 
-    vae.fit(df, epochs=epochs,
+    fit_vae(vae, dataloader, epochs=epochs,
             beta_schedule=beta_schedule, lr=learning_rate, loss=loss_func)
     click.echo("Training complete.")
 
@@ -83,11 +126,7 @@ def train_vae(input_path: str, latent: int,
         click.echo(f"No output path provided, using default naming.")
         out = f"vae_latent{latent}_epochs{epochs}.model"
 
-    if save_stats:
-        vae.save(out, df)
-    else:
-        vae.save(out)
-
+    save(vae, out)
     click.echo(f"Model saved, to {out}")
 
 
@@ -133,15 +172,15 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
     gcounts = [5,2,1]
 
     enc_layers = [
-        LayerInfo(group_count*gcounts[0], op="masked_linear", constraint=ConstraintInfo("features-to-group", fmap, out_group_count=gcounts[0])),
-        LayerInfo(group_count*gcounts[1], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[0], out_group_count=gcounts[1])),
-        LayerInfo(group_count, op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[1], out_group_count=gcounts[2]))
+        Layer(group_count*gcounts[0], op="masked_linear", constraint=ConstraintInfo("features-to-group", fmap, out_group_count=gcounts[0])),
+        Layer(group_count*gcounts[1], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[0], out_group_count=gcounts[1])),
+        Layer(group_count, op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[1], out_group_count=gcounts[2]))
     ]
 
     dec_layers = [
-        LayerInfo(group_count*gcounts[1], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[2], out_group_count=gcounts[1])),
-        LayerInfo(group_count*gcounts[0], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[1], out_group_count=gcounts[0])),
-        LayerInfo(feature_count, op="masked_linear", constraint=ConstraintInfo("group-to-features", fmap, in_group_count=gcounts[0]), activation="none")
+        Layer(group_count*gcounts[1], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[2], out_group_count=gcounts[1])),
+        Layer(group_count*gcounts[0], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[1], out_group_count=gcounts[0])),
+        Layer(feature_count, op="masked_linear", constraint=ConstraintInfo("group-to-features", fmap, in_group_count=gcounts[0]), activation="none")
     ]
 
     loss_func = bce_with_logits
@@ -150,18 +189,24 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
     elif loss == "bce":
         loss_func = bce
 
-
-    #schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
-    schedule = [(0.0, 20)]
-    vae = VAE(df.columns, latent_dim=group_count, encoder_layers=enc_layers, decoder_layers=dec_layers)
-    vae.fit(X=dataloader, beta_schedule=schedule, lr=learning_rate, loss=loss_func)
+    schedule = [(0.0, epochs)]
+    vae = VAE(list(df.columns), latent_dim=group_count, encoder_layers=enc_layers, decoder_layers=dec_layers)
+    fit_vae(vae, X=dataloader, beta_schedule=schedule, lr=learning_rate, loss=loss_func)
 
     click.echo("Training complete.")
 
+    if out is None:
+        click.echo("No output path provided, using default naming.")
+        out = f"netvae_latent{group_count}_epochs{epochs}.model"
+
+    save(vae, out)
+    click.echo(f"Model saved, to {out}")
+
     if save_stats:
-        vae.save(out, df)
-    else:
-        vae.save(out)
+        stats = pd.DataFrame({"mean": df.mean(), "std": df.std(ddof=0)})
+        stats_path = f"{out}.stats.tsv"
+        stats.to_csv(stats_path, sep="\t")
+        click.echo(f"Stats saved, to {stats_path}")
 
 @model.command()
 @click.argument("input_path", type=click.Path(exists=True, dir_okay=False, readable=True, path_type=str))
@@ -169,11 +214,9 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
 @click.option("--normalize", "-n", type=str, default="none")
 @click.option("--out", "-o", type=str, default="embedding.tsv")
 def encode(input_path: str, model_path:str, normalize:str, out:str):
-    m = VAE.open_model(path=model_path)
-    df = pd.read_csv(input_path, sep="\t", index_col=0)
 
-    # print(m)
-    # df = pd.read_csv(input_path, sep="\t", index_col=0)
+    m = load(model_path)
+    df = pd.read_csv(input_path, sep="\t", index_col=0)
 
     df = df[m.features]
     if normalize == "expMinMax":
@@ -188,33 +231,3 @@ def encode(input_path: str, model_path:str, normalize:str, out:str):
     martix = result[2].detach().cpu().numpy()
     out_df = pd.DataFrame(martix, index=df.index)
     out_df.to_csv(out, sep="\t")
-
-@model.command()
-@click.argument("h5", type=str)
-@click.option("--epochs", "-e", type=int, default=5, show_default=True, help="Training epochs")
-@click.option("--batch-size", type=int, default=1024, show_default=True, help="Batch Size")
-@click.option("--learning-rate", type=float, default=1e-3, show_default=True, help="Learning Rate")
-@click.option("--seed", type=int, default=42, show_default=True, help="Batch Size")
-@click.option("--embedding-dim", type=int, default=64)
-def train_hla2vec(h5:str, epochs:int, batch_size:int, learning_rate:float, seed:int, embedding_dim:int):
-
-    #TODO: this should be put into a library function
-    np.random.seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
-    torch.manual_seed(seed)
-
-    data = load_bigmhc(h5)
-
-    model, history = fit_hla2vec(
-        **data,
-        emb_dim=embedding_dim,
-        batch_size=batch_size,
-        epochs=epochs,
-        lr=learning_rate,
-        seed=seed,
-    )
-
-    print("Final epoch:", history[-1])
-    torch.save(model.state_dict(), "hla2vec_demo.pt")
-    print("Saved weights -> hla2vec_demo.pt")
