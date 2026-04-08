@@ -10,13 +10,14 @@ from torch.utils.data import DataLoader
 from .. import dataframe_loader, dataframe_tensor, get_device, dataframe_dataset
 from ..files import H5Reader
 from ..factory import save, load
-from ..factory.layers import Layer, LayerList, ConstraintInfo
+from ..factory.layers import Layer, LayerList
 from ..optimize import fit_vae
 from ..models.vae.vae import VAE
+from ..models.vae.net_vae import NetVAE
 from ..preprocessing import ExpMinMaxScaler, get_dataset_nonzero_mask
 from ..datasets import DatasetMask
 from ..losses import bce_with_logits, bce, mse
-from ..pathway import extract_pathway_interactions, feature_map_intersect, FeatureGroups
+from ..pathway import extract_sif_interactions, feature_map_intersect, build_feature_map_indices
 
 model = click.Group(name="model", help="VAE Model commands.")
 
@@ -150,11 +151,11 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
     """Train VAE model from a TSV file."""
     df = pd.read_csv(input_path, sep="\t", index_col=0)
 
-    feature_map = extract_pathway_interactions(pathway_sif)
+    feature_map = extract_sif_interactions(pathway_sif)
+    feature_map = feature_map_intersect(feature_map, df.columns)
+    feature_idx, group_idx = build_feature_map_indices(feature_map, df.columns)
 
-    feature_map, isect = feature_map_intersect(feature_map, df.columns)
-
-    df = df[isect]
+    df = df[feature_idx]
     if normalize == "expMinMax":
         norm = ExpMinMaxScaler()
         norm.fit(df)
@@ -163,25 +164,12 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
     batch_size=256
     dataloader = dataframe_loader(df, batch_size=batch_size)
 
-    fmap = FeatureGroups(feature_map)
-    group_count = len(fmap)
-    feature_count = len(isect)
+    group_count = len(group_idx)
+    feature_count = len(feature_idx)
 
     click.echo(f"Feature count {feature_count} latent_size: {group_count}")
 
     gcounts = [5,2,1]
-
-    enc_layers = [
-        Layer(group_count*gcounts[0], op="masked_linear", constraint=ConstraintInfo("features-to-group", fmap, out_group_count=gcounts[0])),
-        Layer(group_count*gcounts[1], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[0], out_group_count=gcounts[1])),
-        Layer(group_count, op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[1], out_group_count=gcounts[2]))
-    ]
-
-    dec_layers = [
-        Layer(group_count*gcounts[1], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[2], out_group_count=gcounts[1])),
-        Layer(group_count*gcounts[0], op="masked_linear", constraint=ConstraintInfo("group-to-group", fmap, in_group_count=gcounts[1], out_group_count=gcounts[0])),
-        Layer(feature_count, op="masked_linear", constraint=ConstraintInfo("group-to-features", fmap, in_group_count=gcounts[0]), activation="none")
-    ]
 
     loss_func = bce_with_logits
     if loss == "mse":
@@ -190,7 +178,7 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
         loss_func = bce
 
     schedule = [(0.0, epochs)]
-    vae = VAE(list(df.columns), latent_dim=group_count, encoder_layers=enc_layers, decoder_layers=dec_layers)
+    vae = NetVAE(list(df.columns), latent_groups=feature_map, group_layer_size=gcounts)
     fit_vae(vae, X=dataloader, beta_schedule=schedule, lr=learning_rate, loss=loss_func)
 
     click.echo("Training complete.")

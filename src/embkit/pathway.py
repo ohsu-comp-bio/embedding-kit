@@ -2,15 +2,17 @@
 Methods for opening and processing Pathway files
 """
 from collections import OrderedDict, defaultdict
-from typing import Dict, List, Tuple, Iterable, Optional
+from typing import Any, Dict, List, Tuple, Iterable, Optional, Literal
 
 import numpy as np
 import pandas as pd
 
+from .factory.layers import ConstraintInfo
+
 
 # ---------- SIF parsing ----------
 
-def extract_pathway_interactions(
+def extract_sif_interactions(
         sif_path: str,
         relation: str = "controls-expression-of",
 ) -> Dict[str, List[str]]:
@@ -53,15 +55,20 @@ def extract_pathway_interactions(
     return fmap
 
 
-def build_sif_mask(
-        sif_path: str,
-        src_index: Dict[str, int],
-        dst_index: Dict[str, int],
-        *,
-        relation: Optional[str] = "controls-expression-of",
+def build_mask(
+        feature_map: Dict[str, List[str]],
+        src_index: pd.Index,
+        dst_index: pd.Index,
+        min_group_size: int = 2,
 ) -> np.ndarray:
     """
     Build a binary mask from a SIF file using explicit source/destination indices.
+
+    Because this is a controller mapping (ie the src controls the dst) the inner layer
+    dimension corresponds to the source (controller) and the outer dimension corresponds
+    to the destination (target). This way the mask can be directly applied to a weight
+    matrix of shape (out_features, in_features) where out_features are the targets and
+    in_features are the controllers.
 
     The returned mask has shape (len(dst_index), len(src_index)) and is compatible
     with weight matrices shaped (out_features, in_features) for MaskedLinear layers.
@@ -69,35 +76,25 @@ def build_sif_mask(
 
     Parameters
     ----------
-    sif_path : str
-        Path to the SIF file containing ``src \t relation \t dst`` rows.
-    src_index : Dict[str, int]
-        Mapping from source node name to its column index.
-    dst_index : Dict[str, int]
-        Mapping from destination node name to its row index.
-    relation : Optional[str]
-        If provided, filter rows to only those with the given relation.
+    feature_map : Dict[str, List[str]]
+        Mapping from source node to list of destination nodes (e.g. TF to target genes).
+    src_index : pd.Index
+        Index of source nodes.
+    dst_index : pd.Index
+        Index of destination nodes.
 
     Returns
     -------
     np.ndarray
         Binary mask with shape (len(dst_index), len(src_index)).
     """
-    pc = pd.read_csv(
-        sif_path,
-        sep="\t",
-        header=None,
-        names=["from", "relation", "to"],
-        dtype=str,
-    ).fillna("")
-
-    if relation is not None:
-        pc = pc.loc[pc["relation"] == relation]
-
     mask = np.zeros((len(dst_index), len(src_index)), dtype=np.float32)
-    for src, _, dst in pc[["from", "relation", "to"]].itertuples(index=False, name=None):
-        if src in src_index and dst in dst_index:
-            mask[dst_index[dst], src_index[src]] = 1.0
+    for src, members in feature_map.items():
+        if src in src_index:
+            if dst_index.intersection(members).size >= min_group_size:
+                for dst in members:
+                    if dst in dst_index:
+                        mask[dst_index.get_loc(dst), src_index.get_loc(src)] = 1.0
 
     return mask
 
@@ -107,121 +104,149 @@ def build_sif_mask(
 def feature_map_intersect(
         feature_map: Dict[str, List[str]],
         features: Iterable[str],
-        *,
-        keep_lonely_groups: bool = False,
-) -> Tuple[Dict[str, List[str]], List[str]]:
+        min_group_size: int = 2,
+        include_self: bool = True,
+) -> Dict[str, List[str]]:
     """
     Subset `feature_map` to nodes present in `features`. Keeps the group's self-node
-    if it is in `features`. Members are deduplicated and ordered by the order
-    they appear in the original mapping (stable).
+    if it is in `features`. Members are deduplicated. if include_self is True, the 
+    source node will be included in the members list if it is present in the features.     
 
     Returns:
-        (subset_map, intersect_list_in_input_order)
+        subset_map: Dict[str, List[str]]: subset of feature_map with only features in `features`
     """
     features_list = list(features)
-    feature_set = set(features_list)
-
-    # Build a stable list of all nodes (sources + members)
-    all_nodes: "OrderedDict[str, None]" = OrderedDict()
+    out_map = {}
     for src, members in feature_map.items():
-        all_nodes[src] = None
-        for m in members:
-            all_nodes[m] = None
+        filtered_members = [m for m in set(members) if m in features_list]
+        if include_self and src in features_list:
+            filtered_members = [src] + filtered_members
+        if len(filtered_members) >= min_group_size:
+            out_map[src] = filtered_members
+    return out_map
 
-    # Intersection, respecting the order of features_list (caller’s column order)
-    isect = [f for f in features_list if f in all_nodes]
-
-    out: Dict[str, List[str]] = {}
-    for src, members in feature_map.items():
-        # intersect members (including possible self if it was in the original list)
-        filtered = [m for m in members if m in feature_set]
-        # Also include the group key itself if present in features even when not in members
-        if src in feature_set and src not in filtered:
-            filtered = [src] + filtered
-
-        if filtered or (keep_lonely_groups and src in feature_set):
-            # Keep group only if it retains any member in the intersection,
-            # unless keep_lonely_groups=True and the group itself is in features
-            out[src] = filtered
-
-    return out, isect
-
-
-# ---------- FeatureGroups ----------
-
-class FeatureGroups:
+def build_feature_map_indices(
+        feature_map: Dict[str, List[str]]) -> Tuple[pd.Index, pd.Index]:
     """
-    Thin wrapper that preserves insertion order of groups and members,
-    supports (de)serialization, and builds deterministic index maps.
+    Create feature index from a feature map
     """
+    feature_set = set()
+    group_set = sorted(feature_map.keys())
+    for group in group_set:
+        feature_set.update(feature_map[group])
+    feature_idx = pd.Index( sorted(feature_set) )
+    group_idx = pd.Index(group_set)
+    return feature_idx, group_idx
 
-    def __init__(self, map: Dict[str, List[str]]):
-        od = OrderedDict()
-        for k, v in map.items():
-            # enforce list and preserve order while removing duplicates
-            seen = set()
-            ordered_members = []
-            for m in v:
-                if m not in seen:
-                    seen.add(m)
-                    ordered_members.append(m)
-            od[k] = ordered_members
-        self.map: "OrderedDict[str, List[str]]" = od
 
-    def to_indices(
-            self,
-            *,
-            feature_order: Optional[Iterable[str]] = None,
-            group_order: Optional[Iterable[str]] = None,
-    ) -> Tuple[Dict[str, int], Dict[str, int]]:
-        """
-        Create index maps for features and groups.
 
-        If `feature_order` is provided, features are indexed by that order (and
-        filtered to those present in the groups). Otherwise, insertion order
-        (group-by-group) is used.
 
-        If `group_order` is provided, groups are indexed by that order; otherwise
-        insertion order is used.
-        """
-        # group index
-        groups_iter = list(self.map.keys()) if group_order is None else [g for g in group_order if g in self.map]
-        group_idx = {g: i for i, g in enumerate(groups_iter)}
+ConstraintOP = Literal["features-to-group", "group-to-features", "group-to-group"]
 
-        # features seen in groups (preserve insertion order across groups)
-        seen = OrderedDict()
-        for g in groups_iter:
-            for m in self.map[g]:
-                seen[m] = None
+class PathwayControlConstraint(ConstraintInfo):
+    """
+    ConstraintInfo for pathway-based masking. Supports three types of constraints:
+        - "features-to-group": connects features to group nodes (e.g. TF to target genes)
+        - "group-to-features": connects group nodes to features (e.g. TF to target genes, reverse direction)
+        - "group-to-group": connects group nodes to group nodes (e.g. between latent layers)
+    """
+    def __init__(self, op: ConstraintOP, feature_map : Dict[str, List[str]],
+                 feature_index: pd.Index, group_index: pd.Index,
+                 in_group_scaling: int = 1, 
+                 out_group_scaling: int = 1):
+        self.op = op
+        self.feature_map = feature_map
+        self.in_group_scaling = in_group_scaling
+        self.out_group_scaling = out_group_scaling
 
-        if feature_order is None:
-            feat_iter = list(seen.keys())
-        else:
-            feat_iter = [f for f in feature_order if f in seen]
+    def gen_mask(self, in_features: Optional[int] = None, out_features: Optional[int] = None):
 
-        feature_idx = {f: i for i, f in enumerate(feat_iter)}
-        return feature_idx, group_idx
+        feature_index, group_index = build_feature_map_indices(self.feature_map)
 
-    # convenience
-    def __len__(self) -> int:
-        return len(self.map)
+        if self.op == "features-to-group":
+            return build_features_to_group_mask(self.feature_map, feature_index, group_index, group_node_count=out_features)
+        elif self.op == "group-to-features":
+            return build_features_to_group_mask(self.feature_map, feature_index, group_index, group_node_count=in_features, forward=False)
+        elif self.op == "group-to-group":
+            return build_group_to_group_mask(len(self.feature_map), in_features, out_features)
+        raise ValueError(f"Unknown ConstraintInfo.op '{self.op}'")
 
-    def items(self):
-        return self.map.items()
-
-    def features(self) -> List[str]:
-        out = OrderedDict()
-        for _, members in self.map.items():
-            for m in members:
-                out[m] = None
-        return list(out.keys())
-
-    # --- serialization helpers ---
-
-    def to_dict(self) -> Dict[str, List[str]]:
-        # plain JSON-serializable dict
-        return {k: list(v) for k, v in self.map.items()}
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "op": self.op,
+            "feature_map": self.feature_map,
+            "in_group_scaling": self.in_group_scaling,
+            "out_group_scaling": self.out_group_scaling,
+        }
 
     @staticmethod
-    def from_dict(d: Dict[str, List[str]]) -> "FeatureGroups":
-        return FeatureGroups(d)
+    def from_dict(d: Dict[str, Any]) -> "PathwayControlConstraint":
+        return PathwayControlConstraint(
+            op=d["op"],
+            feature_map=d["feature_map"],
+            feature_index=pd.Index(d.get("feature_index")),
+            group_index=pd.Index(d.get("group_index")),
+            in_group_scaling=d.get("in_group_scaling", 1),
+            out_group_scaling=d.get("out_group_scaling", 1)
+        )
+
+
+def idx_to_list(x):
+    """
+    idx_to_list: takes an index map ( name -> position ) to a list of names
+    ordered by position
+    """
+    out = [None] * len(x)
+    for k, v in x.items():
+        out[v] = k
+    return out
+
+
+def build_features_to_group_mask(feature_map, feature_idx, group_idx, group_node_count=1, forward=True):
+    """
+    Build a masked linear layer based on connecting all features to a 
+    single group node and forcing all other connections to be zero
+    """
+    features = idx_to_list(feature_idx)
+    groups = idx_to_list(group_idx)
+
+    in_dim = len(features)
+    out_dim = len(groups) * group_node_count
+
+    if forward:
+        mask = np.zeros((out_dim, in_dim), dtype=np.float32)
+    else:
+        mask = np.zeros((in_dim, out_dim), dtype=np.float32)
+
+    fi = pd.Index(features)
+    for gnum, group in enumerate(groups):
+        for f in feature_map[group]:
+            if f in fi:
+                floc = fi.get_loc(f)
+                # print(gnum, group_node_count)
+                # print(list(range(gnum*group_node_count, (gnum+1)*(group_node_count))))
+                for pos in range(gnum * group_node_count, (gnum + 1) * (group_node_count)):
+                    if forward:
+                        mask[pos, floc] = 1.0
+                    else:
+                        mask[floc, pos] = 1.0
+    return mask
+
+
+def build_group_to_group_mask(group_count: int, in_group_node_count, out_group_node_count):
+    """
+    build_group_to_group
+    Build a mask that constricts connections between 2 group layer nodes
+    """
+    in_dim = group_count * in_group_node_count
+    out_dim = group_count * out_group_node_count
+
+    mask = np.zeros((out_dim, in_dim), dtype=np.float32)
+    for g in range(group_count):
+        for i in range(g * in_group_node_count, (g + 1) * in_group_node_count):
+            for j in range(g * out_group_node_count, (g + 1) * out_group_node_count):
+                mask[j, i] = 1.0
+    return mask
+
+
+

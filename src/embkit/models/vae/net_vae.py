@@ -3,16 +3,15 @@ NetVAE implementation
 """
 import logging
 
-from typing import Dict, List, Optional, Callable, Union
+from typing import Dict, List, Optional
 import numpy as np
 import pandas as pd
-import torch
+from ...factory.layers import LayerList
+from ...factory.layers import Layer
 
 from .base_vae import BaseVAE
-from .encoder import Encoder
-from .decoder import Decoder
 from ... import factory
-from ...optimize import fit_net_vae
+from ...pathway import PathwayControlConstraint, build_feature_map_indices
 
 logger = logging.getLogger(__name__)
 
@@ -32,84 +31,65 @@ class NetVAE(BaseVAE):
     in from the input layer are forced to be zero
     """
 
-    def __init__(self, features: List[str], encoder: Optional[Encoder] = None, decoder: Optional[Decoder] = None):
+    def __init__(self, latent_groups: Dict[str, List[str]], group_layer_scaling: Optional[List[int]] = None):
+
+        if group_layer_scaling is None:
+            group_layer_scaling = [1,1]
+        
+        feature_idx, group_idx = build_feature_map_indices(latent_groups)
+
+        latent_size = len(latent_index)
+        
+        enc_layers = [
+            Layer(units=latent_size*group_layer_scaling[0], op="masked_linear",
+                  constraint=PathwayControlConstraint("features-to-group", latent_groups,
+                                                      out_group_scaling=group_layer_scaling[0]))
+        ]
+        for i in range(1, len(group_layer_scaling)):
+            enc_layers.append(
+                Layer(latent_size*i, op="masked_linear", 
+                      constraint=PathwayControlConstraint("group-to-group", latent_groups,
+                                                          in_group_count=group_layer_size[i-1],
+                                                          out_group_count=group_layer_size[i]))
+            )
+
+
+        dec_layers = [
+            Layer(latent_size*group_layer_scaling[-1], op="masked_linear", 
+                  constraint=PathwayControlConstraint("group-to-group", latent_groups,
+                                                      in_group_count=group_layer_size[-2],
+                                                      out_group_count=group_layer_size[-1]))
+        ] 
+        for i in reversed(range(len(group_layer_scaling))):
+            dec_layers.append(
+                Layer(len(features), op="masked_linear",
+                    constraint=PathwayControlConstraint("group-to-features", latent_groups,
+                                                          in_group_count=group_layer_size[i],
+                                                          out_group_count=group_layer_size[i-1]),
+                    activation="none")
+            )
+
+
+        encoder = self.build_encoder(feature_dim=len(features), latent_dim=latent_size, layers=LayerList( enc_layers) )
+        decoder = self.build_decoder(feature_dim=len(features), latent_dim=latent_size, layers=LayerList( dec_layers) )
+
         super().__init__(features=features, encoder=encoder, decoder=decoder)
-        self.latent_groups: Optional[Dict[str, List[str]]] = None
-        self.latent_index: Optional[List[str]] = None
+        self.latent_groups: Dict[str, List[str]] = latent_groups
+        self.latent_index: Optional[List[str]] = latent_index
+        self.group_layer_size = group_layer_size
         self.history: Optional[Dict[str, List[float]]] = None
         self.normal_stats: Optional[pd.DataFrame] = None
 
     def to_dict(self):
         return {
-            "features": self.features,
-            "encoder": self.encoder.to_dict() if self.encoder else None,
-            "decoder": self.decoder.to_dict() if self.decoder else None,
-            "latent_index": self.latent_index,
             "latent_groups": self.latent_groups,
+            "group_layer_scaling": self.group_layer_scaling,
         }
 
     @classmethod
     def from_dict(cls, d):
         model = NetVAE(
-            features=d["features"],
-            encoder=Encoder.from_dict(d["encoder"]) if d.get("encoder") else None,
-            decoder=Decoder.from_dict(d["decoder"]) if d.get("decoder") else None,
+            latent_groups=d.get("latent_groups"),
+            group_layer_scaling=d.get("group_layer_scaling")
         )
-        model.latent_index = d.get("latent_index")
-        model.latent_groups = d.get("latent_groups")
         return model
-
-    def fit(
-            self,
-            X: Union[pd.DataFrame, torch.Tensor],
-            *,
-            latent_dim: Optional[int] = None,
-            latent_index: Optional[List[str]] = None,
-            latent_groups: Optional[Dict[str, List[str]]] = None,
-            learning_rate: float = 1e-3,
-            batch_size: int = 128,
-            epochs: int = 80,
-            phases: Optional[List[int]] = None,  # e.g. [warmup, constrained, finetune]
-            device: Optional[str] = None,
-            grouping_fn: Optional[Callable[[np.ndarray, List[str]], Dict[str, List[str]]]] = None,
-    ) -> None:
-        """
-        Train the model on X. Builds encoder/decoder if missing.
-        Supply either latent_dim or latent_index.
-        """
-        fit_net_vae(
-            model=self,
-            X=X,
-            latent_dim=latent_dim,
-            latent_index=latent_index,
-            latent_groups=latent_groups,
-            learning_rate=learning_rate,
-            batch_size=batch_size,
-            epochs=epochs,
-            phases=phases,
-            device=device,
-            grouping_fn=grouping_fn,
-        )
-
-
-if __name__ == "__main__":
-    # Make a simple 2-feature dataset with 1-D columns
-    N = 100
-    df = pd.DataFrame({
-        "feat1": np.random.rand(N),
-        "feat2": np.random.rand(N),
-    })
-
-    # Setup and train NetVae (this builds encoder/decoder internally)
-    net = NetVAE(features=list(df.columns))
-    net.encoder = BaseVAE.build_encoder(feature_dim=len(df.columns), latent_dim=2)
-    net.decoder = BaseVAE.build_decoder(feature_dim=len(df.columns), latent_dim=2)
-    net.fit(df, latent_dim=2, epochs=10, learning_rate=0.01, batch_size=16)
-    # Save artifacts
-    from ...factory import save, load
-
-    save(net, "net_vae_model")
-
-    model: NetVAE = load("net_vae_model", device="cpu")
-    print("Model loaded with features:", model.features)
-    print(model.decoder)

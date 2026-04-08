@@ -1,13 +1,14 @@
 import unittest
 
+import torch
+
 import numpy as np
 import pandas as pd
-import torch
 
 from embkit.models.vae.net_vae import NetVAE
 from embkit.modules import MaskedLinear
 from embkit.losses import bce_with_logits
-
+from embkit.optimize import fit_vae
 
 class TestNetVAE(unittest.TestCase):
     def test_fit_applies_constraint_mask(self):
@@ -22,14 +23,13 @@ class TestNetVAE(unittest.TestCase):
             "TF2": ["G2"],
         }
 
-        model = NetVAE(features=list(df.columns))
-        model.fit(
+        model = NetVAE(features=list(df.columns), latent_groups=latent_groups, latent_index=latent_index)
+        fit_vae(
             df,
-            latent_index=latent_index,
-            latent_groups=latent_groups,
+            model,
             epochs=0,
             batch_size=2,
-            learning_rate=1e-3,
+            lr=1e-3,
             device="cpu",
         )
 
@@ -64,14 +64,13 @@ class TestNetVAE(unittest.TestCase):
             "TF2": ["G2"],
         }
 
-        model = NetVAE(features=list(df.columns))
-        model.fit(
+        model = NetVAE(features=list(df.columns), latent_groups=latent_groups, latent_index=latent_index, group_layer_size=[1,1])
+        fit_vae(
             df,
-            latent_index=latent_index,
-            latent_groups=latent_groups,
+            model,
             epochs=0,
             batch_size=4,
-            learning_rate=1e-3,
+            lr=1e-3,
             device="cpu",
         )
 
