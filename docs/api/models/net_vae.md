@@ -7,7 +7,6 @@ Pathway-constrained Variational Autoencoder.
       show_source: false
       members:
         - __init__
-        - fit
         - forward
         - encode
       merge_init_into_class: true

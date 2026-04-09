@@ -135,16 +135,17 @@ You can also pass a comma-separated string of sizes to the CLI; the `train-vae` 
 
 ### Pathway-masked layers
 
-For `NetVAE`, layers use `op="masked_linear"` with a `ConstraintInfo` that describes which features connect to which pathway groups:
+For `NetVAE`, layers use `op="masked_linear"` with a pathway constraint object that describes which features connect to which pathway groups:
 
 ```python
-from embkit.factory.layers import Layer, ConstraintInfo
+from embkit.factory.layers import Layer
+from embkit.pathway import PathwayConstraintInfo
 
 Layer(
     units=n_groups,
     op="masked_linear",
-    constraint=ConstraintInfo("features-to-group", feature_groups, out_group_count=5),
+    constraint=PathwayConstraintInfo("features-to-group", feature_map),
 )
 ```
 
-`ConstraintInfo` generates a binary mask at build time; weights at masked positions are set to zero and kept at zero throughout training.
+`PathwayConstraintInfo` generates a binary mask at build time; weights at masked positions are set to zero and kept at zero throughout training.

@@ -1,13 +1,14 @@
 import unittest
 
+import torch
+
 import numpy as np
 import pandas as pd
-import torch
 
 from embkit.models.vae.net_vae import NetVAE
 from embkit.modules import MaskedLinear
 from embkit.losses import bce_with_logits
-
+from embkit.optimize import fit_vae
 
 class TestNetVAE(unittest.TestCase):
     def test_fit_applies_constraint_mask(self):
@@ -22,22 +23,16 @@ class TestNetVAE(unittest.TestCase):
             "TF2": ["G2"],
         }
 
-        model = NetVAE(features=list(df.columns))
-        model.fit(
+        model = NetVAE(features=list(df.columns), latent_groups=latent_groups, latent_index=latent_index)
+        fit_vae(
+            model,
             df,
-            latent_index=latent_index,
-            latent_groups=latent_groups,
             epochs=0,
             batch_size=2,
-            learning_rate=1e-3,
+            lr=1e-3,
+            loss=bce_with_logits,
             device="cpu",
         )
-
-        constraint = model.encoder.constraint
-        self.assertIsNotNone(constraint)
-
-        constraint.set_active(True)
-        model.encoder.refresh_mask(device=torch.device("cpu"))
 
         masked_layers = [m for m in model.encoder.net if isinstance(m, MaskedLinear)]
         self.assertTrue(masked_layers)
@@ -64,20 +59,16 @@ class TestNetVAE(unittest.TestCase):
             "TF2": ["G2"],
         }
 
-        model = NetVAE(features=list(df.columns))
-        model.fit(
+        model = NetVAE(features=list(df.columns), latent_groups=latent_groups, latent_index=latent_index, group_layer_size=[1,1])
+        fit_vae(
+            model,
             df,
-            latent_index=latent_index,
-            latent_groups=latent_groups,
             epochs=0,
             batch_size=4,
-            learning_rate=1e-3,
+            lr=1e-3,
+            loss=bce_with_logits,
             device="cpu",
         )
-
-        constraint = model.encoder.constraint
-        constraint.set_active(True)
-        model.encoder.refresh_mask(device=torch.device("cpu"))
 
         masked_layer = next(m for m in model.encoder.net if isinstance(m, MaskedLinear))
         opt = torch.optim.Adam(model.parameters(), lr=1e-3)

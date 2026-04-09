@@ -3,16 +3,13 @@ NetVAE implementation
 """
 import logging
 
-from typing import Dict, List, Optional, Callable, Union
-import numpy as np
+from typing import Dict, List, Optional
 import pandas as pd
 import torch
 
 from .base_vae import BaseVAE
-from .encoder import Encoder
-from .decoder import Decoder
 from ... import factory
-from ...optimize import fit_net_vae
+from ...pathway import build_feature_map_indices, PathwayConstraintInfo
 
 logger = logging.getLogger(__name__)
 
@@ -32,84 +29,156 @@ class NetVAE(BaseVAE):
     in from the input layer are forced to be zero
     """
 
-    def __init__(self, features: List[str], encoder: Optional[Encoder] = None, decoder: Optional[Decoder] = None):
-        super().__init__(features=features, encoder=encoder, decoder=decoder)
-        self.latent_groups: Optional[Dict[str, List[str]]] = None
-        self.latent_index: Optional[List[str]] = None
+    def __init__(
+            self,
+            features: List[str],
+            latent_groups: Dict[str, List[str]],
+            latent_index: Optional[List[str]] = None,
+            group_layer_size: Optional[List[int]] = None,
+            group_layer_scaling: Optional[List[int]] = None,
+            batch_norm: bool = False,
+            device: Optional[torch.device] = None,
+            dtype: Optional[torch.dtype] = None,
+    ):
+        if not latent_groups:
+            raise ValueError("latent_groups cannot be empty for NetVAE.")
+
+        # Canonical field: group_layer_size. Keep group_layer_scaling as a deprecated alias.
+        if group_layer_size is not None and group_layer_scaling is not None and list(group_layer_size) != list(group_layer_scaling):
+            raise ValueError(
+                "group_layer_size and group_layer_scaling disagree; "
+                "use group_layer_size as the canonical setting."
+            )
+        if group_layer_size is None:
+            group_layer_size = group_layer_scaling
+        if group_layer_size is None:
+            group_layer_size = [1, 1]
+        group_layer_size = [int(v) for v in group_layer_size]
+        if any(v <= 0 for v in group_layer_size):
+            raise ValueError(f"group_layer_size must contain positive integers, got {group_layer_size}.")
+
+        if latent_index is None:
+            _, group_idx = build_feature_map_indices(latent_groups)
+            latent_index = list(group_idx)
+        else:
+            latent_index = list(latent_index)
+        if len(latent_index) == 0:
+            raise ValueError("latent_index cannot be empty.")
+
+        feature_list = list(features)
+        latent_size = len(latent_index)
+
+        # Encoder: features -> groups*s0 -> groups*s1 -> ... -> groups*sN
+        enc_layers = [
+            factory.Layer(
+                units=latent_size * group_layer_size[0],
+                op="masked_linear",
+                constraint=PathwayConstraintInfo(
+                    "features-to-group",
+                    feature_map=latent_groups,
+                    feature_index=feature_list,
+                    group_index=latent_index,
+                    out_group_scaling=group_layer_size[0],
+                ),
+            )
+        ]
+        for in_scale, out_scale in zip(group_layer_size[:-1], group_layer_size[1:]):
+            enc_layers.append(
+                factory.Layer(
+                    units=latent_size * out_scale,
+                    op="masked_linear",
+                    constraint=PathwayConstraintInfo(
+                        "group-to-group",
+                        feature_map=latent_groups,
+                        feature_index=feature_list,
+                        group_index=latent_index,
+                        in_group_scaling=in_scale,
+                        out_group_scaling=out_scale,
+                    ),
+                )
+            )
+
+        # Decoder: groups*sN -> ... -> groups*s1 -> groups*s0 -> features
+        dec_layers = []
+        for in_scale, out_scale in zip(reversed(group_layer_size[1:]), reversed(group_layer_size[:-1])):
+            dec_layers.append(
+                factory.Layer(
+                    units=latent_size * out_scale,
+                    op="masked_linear",
+                    constraint=PathwayConstraintInfo(
+                        "group-to-group",
+                        feature_map=latent_groups,
+                        feature_index=feature_list,
+                        group_index=latent_index,
+                        in_group_scaling=in_scale,
+                        out_group_scaling=out_scale,
+                    ),
+                )
+            )
+        dec_layers.append(
+            factory.Layer(
+                units=len(feature_list),
+                op="masked_linear",
+                constraint=PathwayConstraintInfo(
+                    "group-to-features",
+                    feature_map=latent_groups,
+                    feature_index=feature_list,
+                    group_index=latent_index,
+                    in_group_scaling=group_layer_size[0],
+                ),
+                activation="none",
+            )
+        )
+
+        encoder = self.build_encoder(
+            feature_dim=len(feature_list),
+            latent_dim=latent_size,
+            layers=factory.LayerList(enc_layers),
+            batch_norm=batch_norm,
+            device=device,
+            dtype=dtype,
+        )
+        decoder = self.build_decoder(
+            feature_dim=len(feature_list),
+            latent_dim=latent_size,
+            layers=factory.LayerList(dec_layers),
+            device=device,
+            dtype=dtype,
+        )
+
+        super().__init__(features=feature_list, encoder=encoder, decoder=decoder)
+        self.latent_groups: Dict[str, List[str]] = latent_groups
+        self.latent_index: List[str] = latent_index
+        self.group_layer_size: List[int] = list(group_layer_size)
+        # Keep both names during transition for compatibility with older configs.
+        self.group_layer_scaling: List[int] = list(group_layer_size)
         self.history: Optional[Dict[str, List[float]]] = None
         self.normal_stats: Optional[pd.DataFrame] = None
 
     def to_dict(self):
         return {
             "features": self.features,
-            "encoder": self.encoder.to_dict() if self.encoder else None,
-            "decoder": self.decoder.to_dict() if self.decoder else None,
-            "latent_index": self.latent_index,
             "latent_groups": self.latent_groups,
+            "latent_index": self.latent_index,
+            "group_layer_size": self.group_layer_size,
+            "group_layer_scaling": self.group_layer_scaling,
         }
 
     @classmethod
     def from_dict(cls, d):
+        features = d.get("features")
+        if features is None:
+            fmap = d.get("latent_groups") or {}
+            feature_set = set()
+            for members in fmap.values():
+                feature_set.update(members)
+            features = sorted(feature_set)
+
         model = NetVAE(
-            features=d["features"],
-            encoder=Encoder.from_dict(d["encoder"]) if d.get("encoder") else None,
-            decoder=Decoder.from_dict(d["decoder"]) if d.get("decoder") else None,
+            features=features,
+            latent_groups=d.get("latent_groups"),
+            latent_index=d.get("latent_index"),
+            group_layer_size=d.get("group_layer_size"),
+            group_layer_scaling=d.get("group_layer_scaling"),
         )
-        model.latent_index = d.get("latent_index")
-        model.latent_groups = d.get("latent_groups")
         return model
-
-    def fit(
-            self,
-            X: Union[pd.DataFrame, torch.Tensor],
-            *,
-            latent_dim: Optional[int] = None,
-            latent_index: Optional[List[str]] = None,
-            latent_groups: Optional[Dict[str, List[str]]] = None,
-            learning_rate: float = 1e-3,
-            batch_size: int = 128,
-            epochs: int = 80,
-            phases: Optional[List[int]] = None,  # e.g. [warmup, constrained, finetune]
-            device: Optional[str] = None,
-            grouping_fn: Optional[Callable[[np.ndarray, List[str]], Dict[str, List[str]]]] = None,
-    ) -> None:
-        """
-        Train the model on X. Builds encoder/decoder if missing.
-        Supply either latent_dim or latent_index.
-        """
-        fit_net_vae(
-            model=self,
-            X=X,
-            latent_dim=latent_dim,
-            latent_index=latent_index,
-            latent_groups=latent_groups,
-            learning_rate=learning_rate,
-            batch_size=batch_size,
-            epochs=epochs,
-            phases=phases,
-            device=device,
-            grouping_fn=grouping_fn,
-        )
-
-
-if __name__ == "__main__":
-    # Make a simple 2-feature dataset with 1-D columns
-    N = 100
-    df = pd.DataFrame({
-        "feat1": np.random.rand(N),
-        "feat2": np.random.rand(N),
-    })
-
-    # Setup and train NetVae (this builds encoder/decoder internally)
-    net = NetVAE(features=list(df.columns))
-    net.encoder = BaseVAE.build_encoder(feature_dim=len(df.columns), latent_dim=2)
-    net.decoder = BaseVAE.build_decoder(feature_dim=len(df.columns), latent_dim=2)
-    net.fit(df, latent_dim=2, epochs=10, learning_rate=0.01, batch_size=16)
-    # Save artifacts
-    from ...factory import save, load
-
-    save(net, "net_vae_model")
-
-    model: NetVAE = load("net_vae_model", device="cpu")
-    print("Model loaded with features:", model.features)
-    print(model.decoder)
