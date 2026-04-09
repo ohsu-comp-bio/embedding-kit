@@ -34,6 +34,11 @@ jobs:
         coverage run --source=embkit -m unittest discover -s tests
         coverage xml
 
+    - name: Run NetVAE E2E conformance
+      run: |
+        export PYTHONPATH=$PWD/src
+        python -m pytest -q -s tests/e2e/test_netvae_cli_e2e.py
+
     - name: Print coverage report
       run: |
         coverage report -m

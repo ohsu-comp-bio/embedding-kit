@@ -145,11 +145,14 @@ def train_vae(input_path: str,
 @click.option("--learning-rate", "-r", type=float, default=0.0001)
 @click.option("--out", "-o", type=str, default=None)
 @click.option("--loss", type=click.Choice(["mse", "bce", "bce-logit"]), default="bce-logit")
+@click.option("--group-layer-size", default="5,2,1", show_default=True,
+              help="Comma-separated per-group widths for NetVAE masked layers.")
 @click.option("--save-stats", is_flag=True)
 def train_netvae(input_path: str, pathway_sif:str, out:str,
                 epochs: int, normalize: str,
                 learning_rate: float,
                 loss:str,
+                group_layer_size: str,
                 save_stats:bool):
     """Train VAE model from a TSV file."""
     df = pd.read_csv(input_path, sep="\t", index_col=0)
@@ -172,7 +175,9 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
 
     click.echo(f"Feature count {feature_count} latent_size: {group_count}")
 
-    gcounts = [5,2,1]
+    gcounts = [int(v.strip()) for v in group_layer_size.split(",") if v.strip()]
+    if not gcounts or any(v <= 0 for v in gcounts):
+        raise click.BadParameter("--group-layer-size must contain one or more positive integers.")
 
     loss_func = bce_with_logits
     if loss == "mse":

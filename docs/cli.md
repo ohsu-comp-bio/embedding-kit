@@ -96,6 +96,7 @@ embkit model train-netvae INPUT_PATH PATHWAY_SIF [OPTIONS]
 | `--learning-rate`, `-r` | `0.0001` | Adam learning rate |
 | `--out`, `-o` | — | Output model file path |
 | `--loss` | `bce-logit` | Loss function: `mse`, `bce`, `bce-logit` |
+| `--group-layer-size` | `5,2,1` | Comma-separated per-group widths for masked NetVAE layers |
 | `--save-stats` | false | Save training statistics |
 
 **Example**

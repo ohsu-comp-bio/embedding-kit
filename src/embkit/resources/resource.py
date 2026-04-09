@@ -29,10 +29,20 @@ class Resource(os.PathLike[str]):
         self.name = name
 
         if save_path is None:
-            # Use default repository directory under home
-            default_path = Path(Path.home(), REPO_DIR)
-            default_path.mkdir(parents=True, exist_ok=True)
-            self.save_path = default_path
+            # Use default repository directory under home (overridable by EMBKIT_HOME).
+            env_home = os.environ.get("EMBKIT_HOME")
+            default_path = Path(env_home) if env_home else Path(Path.home(), REPO_DIR)
+            try:
+                default_path.mkdir(parents=True, exist_ok=True)
+                self.save_path = default_path
+            except PermissionError:
+                fallback = Path(tempfile.mkdtemp(prefix="embkit-"))
+                warnings.warn(
+                    f"Could not create default resource path '{default_path}'. "
+                    f"Falling back to temporary directory '{fallback}'.",
+                    stacklevel=2,
+                )
+                self.save_path = fallback
         else:
             logger.debug(f"Using save_path={save_path}")
             self.save_path = Path(save_path)

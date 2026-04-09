@@ -1,6 +1,7 @@
 import unittest
 import tempfile
 import logging
+import os
 from pathlib import Path
 from embkit.resources.resource import Resource, REPO_DIR
 
@@ -44,9 +45,11 @@ class TestResource(unittest.TestCase):
                 self.assertFalse(dataset._download_called_from_init)
 
     def test_none_save_path_with_download_skips_creation(self):
-        dataset = DummyResource(name="dummy", save_path=None, download=False)
-        expected_path = Path.home() / REPO_DIR
-        self.assertEqual(Path(dataset.save_path).resolve(), expected_path.resolve())
+        with tempfile.TemporaryDirectory() as tmpdir:
+            home = Path(tmpdir) / "embkit-home"
+            with unittest.mock.patch.dict(os.environ, {"EMBKIT_HOME": str(home)}):
+                dataset = DummyResource(name="dummy", save_path=None, download=False)
+            self.assertEqual(Path(dataset.save_path).resolve(), home.resolve())
 
 
 if __name__ == '__main__':
