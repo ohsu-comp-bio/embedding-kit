@@ -6,10 +6,13 @@ import logging
 from typing import Dict, List, Optional
 import pandas as pd
 import torch
+import numpy as np
+from ...modules import MaskedLinear
 
 from .base_vae import BaseVAE
 from ... import factory
-from ...pathway import build_feature_map_indices, PathwayConstraintInfo
+from ...pathway import build_feature_map_indices
+from ...constraints import PathwayConstraintInfo
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +157,48 @@ class NetVAE(BaseVAE):
         self.group_layer_scaling: List[int] = list(group_layer_size)
         self.history: Optional[Dict[str, List[float]]] = None
         self.normal_stats: Optional[pd.DataFrame] = None
+
+    def _iter_pathway_constraints(self):
+        modules = []
+        if self.encoder is not None:
+            modules.extend(self.encoder.net)
+        if self.decoder is not None:
+            modules.extend(self.decoder.net)
+        for module in modules:
+            if isinstance(module, MaskedLinear):
+                constraint_info = getattr(module, "constraint_info", None)
+                if constraint_info is not None:
+                    yield module, constraint_info
+
+    def set_constraint_active(self, active: bool) -> None:
+        for _, constraint_info in self._iter_pathway_constraints():
+            if hasattr(constraint_info, "set_active"):
+                constraint_info.set_active(active)
+
+    def update_membership(self, latent_groups: Dict[str, List[str]]) -> None:
+        self.latent_groups = latent_groups
+        for _, constraint_info in self._iter_pathway_constraints():
+            if hasattr(constraint_info, "update_membership"):
+                constraint_info.update_membership(latent_groups)
+
+    def refresh_masks(self, device: torch.device) -> None:
+        if self.encoder is not None:
+            self.encoder.refresh_mask(device)
+        if self.decoder is not None:
+            for module in self.decoder.net:
+                if isinstance(module, MaskedLinear):
+                    constraint_info = getattr(module, "constraint_info", None)
+                    if constraint_info is not None:
+                        m = constraint_info.gen_mask(module.linear.in_features, module.linear.out_features)
+                        module.set_mask(torch.as_tensor(m, dtype=module.mask.dtype, device=module.mask.device))
+
+    def get_constraint_projection_weights(self) -> Optional[np.ndarray]:
+        if self.encoder is None:
+            return None
+        for module in self.encoder.net:
+            if isinstance(module, MaskedLinear):
+                return module.linear.weight.detach().cpu().numpy()
+        return None
 
     def to_dict(self):
         return {

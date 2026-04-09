@@ -7,7 +7,7 @@ from pathlib import Path
 
 from embkit.models.vae.vae import VAE
 from embkit.models.vae.net_vae import NetVAE
-from embkit.pathway import PathwayConstraintInfo
+from embkit.constraints import PathwayConstraintInfo
 from embkit.factory.layers import ConstraintInfo
 from embkit import factory
 

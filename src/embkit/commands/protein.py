@@ -50,8 +50,10 @@ def encode(fasta: str, filter:str, batch_size:int, model:str, trim:int, pool:str
         "sum" : "sum-pool"
     }
     out = sys.stdout
+    should_close = False
     if output is not None:
         out = open(output, "wt")
+        should_close = True
 
     enc = ProteinEncoder(batch_size=batch_size, model=model)
     enc.to(get_device())
@@ -68,4 +70,5 @@ def encode(fasta: str, filter:str, batch_size:int, model:str, trim:int, pool:str
         for i, emb in enc.encode(fasta_reader(fasta, filter=filter), output=pool_map[pool]):
             out.write( f"{i}\t" + "\t".join(stringify(emb.tolist(), trim)))
             out.write("\n")
-    out.close()
+    if should_close:
+        out.close()

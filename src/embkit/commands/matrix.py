@@ -14,15 +14,14 @@ def normalize(srcs, out, features, col_quantile, quantile_max, precision):
 
     features_list = None
     if features is not None:
-        features = []
         with open(features, encoding="ascii") as handle:
             features_list = list(line.rstrip() for line in handle)
 
     dfs = []
     for i in srcs:
         df = pd.read_csv(i, sep="\t", index_col=0)
-        if features is not None:
-            df = df[features]
+        if features_list is not None:
+            df = df[features_list]
         dfs.append(df)
     if len(dfs) == 0:
         click.echo("No matrices defined")

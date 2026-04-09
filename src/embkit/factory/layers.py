@@ -31,7 +31,7 @@ class ConstraintInfo(ABC):
 
         op = d.get("op")
         if op in {"features-to-group", "group-to-features", "group-to-group"}:
-            from ..pathway import PathwayConstraintInfo
+            from ..constraints.pathway_constraint import PathwayConstraintInfo
             return PathwayConstraintInfo.from_dict(d)
 
         raise ValueError(f"Unknown constraint payload: {d}")
@@ -72,6 +72,7 @@ class Layer:
         layers = []
         if self.op == "masked_linear":
             init_mask = None
+            masked = MaskedLinear(in_features, out_features, bias=self.bias, mask=init_mask, device=device, dtype=dtype)
             if self.constraint is not None:
                 m = self.constraint.gen_mask(in_features, out_features)
                 # Expect (out_features, in_features)
@@ -81,7 +82,9 @@ class Layer:
                         f"(units, in_features)=({out_features}, {in_features})."
                     )
                 init_mask = torch.as_tensor(m, dtype=torch.float32, device=device)
-            layers.append(MaskedLinear(in_features, out_features, bias=self.bias, mask=init_mask, device=device, dtype=dtype))
+                masked.set_mask(init_mask)
+                setattr(masked, "constraint_info", self.constraint)
+            layers.append(masked)
         elif self.op ==  "linear":
             layers.append(Linear(in_features, out_features, bias=self.bias, device=device, dtype=dtype))
         else:

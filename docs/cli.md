@@ -92,8 +92,6 @@ embkit model train-netvae INPUT_PATH PATHWAY_SIF [OPTIONS]
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--epochs`, `-e` | `20` | Number of training epochs |
-| `--encode-layers` | `400,200` | Encoder hidden layer sizes |
-| `--decode-layers` | `200,400` | Decoder hidden layer sizes |
 | `--normalize`, `-n` | `none` | Pre-normalization: `none`, `expMinMax` |
 | `--learning-rate`, `-r` | `0.0001` | Adam learning rate |
 | `--out`, `-o` | — | Output model file path |

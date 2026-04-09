@@ -139,7 +139,7 @@ For `NetVAE`, layers use `op="masked_linear"` with a pathway constraint object t
 
 ```python
 from embkit.factory.layers import Layer
-from embkit.pathway import PathwayConstraintInfo
+from embkit.constraints import PathwayConstraintInfo
 
 Layer(
     units=n_groups,

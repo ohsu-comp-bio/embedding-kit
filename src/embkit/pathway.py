@@ -2,9 +2,7 @@
 Methods for opening and processing Pathway files
 """
 from collections import OrderedDict, defaultdict
-from typing import Any, Dict, List, Tuple, Iterable, Literal, Optional
-
-from .factory.layers import ConstraintInfo
+from typing import Any, Dict, List, Tuple, Iterable
 
 import numpy as np
 import pandas as pd
@@ -157,88 +155,6 @@ def build_feature_map_indices(
     feature_idx = pd.Index( sorted(feature_set) )
     group_idx = pd.Index(group_set)
     return feature_idx, group_idx
-
-
-
-
-ConstraintOP = Literal["features-to-group", "group-to-features", "group-to-group"]
-
-class PathwayConstraintInfo(ConstraintInfo):
-    """
-    ConstraintInfo for pathway-based masking. Supports three types of constraints:
-        - "features-to-group": connects features to group nodes (e.g. TF to target genes)
-        - "group-to-features": connects group nodes to features (e.g. TF to target genes, reverse direction)
-        - "group-to-group": connects group nodes to group nodes (e.g. between latent layers)
-    """
-    def __init__(self, op: ConstraintOP, feature_map : Dict[str, List[str]],
-                 feature_index: Optional[Any] = None,
-                 group_index: Optional[Any] = None,
-                 in_group_scaling: int = 1,
-                 out_group_scaling: int = 1):
-        self.op = op
-        self.feature_map = feature_map
-        self.feature_index = _normalize_index(feature_index) if feature_index is not None else None
-        self.group_index = _normalize_index(group_index) if group_index is not None else None
-        self.in_group_scaling = in_group_scaling
-        self.out_group_scaling = out_group_scaling
-
-    def gen_mask(self, in_features: Optional[int] = None, out_features: Optional[int] = None):
-        feature_index = self.feature_index
-        group_index = self.group_index
-        if feature_index is None or group_index is None:
-            feature_index, group_index = build_feature_map_indices(self.feature_map)
-        group_count = len(group_index)
-        if group_count == 0:
-            raise ValueError("Cannot generate pathway mask with zero groups.")
-
-        if self.op == "features-to-group":
-            if out_features is None or out_features % group_count != 0:
-                raise ValueError(f"features-to-group expects out_features divisible by group count ({group_count}); got {out_features}.")
-            group_node_count = out_features // group_count
-            return build_features_to_group_mask(self.feature_map, feature_index, group_index, group_node_count=group_node_count)
-        elif self.op == "group-to-features":
-            if in_features is None or in_features % group_count != 0:
-                raise ValueError(f"group-to-features expects in_features divisible by group count ({group_count}); got {in_features}.")
-            group_node_count = in_features // group_count
-            return build_features_to_group_mask(self.feature_map, feature_index, group_index, group_node_count=group_node_count, forward=False)
-        elif self.op == "group-to-group":
-            if in_features is None or out_features is None:
-                raise ValueError("group-to-group requires in_features and out_features.")
-            if in_features % group_count != 0 or out_features % group_count != 0:
-                raise ValueError(
-                    f"group-to-group expects both dimensions divisible by group count ({group_count}); "
-                    f"got in_features={in_features}, out_features={out_features}."
-                )
-            in_group_nodes = in_features // group_count
-            out_group_nodes = out_features // group_count
-            return build_group_to_group_mask(group_count, in_group_nodes, out_group_nodes)
-        raise ValueError(f"Unknown ConstraintInfo.op '{self.op}'")
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "op": self.op,
-            "feature_map": self.feature_map,
-            "feature_index": (list(self.feature_index) if self.feature_index is not None else None),
-            "group_index": (list(self.group_index) if self.group_index is not None else None),
-            "in_group_scaling": self.in_group_scaling,
-            "out_group_scaling": self.out_group_scaling,
-        }
-
-    @staticmethod
-    def from_dict(d: Dict[str, Any]) -> "PathwayConstraintInfo":
-        return PathwayConstraintInfo(
-            op=d["op"],
-            feature_map=d["feature_map"],
-            feature_index=d.get("feature_index"),
-            group_index=d.get("group_index"),
-            in_group_scaling=d.get("in_group_scaling", 1),
-            out_group_scaling=d.get("out_group_scaling", 1)
-        )
-
-
-# Backward-compatible alias used by older code paths.
-PathwayControlConstraint = PathwayConstraintInfo
-
 
 def idx_to_list(x):
     """

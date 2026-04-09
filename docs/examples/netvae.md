@@ -77,7 +77,7 @@ Each `Layer` uses `op="masked_linear"` with `PathwayConstraintInfo` that describ
 
 ```python
 from embkit.factory.layers import Layer
-from embkit.pathway import PathwayConstraintInfo
+from embkit.constraints import PathwayConstraintInfo
 from embkit import dataframe_loader
 
 # How many nodes per group at each encoder depth

@@ -32,7 +32,6 @@ nav:
           - VAE Loss: api/losses/vae_loss.md
       - Constraints:
           - Overview: api/constraints/index.md
-          - NetworkConstraint: api/constraints/network_constraint.md
       - Metrics:
           - Distance: api/metrics/distance.md
       - Estimator:

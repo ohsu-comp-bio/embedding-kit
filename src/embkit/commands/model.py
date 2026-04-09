@@ -130,20 +130,23 @@ def train_vae(input_path: str,
     save(vae, out)
     click.echo(f"Model saved, to {out}")
 
+    if save_stats and df is not None:
+        stats = pd.DataFrame({"mean": df.mean(), "std": df.std(ddof=0)})
+        stats_path = f"{out}.stats.tsv"
+        stats.to_csv(stats_path, sep="\t")
+        click.echo(f"Stats saved, to {stats_path}")
+
 
 @model.command()
 @click.argument("input_path", type=click.Path(exists=True, dir_okay=False, readable=True, path_type=str))
 @click.argument("pathway_sif", type=click.Path(exists=True, dir_okay=False, readable=True, path_type=str))
 @click.option("--epochs", "-e", type=int, default=20, show_default=True, help="Training epochs.")
-@click.option("--encode-layers", type=str, default="400,200")
-@click.option("--decode-layers", type=str, default="200,400")
 @click.option("--normalize", "-n", type=str, default="none")
 @click.option("--learning-rate", "-r", type=float, default=0.0001)
 @click.option("--out", "-o", type=str, default=None)
 @click.option("--loss", type=click.Choice(["mse", "bce", "bce-logit"]), default="bce-logit")
 @click.option("--save-stats", is_flag=True)
 def train_netvae(input_path: str, pathway_sif:str, out:str,
-                encode_layers:str, decode_layers:str,
                 epochs: int, normalize: str,
                 learning_rate: float,
                 loss:str,
