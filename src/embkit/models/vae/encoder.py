@@ -15,6 +15,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _module_out_features(module: nn.Module) -> Optional[int]:
+    if isinstance(module, MaskedLinear):
+        return int(module.linear.out_features)
+    if isinstance(module, nn.Linear):
+        return int(module.out_features)
+    return None
+
+
 @factory.nn_module
 class Encoder(nn.Module):
     """
@@ -57,8 +65,12 @@ class Encoder(nn.Module):
             logger.info("Building encoder with %d layers", len(layers))
             enc_net = layers.build( input_dim=in_features, output_dim=self.latent_dim, device=device, dtype=dtype)
             self.net.extend(enc_net)
-
-            in_features = enc_net[-1].out_features
+            in_features = self.latent_dim
+            for module in reversed(enc_net):
+                width = _module_out_features(module)
+                if width is not None:
+                    in_features = width
+                    break
 
             # Latent heads requirement
             self.z_mean = None

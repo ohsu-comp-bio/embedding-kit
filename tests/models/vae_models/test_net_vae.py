@@ -34,12 +34,6 @@ class TestNetVAE(unittest.TestCase):
             device="cpu",
         )
 
-        constraint = model.encoder.constraint
-        self.assertIsNotNone(constraint)
-
-        constraint.set_active(True)
-        model.encoder.refresh_mask(device=torch.device("cpu"))
-
         masked_layers = [m for m in model.encoder.net if isinstance(m, MaskedLinear)]
         self.assertTrue(masked_layers)
 
@@ -75,10 +69,6 @@ class TestNetVAE(unittest.TestCase):
             loss=bce_with_logits,
             device="cpu",
         )
-
-        constraint = model.encoder.constraint
-        constraint.set_active(True)
-        model.encoder.refresh_mask(device=torch.device("cpu"))
 
         masked_layer = next(m for m in model.encoder.net if isinstance(m, MaskedLinear))
         opt = torch.optim.Adam(model.parameters(), lr=1e-3)

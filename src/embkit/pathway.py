@@ -130,10 +130,16 @@ def feature_map_intersect(
         subset_map: Dict[str, List[str]]: subset of feature_map with only features in `features`
     """
     features_list = list(features)
+    feature_set = set(features_list)
     out_map = {}
     for src, members in feature_map.items():
-        filtered_members = [m for m in set(members) if m in features_list]
-        if include_self and src in features_list:
+        filtered_members: List[str] = []
+        seen = set()
+        for member in members:
+            if member in feature_set and member not in seen:
+                filtered_members.append(member)
+                seen.add(member)
+        if include_self and src in feature_set and src not in seen:
             filtered_members = [src] + filtered_members
         if len(filtered_members) >= min_group_size:
             out_map[src] = filtered_members
@@ -165,30 +171,55 @@ class PathwayConstraintInfo(ConstraintInfo):
         - "group-to-group": connects group nodes to group nodes (e.g. between latent layers)
     """
     def __init__(self, op: ConstraintOP, feature_map : Dict[str, List[str]],
-                 feature_index: pd.Index, group_index: pd.Index,
-                 in_group_scaling: int = 1, 
+                 feature_index: Optional[Any] = None,
+                 group_index: Optional[Any] = None,
+                 in_group_scaling: int = 1,
                  out_group_scaling: int = 1):
         self.op = op
         self.feature_map = feature_map
+        self.feature_index = _normalize_index(feature_index) if feature_index is not None else None
+        self.group_index = _normalize_index(group_index) if group_index is not None else None
         self.in_group_scaling = in_group_scaling
         self.out_group_scaling = out_group_scaling
 
     def gen_mask(self, in_features: Optional[int] = None, out_features: Optional[int] = None):
-
-        feature_index, group_index = build_feature_map_indices(self.feature_map)
+        feature_index = self.feature_index
+        group_index = self.group_index
+        if feature_index is None or group_index is None:
+            feature_index, group_index = build_feature_map_indices(self.feature_map)
+        group_count = len(group_index)
+        if group_count == 0:
+            raise ValueError("Cannot generate pathway mask with zero groups.")
 
         if self.op == "features-to-group":
-            return build_features_to_group_mask(self.feature_map, feature_index, group_index, group_node_count=out_features)
+            if out_features is None or out_features % group_count != 0:
+                raise ValueError(f"features-to-group expects out_features divisible by group count ({group_count}); got {out_features}.")
+            group_node_count = out_features // group_count
+            return build_features_to_group_mask(self.feature_map, feature_index, group_index, group_node_count=group_node_count)
         elif self.op == "group-to-features":
-            return build_features_to_group_mask(self.feature_map, feature_index, group_index, group_node_count=in_features, forward=False)
+            if in_features is None or in_features % group_count != 0:
+                raise ValueError(f"group-to-features expects in_features divisible by group count ({group_count}); got {in_features}.")
+            group_node_count = in_features // group_count
+            return build_features_to_group_mask(self.feature_map, feature_index, group_index, group_node_count=group_node_count, forward=False)
         elif self.op == "group-to-group":
-            return build_group_to_group_mask(len(self.feature_map), in_features, out_features)
+            if in_features is None or out_features is None:
+                raise ValueError("group-to-group requires in_features and out_features.")
+            if in_features % group_count != 0 or out_features % group_count != 0:
+                raise ValueError(
+                    f"group-to-group expects both dimensions divisible by group count ({group_count}); "
+                    f"got in_features={in_features}, out_features={out_features}."
+                )
+            in_group_nodes = in_features // group_count
+            out_group_nodes = out_features // group_count
+            return build_group_to_group_mask(group_count, in_group_nodes, out_group_nodes)
         raise ValueError(f"Unknown ConstraintInfo.op '{self.op}'")
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "op": self.op,
             "feature_map": self.feature_map,
+            "feature_index": (list(self.feature_index) if self.feature_index is not None else None),
+            "group_index": (list(self.group_index) if self.group_index is not None else None),
             "in_group_scaling": self.in_group_scaling,
             "out_group_scaling": self.out_group_scaling,
         }
@@ -198,11 +229,15 @@ class PathwayConstraintInfo(ConstraintInfo):
         return PathwayConstraintInfo(
             op=d["op"],
             feature_map=d["feature_map"],
-            feature_index=pd.Index(d.get("feature_index")),
-            group_index=pd.Index(d.get("group_index")),
+            feature_index=d.get("feature_index"),
+            group_index=d.get("group_index"),
             in_group_scaling=d.get("in_group_scaling", 1),
             out_group_scaling=d.get("out_group_scaling", 1)
         )
+
+
+# Backward-compatible alias used by older code paths.
+PathwayControlConstraint = PathwayConstraintInfo
 
 
 def idx_to_list(x):
@@ -265,6 +300,3 @@ def build_group_to_group_mask(group_count: int, in_group_node_count, out_group_n
             for j in range(g * out_group_node_count, (g + 1) * out_group_node_count):
                 mask[j, i] = 1.0
     return mask
-
-
-

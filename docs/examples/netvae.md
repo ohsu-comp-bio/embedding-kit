@@ -57,26 +57,27 @@ df_norm = pd.DataFrame(norm.transform(df), index=df.index, columns=df.columns)
 ### 2) Parse pathways and intersect with features
 
 ```python
-from embkit.pathway import extract_pathway_interactions, feature_map_intersect, FeatureGroups
+from embkit.pathway import extract_sif_interactions, feature_map_intersect, build_feature_map_indices
 
-feature_map = extract_pathway_interactions("pathway.sif")
-feature_map, isect = feature_map_intersect(feature_map, df_norm.columns)
+feature_map = extract_sif_interactions("pathway.sif")
+feature_map = feature_map_intersect(feature_map, df_norm.columns)
+feature_idx, group_idx = build_feature_map_indices(feature_map)
 
 # Keep only genes that appear in the pathway file
-df_norm = df_norm[isect]
+df_norm = df_norm[feature_idx]
 
-fmap = FeatureGroups(feature_map)
-group_count   = len(fmap)
-feature_count = len(isect)
+group_count   = len(group_idx)
+feature_count = len(feature_idx)
 print(f"Features: {feature_count}, Pathway groups: {group_count}")
 ```
 
 ### 3) Build masked layers
 
-Each `Layer` uses `op="masked_linear"` with a `ConstraintInfo` that describes the connection pattern:
+Each `Layer` uses `op="masked_linear"` with `PathwayConstraintInfo` that describes the connection pattern:
 
 ```python
-from embkit.factory.layers import Layer, LayerList, ConstraintInfo
+from embkit.factory.layers import Layer
+from embkit.pathway import PathwayConstraintInfo
 from embkit import dataframe_loader
 
 # How many nodes per group at each encoder depth
@@ -84,24 +85,24 @@ gcounts = [5, 2, 1]
 
 enc_layers = [
     Layer(group_count * gcounts[0], op="masked_linear",
-          constraint=ConstraintInfo("features-to-group", fmap, out_group_count=gcounts[0])),
+          constraint=PathwayConstraintInfo("features-to-group", feature_map)),
     Layer(group_count * gcounts[1], op="masked_linear",
-          constraint=ConstraintInfo("group-to-group", fmap,
-                                    in_group_count=gcounts[0], out_group_count=gcounts[1])),
+          constraint=PathwayConstraintInfo("group-to-group", feature_map,
+                                           in_group_scaling=gcounts[0], out_group_scaling=gcounts[1])),
     Layer(group_count, op="masked_linear",
-          constraint=ConstraintInfo("group-to-group", fmap,
-                                    in_group_count=gcounts[1], out_group_count=gcounts[2])),
+          constraint=PathwayConstraintInfo("group-to-group", feature_map,
+                                           in_group_scaling=gcounts[1], out_group_scaling=gcounts[2])),
 ]
 
 dec_layers = [
     Layer(group_count * gcounts[1], op="masked_linear",
-          constraint=ConstraintInfo("group-to-group", fmap,
-                                    in_group_count=gcounts[2], out_group_count=gcounts[1])),
+          constraint=PathwayConstraintInfo("group-to-group", feature_map,
+                                           in_group_scaling=gcounts[2], out_group_scaling=gcounts[1])),
     Layer(group_count * gcounts[0], op="masked_linear",
-          constraint=ConstraintInfo("group-to-group", fmap,
-                                    in_group_count=gcounts[1], out_group_count=gcounts[0])),
+          constraint=PathwayConstraintInfo("group-to-group", feature_map,
+                                           in_group_scaling=gcounts[1], out_group_scaling=gcounts[0])),
     Layer(feature_count, op="masked_linear",
-          constraint=ConstraintInfo("group-to-features", fmap, in_group_count=gcounts[0]),
+          constraint=PathwayConstraintInfo("group-to-features", feature_map, in_group_scaling=gcounts[0]),
           activation="none"),
 ]
 ```
@@ -116,7 +117,7 @@ dec_layers = [
 
 ### 4) Train
 
-This Python API example uses the standard `VAE` class with pathway-constrained masked layers — not the `NetVAE` class. This gives you finer control over layer architecture (multiple depths per group). The `NetVAE` class (used by the CLI) provides a simpler single-projection constraint.
+This Python API example uses the standard `VAE` class with pathway-constrained masked layers — not the `NetVAE` class. This gives you finer control over layer architecture (multiple depths per group). The `NetVAE` class wraps this pattern and builds the masked stack from `latent_groups` + `group_layer_size`.
 
 ```python
 from embkit.models.vae.vae import VAE

@@ -153,7 +153,7 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
 
     feature_map = extract_sif_interactions(pathway_sif)
     feature_map = feature_map_intersect(feature_map, df.columns)
-    feature_idx, group_idx = build_feature_map_indices(feature_map, df.columns)
+    feature_idx, group_idx = build_feature_map_indices(feature_map)
 
     df = df[feature_idx]
     if normalize == "expMinMax":

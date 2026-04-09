@@ -8,10 +8,8 @@ import pandas as pd
 import torch
 
 from .base_vae import BaseVAE
-from .encoder import Encoder
 from ... import factory
 from ...pathway import build_feature_map_indices, PathwayConstraintInfo
-from ...constraints import NetworkConstraint
 
 logger = logging.getLogger(__name__)
 
@@ -42,50 +40,111 @@ class NetVAE(BaseVAE):
             device: Optional[torch.device] = None,
             dtype: Optional[torch.dtype] = None,
     ):
+        if not latent_groups:
+            raise ValueError("latent_groups cannot be empty for NetVAE.")
+
+        # Canonical field: group_layer_size. Keep group_layer_scaling as a deprecated alias.
+        if group_layer_size is not None and group_layer_scaling is not None and list(group_layer_size) != list(group_layer_scaling):
+            raise ValueError(
+                "group_layer_size and group_layer_scaling disagree; "
+                "use group_layer_size as the canonical setting."
+            )
         if group_layer_size is None:
             group_layer_size = group_layer_scaling
         if group_layer_size is None:
             group_layer_size = [1, 1]
+        group_layer_size = [int(v) for v in group_layer_size]
+        if any(v <= 0 for v in group_layer_size):
+            raise ValueError(f"group_layer_size must contain positive integers, got {group_layer_size}.")
 
         if latent_index is None:
             _, group_idx = build_feature_map_indices(latent_groups)
             latent_index = list(group_idx)
         else:
             latent_index = list(latent_index)
+        if len(latent_index) == 0:
+            raise ValueError("latent_index cannot be empty.")
 
         feature_list = list(features)
         latent_size = len(latent_index)
-        
+
+        # Encoder: features -> groups*s0 -> groups*s1 -> ... -> groups*sN
         enc_layers = [
-            factory.Layer(units=latent_size*group_layer_scaling[0], op="masked_linear",
-                  constraint=PathwayConstraintInfo("features-to-group", feature_map=latent_groups,
-                                                   feature_index=feature_list, group_index=latent_index,
-                                                      out_group_scaling=group_layer_scaling[0]))
+            factory.Layer(
+                units=latent_size * group_layer_size[0],
+                op="masked_linear",
+                constraint=PathwayConstraintInfo(
+                    "features-to-group",
+                    feature_map=latent_groups,
+                    feature_index=feature_list,
+                    group_index=latent_index,
+                    out_group_scaling=group_layer_size[0],
+                ),
+            )
         ]
-        for i in range(1, len(group_layer_scaling)):
+        for in_scale, out_scale in zip(group_layer_size[:-1], group_layer_size[1:]):
             enc_layers.append(
-                factory.Layer(latent_size*i, op="masked_linear", 
-                      constraint=PathwayConstraintInfo("group-to-group", feature_map=latent_groups,
-                                                       feature_index=feature_list, group_index=latent_index)
-            ))
-
-
-        dec_layers = [
-            factory.Layer(latent_size*group_layer_scaling[-1], op="masked_linear", 
-                  constraint=PathwayConstraintInfo("group-to-group", feature_map=latent_groups,
-                                                   feature_index=feature_list, group_index=latent_index))
-        ] 
-        for i in reversed(range(len(group_layer_scaling))):
-            dec_layers.append(
-                factory.Layer(len(features), op="masked_linear",
-                    constraint=PathwayConstraintInfo("group-to-features", feature_map=latent_groups,
-                                                     feature_index=feature_list, group_index=latent_index),
-                                                        activation="none")
+                factory.Layer(
+                    units=latent_size * out_scale,
+                    op="masked_linear",
+                    constraint=PathwayConstraintInfo(
+                        "group-to-group",
+                        feature_map=latent_groups,
+                        feature_index=feature_list,
+                        group_index=latent_index,
+                        in_group_scaling=in_scale,
+                        out_group_scaling=out_scale,
+                    ),
+                )
             )
 
+        # Decoder: groups*sN -> ... -> groups*s1 -> groups*s0 -> features
+        dec_layers = []
+        for in_scale, out_scale in zip(reversed(group_layer_size[1:]), reversed(group_layer_size[:-1])):
+            dec_layers.append(
+                factory.Layer(
+                    units=latent_size * out_scale,
+                    op="masked_linear",
+                    constraint=PathwayConstraintInfo(
+                        "group-to-group",
+                        feature_map=latent_groups,
+                        feature_index=feature_list,
+                        group_index=latent_index,
+                        in_group_scaling=in_scale,
+                        out_group_scaling=out_scale,
+                    ),
+                )
+            )
+        dec_layers.append(
+            factory.Layer(
+                units=len(feature_list),
+                op="masked_linear",
+                constraint=PathwayConstraintInfo(
+                    "group-to-features",
+                    feature_map=latent_groups,
+                    feature_index=feature_list,
+                    group_index=latent_index,
+                    in_group_scaling=group_layer_size[0],
+                ),
+                activation="none",
+            )
+        )
 
-        encoder = self.build_encoder(feature_dim=len(features), latent_dim=latent_size, layers=factory.LayerList( enc_layers) )
-        decoder = self.build_decoder(feature_dim=len(features), latent_dim=latent_size, layers=factory.LayerList( dec_layers) )
+        encoder = self.build_encoder(
+            feature_dim=len(feature_list),
+            latent_dim=latent_size,
+            layers=factory.LayerList(enc_layers),
+            batch_norm=batch_norm,
+            device=device,
+            dtype=dtype,
+        )
+        decoder = self.build_decoder(
+            feature_dim=len(feature_list),
+            latent_dim=latent_size,
+            layers=factory.LayerList(dec_layers),
+            device=device,
+            dtype=dtype,
+        )
 
         super().__init__(features=feature_list, encoder=encoder, decoder=decoder)
         self.latent_groups: Dict[str, List[str]] = latent_groups
@@ -123,4 +182,3 @@ class NetVAE(BaseVAE):
             group_layer_scaling=d.get("group_layer_scaling"),
         )
         return model
-

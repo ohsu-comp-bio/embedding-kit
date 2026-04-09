@@ -26,6 +26,15 @@ class ConstraintInfo(ABC):
     @staticmethod
     def from_dict(d: Dict[str, Any]) -> "ConstraintInfo":
         """Deserialize constraint configuration from a dict."""
+        if d is None:
+            raise ValueError("ConstraintInfo.from_dict requires a non-null dict.")
+
+        op = d.get("op")
+        if op in {"features-to-group", "group-to-features", "group-to-group"}:
+            from ..pathway import PathwayConstraintInfo
+            return PathwayConstraintInfo.from_dict(d)
+
+        raise ValueError(f"Unknown constraint payload: {d}")
 
 class Layer:
     """
@@ -141,7 +150,8 @@ class LayerList:
             else:
                 raise ValueError(f"Unsupported layer type: {type(layer)}")
 
-        layers.append(Linear(in_features=cur_dim, out_features=output_dim, device=device, dtype=dtype))
+        if cur_dim != output_dim:
+            layers.append(Linear(in_features=cur_dim, out_features=output_dim, device=device, dtype=dtype))
         return Sequential(*layers)
 
     def __str__(self):
