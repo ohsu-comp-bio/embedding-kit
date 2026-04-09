@@ -5,7 +5,7 @@ import torch
 
 class NetworkConstraint:
     """
-    PyTorch-native mask manager that mirrors the Keras constraint logic.
+    Network based connectivity constraint logic.
 
     feature_index: list of feature ids (len = input_dim)
     latent_index:  list of latent ids (len = latent_dim)

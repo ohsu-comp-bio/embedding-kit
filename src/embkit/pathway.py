@@ -2,12 +2,24 @@
 Methods for opening and processing Pathway files
 """
 from collections import OrderedDict, defaultdict
-from typing import Any, Dict, List, Tuple, Iterable, Optional, Literal
+from typing import Any, Dict, List, Tuple, Iterable, Literal, Optional
+
+from .factory.layers import ConstraintInfo
 
 import numpy as np
 import pandas as pd
 
-from .factory.layers import ConstraintInfo
+
+def _normalize_index(index_like: Any) -> pd.Index:
+    """Accept pd.Index, list-like, or name->position maps and return a pd.Index."""
+    if isinstance(index_like, pd.Index):
+        return index_like
+    if isinstance(index_like, dict):
+        ordered = [None] * len(index_like)
+        for name, pos in index_like.items():
+            ordered[pos] = name
+        return pd.Index(ordered)
+    return pd.Index(list(index_like))
 
 
 # ---------- SIF parsing ----------
@@ -57,9 +69,9 @@ def extract_sif_interactions(
 
 def build_mask(
         feature_map: Dict[str, List[str]],
-        src_index: pd.Index,
-        dst_index: pd.Index,
-        min_group_size: int = 2,
+    src_index: Any,
+    dst_index: Any,
+    min_group_size: int = 1,
 ) -> np.ndarray:
     """
     Build a binary mask from a SIF file using explicit source/destination indices.
@@ -88,6 +100,8 @@ def build_mask(
     np.ndarray
         Binary mask with shape (len(dst_index), len(src_index)).
     """
+    src_index = _normalize_index(src_index)
+    dst_index = _normalize_index(dst_index)
     mask = np.zeros((len(dst_index), len(src_index)), dtype=np.float32)
     for src, members in feature_map.items():
         if src in src_index:
@@ -143,7 +157,7 @@ def build_feature_map_indices(
 
 ConstraintOP = Literal["features-to-group", "group-to-features", "group-to-group"]
 
-class PathwayControlConstraint(ConstraintInfo):
+class PathwayConstraintInfo(ConstraintInfo):
     """
     ConstraintInfo for pathway-based masking. Supports three types of constraints:
         - "features-to-group": connects features to group nodes (e.g. TF to target genes)
@@ -180,8 +194,8 @@ class PathwayControlConstraint(ConstraintInfo):
         }
 
     @staticmethod
-    def from_dict(d: Dict[str, Any]) -> "PathwayControlConstraint":
-        return PathwayControlConstraint(
+    def from_dict(d: Dict[str, Any]) -> "PathwayConstraintInfo":
+        return PathwayConstraintInfo(
             op=d["op"],
             feature_map=d["feature_map"],
             feature_index=pd.Index(d.get("feature_index")),
@@ -196,10 +210,14 @@ def idx_to_list(x):
     idx_to_list: takes an index map ( name -> position ) to a list of names
     ordered by position
     """
-    out = [None] * len(x)
-    for k, v in x.items():
-        out[v] = k
-    return out
+    if isinstance(x, pd.Index):
+        return list(x)
+    if isinstance(x, dict):
+        out = [None] * len(x)
+        for k, v in x.items():
+            out[v] = k
+        return out
+    return list(x)
 
 
 def build_features_to_group_mask(feature_map, feature_idx, group_idx, group_node_count=1, forward=True):

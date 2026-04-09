@@ -25,11 +25,12 @@ class TestNetVAE(unittest.TestCase):
 
         model = NetVAE(features=list(df.columns), latent_groups=latent_groups, latent_index=latent_index)
         fit_vae(
-            df,
             model,
+            df,
             epochs=0,
             batch_size=2,
             lr=1e-3,
+            loss=bce_with_logits,
             device="cpu",
         )
 
@@ -66,11 +67,12 @@ class TestNetVAE(unittest.TestCase):
 
         model = NetVAE(features=list(df.columns), latent_groups=latent_groups, latent_index=latent_index, group_layer_size=[1,1])
         fit_vae(
-            df,
             model,
+            df,
             epochs=0,
             batch_size=4,
             lr=1e-3,
+            loss=bce_with_logits,
             device="cpu",
         )
 
