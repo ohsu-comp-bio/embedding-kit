@@ -1,20 +1,23 @@
 import unittest
 from unittest.mock import MagicMock, patch
+import importlib
 
 from click.testing import CliRunner
 
 from embkit.__main__ import cli_main
 from embkit.files import H5Writer
 
+model_cmd = importlib.import_module("embkit.commands.model")
+
 
 class TestModelCommands(unittest.TestCase):
     def setUp(self):
         self.runner = CliRunner()
 
-    @patch("embkit.commands.model.save")
-    @patch("embkit.commands.model.fit_vae")
-    @patch("embkit.commands.model.dataframe_loader", return_value="loader")
-    @patch("embkit.commands.model.NetVAE")
+    @patch.object(model_cmd, "save")
+    @patch.object(model_cmd, "fit_vae")
+    @patch.object(model_cmd, "dataframe_loader", return_value="loader")
+    @patch.object(model_cmd, "NetVAE")
     def test_train_netvae_smoke(self, netvae_cls, loader_mock, fit_mock, save_mock):
         dummy_model = MagicMock(name="netvae")
         netvae_cls.return_value = dummy_model
