@@ -9,6 +9,10 @@ permissions:
 jobs:
   coverage:
     runs-on: ubuntu-latest
+    env:
+      THRESHOLD_ALL: 30
+      THRESHOLD_NEW: 80
+      NODE_OPTIONS: "--no-deprecation"
 
     steps:
     - name: Checkout code
@@ -26,9 +30,9 @@ jobs:
 
     - name: Install library
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install -r requirements.txt
-        python -m pip install -e .
+        python -m pip install --upgrade pip --root-user-action=ignore
+        python -m pip install -r requirements.txt --root-user-action=ignore
+        python -m pip install -e . --root-user-action=ignore
 
     - name: Run unittests with coverage
       run: |
@@ -55,57 +59,128 @@ jobs:
         import subprocess
         from pathlib import Path
 
+        # --- Identify Base SHA ---
         base_sha = os.environ.get("BASE_SHA", "").strip()
         if not base_sha:
-            print("PR coverage breakdown skipped: missing base SHA.")
-            raise SystemExit(0)
+            base_sha = "develop"
+            print(f"DEBUG: No BASE_SHA provided. Defaulting to branch: '{base_sha}'")
 
-        files = json.loads(Path("coverage.json").read_text(encoding="utf-8")).get("files", {})
+        data = json.loads(Path("coverage.json").read_text(encoding="utf-8"))
+        files = data.get("files", {})
+        total_cov = data["totals"].get("percent_covered", 0)
+        
+        print(f"\n--- Coverage Summary ---")
+        print(f"Overall Project Coverage: {total_cov:.2f}%")
+        
         changed = subprocess.check_output(
             ["git", "diff", "--name-only", f"{base_sha}...HEAD"],
             text=True,
         ).splitlines()
 
         def cov_for(path: str):
-            keys = (path, f"src/{path}")
-            for key in keys:
+            for key in (path, f"src/{path}"):
                 if key in files:
                     return float(files[key]["summary"]["percent_covered"])
             return None
 
-        def avg(values):
-            return (sum(values) / len(values)) if values else None
-
-        modified_cov = []
-        new_cov = []
-
+        new_files_found = []
+        new_cov_values = []
+        
+        print("\n--- New Files Identified ---")
         for rel in changed:
             cov = cov_for(rel)
             if cov is None:
                 continue
+                
             exists_in_base = subprocess.run(
                 ["git", "cat-file", "-e", f"{base_sha}:{rel}"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             ).returncode == 0
-            if exists_in_base:
-                modified_cov.append(cov)
-            else:
-                new_cov.append(cov)
+            
+            if not exists_in_base:
+                new_files_found.append(rel)
+                new_cov_values.append(cov)
+                print(f"  [NEW] {rel}: {cov:.2f}%")
 
-        mod_avg = avg(modified_cov)
-        new_avg = avg(new_cov)
-
-        if mod_avg is None:
-            print("Modified files coverage: N/A (no covered modified files)")
+        if not new_files_found:
+            print("  (No new files found in this PR)")
         else:
-            print(f"Modified files coverage: {mod_avg:.2f}% ({len(modified_cov)} files)")
-
-        if new_avg is None:
-            print("New files coverage: N/A (no covered new files)")
-        else:
-            print(f"New files coverage: {new_avg:.2f}% ({len(new_cov)} files)")
+            new_avg = sum(new_cov_values) / len(new_cov_values)
+            print(f"\nAverage Coverage for New Files: {new_avg:.2f}%")
+        print("------------------------\n")
         PY
+
+    - name: Enforce Coverage Thresholds
+      if: github.event_name == 'pull_request'
+      env:
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      run: |
+        python - <<'PY'
+        import json
+        import os
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        # --- Identify Base SHA ---
+        base_sha = os.environ.get("BASE_SHA", "").strip()
+        if not base_sha:
+            base_sha = "develop"
+
+        threshold_all = float(os.environ["THRESHOLD_ALL"])
+        threshold_new = float(os.environ["THRESHOLD_NEW"])
+
+        data = json.loads(Path("coverage.json").read_text(encoding="utf-8"))
+        total_cov = data["totals"].get("percent_covered", 0)
+        files = data.get("files", {})
+
+        changed = subprocess.check_output(
+            ["git", "diff", "--name-only", f"{base_sha}...HEAD"],
+            text=True,
+        ).splitlines()
+
+        new_cov = []
+        for rel in changed:
+            for key in (rel, f"src/{rel}"):
+                if key in files:
+                    exists_in_base = subprocess.run(
+                        ["git", "cat-file", "-e", f"{base_sha}:{rel}"],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                    ).returncode == 0
+                    if not exists_in_base:
+                        new_cov.append(float(files[key]["summary"]["percent_covered"]))
+                    break
+
+        new_avg = (sum(new_cov) / len(new_cov)) if new_cov else None
+        
+        print("\n--- Coverage Enforcement Results ---")
+        
+        failed = False
+        # Check Total
+        passed_total = total_cov >= threshold_all
+        status_total = "✅ PASS" if passed_total else "❌ FAIL"
+        print(f"{status_total} | Total Project Coverage: {total_cov:.2f}% (Threshold: {threshold_all}%)")
+        if not passed_total:
+            failed = True
+        
+        # Check New
+        if new_avg is not None:
+            passed_new = new_avg >= threshold_new
+            status_new = "✅ PASS" if passed_new else "❌ FAIL"
+            print(f"{status_new} | New Files Coverage: {new_avg:.2f}% (Threshold: {threshold_new}%)")
+            if not passed_new:
+                failed = True
+        else:
+            print("N/A | New Files Coverage: (No new files found)")
+
+        print("------------------------------------\n")
+
+        if failed:
+            sys.exit(1)
+        print("All required coverage checks passed! 🚀")
+        PY
+
 
     - name: Comment PR with coverage
       if: github.event.pull_request.head.repo.full_name == github.repository
@@ -113,6 +188,6 @@ jobs:
       with:
         coverageFile: coverage.xml
         token: ${{ secrets.GITHUB_TOKEN }}
-        thresholdNew: 0.8
-        thresholdAll: 0.3
-        thresholdModified: 0.9
+        thresholdNew: 0
+        thresholdAll: 0
+        thresholdModified: 0

@@ -127,12 +127,15 @@ class SingleFileDownloader(Resource):
             # Use a temporary file
             with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
                 tmp_path = Path(tmp_file.name)
+                # disable tqdm in CI environments
+                is_ci = os.environ.get("GITHUB_ACTIONS") == "true"
                 with tqdm(
                     desc=f"Downloading {self.name}",
                     total=total_size,
                     unit="B",
                     unit_scale=True,
                     unit_divisor=1024,
+                    disable=is_ci,
                 ) as bar:
                     for chunk in response.iter_content(chunk_size=8192):
                         if chunk:

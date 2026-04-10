@@ -18,13 +18,14 @@ from ..encoding.protein import ProteinEncoder
 protein = click.Group(name="protein", help="Protein commands.")
 
 def fasta_reader(path, filter=None):
-    for record in SeqIO.parse(path, "fasta"):
-        use = True
-        if filter is not None:
-            if not re.match(filter, record.id):
-                use = False
-        if use:
-            yield (record.id, str(record.seq))
+    with open(path, "rt") as handle:
+        for record in SeqIO.parse(handle, "fasta"):
+            use = True
+            if filter is not None:
+                if not re.match(filter, record.id):
+                    use = False
+            if use:
+                yield (record.id, str(record.seq))
 
 def stringify(l:List[float], trim=None) -> List[str]:
     out = []

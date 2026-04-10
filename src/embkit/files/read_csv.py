@@ -183,6 +183,8 @@ class LargeCsvReader:
 
     def __enter__(self):
         """Opens the CSV file for reading when entering a context manager."""
+        if self._file and not self._file.closed:
+            self._file.close()
         self._file = open(self.csv_path, 'r', newline='')
         return self
 
@@ -270,7 +272,9 @@ class LargeCsvReader:
 
         with self:
             if show_progress:
-                for k, v in tqdm(self, total=self.shape[0]):
+                # disable tqdm in CI environments
+                is_ci = os.environ.get("GITHUB_ACTIONS") == "true"
+                for k, v in tqdm(self, total=self.shape[0], disable=is_ci):
                     yield np.array(_extract_values(v), dtype=np.float32)
             else:
                 for k, v in self:
