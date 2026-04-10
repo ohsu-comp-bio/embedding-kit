@@ -107,7 +107,4 @@ class PathwayConstraintInfo(ConstraintInfo):
         obj.set_active(d.get("active", True))
         return obj
 
-
-PathwayControlConstraint = PathwayConstraintInfo
-
-__all__ = ["PathwayConstraintInfo", "PathwayControlConstraint"]
+__all__ = ["PathwayConstraintInfo"]

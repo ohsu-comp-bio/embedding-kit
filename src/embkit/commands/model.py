@@ -29,7 +29,7 @@ model = click.Group(name="model", help="VAE Model commands.")
 @click.option("--batch-size", "-b", type=int, default=256)
 @click.option("--encode-layers", type=str, default="400,200")
 @click.option("--decode-layers", type=str, default="200,400")
-@click.option("--normalize", "-n", type=str, default="none")
+@click.option("--normalize", "-n", type=click.Choice(["none", "expMinMax", "minMax"]), default="none")
 @click.option("--final-activation", default="none", type=click.Choice(["none", "sigmoid", "relu"]))
 @click.option("--learning-rate", "-r", type=float, default=0.0001)
 @click.option("--out", "-o", type=str, default=None)
@@ -66,12 +66,15 @@ def train_vae(input_path: str,
     torch.manual_seed(seed)
     df = None
     if group is not None:
+        if normalize != "none":
+            raise click.BadParameter(
+                "Normalization for HDF5 input is not supported in train-vae. "
+                "Use '--normalize none' for HDF5 or provide TSV input for normalization."
+            )
         dataset = H5Reader(input_path, group)
-        #TODO add normalization here
         if zero_mask is not None:
             dataset_mask = get_dataset_nonzero_mask(dataset, zero_mask)
             mask = dataset_mask[0].cpu().numpy()
-            #print(mask)
             features = dataset.columns[mask]
             dataset = DatasetMask(dataset, dataset_mask, device)
         else:

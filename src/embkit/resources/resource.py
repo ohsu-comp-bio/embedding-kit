@@ -52,8 +52,8 @@ class Resource(os.PathLike[str]):
             try:
                 self.download()
                 self._download_called_from_init = True
-            except Exception as e:
-                logger.error(e)
+            except (RuntimeError, requests.RequestException, OSError, ValueError) as e:
+                logger.error("Download failed for resource '%s': %s", self.name, e)
         else:
             # When not downloading, set target file based on the resolved save_path
             target_file: Path = Path(self.save_path, self.name)

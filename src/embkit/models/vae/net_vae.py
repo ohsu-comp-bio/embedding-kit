@@ -38,7 +38,6 @@ class NetVAE(BaseVAE):
             latent_groups: Dict[str, List[str]],
             latent_index: Optional[List[str]] = None,
             group_layer_size: Optional[List[int]] = None,
-            group_layer_scaling: Optional[List[int]] = None,
             batch_norm: bool = False,
             device: Optional[torch.device] = None,
             dtype: Optional[torch.dtype] = None,
@@ -46,14 +45,6 @@ class NetVAE(BaseVAE):
         if not latent_groups:
             raise ValueError("latent_groups cannot be empty for NetVAE.")
 
-        # Canonical field: group_layer_size. Keep group_layer_scaling as a deprecated alias.
-        if group_layer_size is not None and group_layer_scaling is not None and list(group_layer_size) != list(group_layer_scaling):
-            raise ValueError(
-                "group_layer_size and group_layer_scaling disagree; "
-                "use group_layer_size as the canonical setting."
-            )
-        if group_layer_size is None:
-            group_layer_size = group_layer_scaling
         if group_layer_size is None:
             group_layer_size = [1, 1]
         group_layer_size = [int(v) for v in group_layer_size]
@@ -153,8 +144,6 @@ class NetVAE(BaseVAE):
         self.latent_groups: Dict[str, List[str]] = latent_groups
         self.latent_index: List[str] = latent_index
         self.group_layer_size: List[int] = list(group_layer_size)
-        # Keep both names during transition for compatibility with older configs.
-        self.group_layer_scaling: List[int] = list(group_layer_size)
         self.history: Optional[Dict[str, List[float]]] = None
         self.normal_stats: Optional[pd.DataFrame] = None
 
@@ -206,11 +195,16 @@ class NetVAE(BaseVAE):
             "latent_groups": self.latent_groups,
             "latent_index": self.latent_index,
             "group_layer_size": self.group_layer_size,
-            "group_layer_scaling": self.group_layer_scaling,
         }
 
     @classmethod
     def from_dict(cls, d):
+        if "group_layer_scaling" in d and "group_layer_size" not in d:
+            raise ValueError(
+                "NetVAE config uses deprecated key 'group_layer_scaling'. "
+                "Use 'group_layer_size' instead."
+            )
+
         features = d.get("features")
         if features is None:
             fmap = d.get("latent_groups") or {}
@@ -224,6 +218,5 @@ class NetVAE(BaseVAE):
             latent_groups=d.get("latent_groups"),
             latent_index=d.get("latent_index"),
             group_layer_size=d.get("group_layer_size"),
-            group_layer_scaling=d.get("group_layer_scaling"),
         )
         return model

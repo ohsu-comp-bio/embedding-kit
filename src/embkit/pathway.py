@@ -192,8 +192,6 @@ def build_features_to_group_mask(feature_map, feature_idx, group_idx, group_node
         for f in feature_map[group]:
             if f in fi:
                 floc = fi.get_loc(f)
-                # print(gnum, group_node_count)
-                # print(list(range(gnum*group_node_count, (gnum+1)*(group_node_count))))
                 for pos in range(gnum * group_node_count, (gnum + 1) * (group_node_count)):
                     if forward:
                         mask[pos, floc] = 1.0

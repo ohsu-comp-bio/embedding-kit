@@ -442,12 +442,6 @@ def fit_net_vae(
         _append_history("kl_loss", epoch_kl / batch_count)
 
         if epoch % 2 == 0:
-            print(f"Epoch {epoch + 1}/{total_epochs} | ")
-            print(
-                f"loss={model.history['loss'][-1]:.4f} | "
-                f"recon={model.history['reconstruction_loss'][-1]:.4f} | "
-                f"kl={model.history['kl_loss'][-1]:.4f}"
-            )
             logger.info(
                 "Epoch %d/%d | loss=%.4f | recon=%.4f | kl=%.4f",
                 epoch + 1,

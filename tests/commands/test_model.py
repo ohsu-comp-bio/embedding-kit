@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 from click.testing import CliRunner
 
 from embkit.__main__ import cli_main
+from embkit.files import H5Writer
 
 
 class TestModelCommands(unittest.TestCase):
@@ -61,6 +62,31 @@ class TestModelCommands(unittest.TestCase):
         fit_mock.assert_called_once()
         self.assertEqual(fit_mock.call_args.kwargs["X"], "loader")
         save_mock.assert_called_once_with(dummy_model, "netvae.model")
+
+    def test_train_vae_h5_rejects_normalization(self):
+        with self.runner.isolated_filesystem():
+            writer = H5Writer("matrix.h5", "rna", index=["s1", "s2"], columns=["G1", "G2"])
+            writer.set_irow(0, [1.0, 2.0])
+            writer.set_irow(1, [3.0, 4.0])
+            writer.close()
+
+            result = self.runner.invoke(
+                cli_main,
+                [
+                    "model",
+                    "train-vae",
+                    "matrix.h5",
+                    "--group",
+                    "rna",
+                    "--normalize",
+                    "expMinMax",
+                    "--epochs",
+                    "1",
+                ],
+            )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("Normalization for HDF5 input is not supported in train-vae", result.output)
 
 
 if __name__ == "__main__":

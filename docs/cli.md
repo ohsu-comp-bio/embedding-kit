@@ -49,6 +49,8 @@ embkit model train-vae INPUT_PATH [OPTIONS]
 | `--bfloat16` | false | Use bfloat16 dtype for reduced memory usage |
 | `--save-stats` | false | Save training statistics alongside the model |
 
+For HDF5 input (`--group`), normalization must be `none`.
+
 **Examples**
 
 ```bash
@@ -98,6 +100,8 @@ embkit model train-netvae INPUT_PATH PATHWAY_SIF [OPTIONS]
 | `--loss` | `bce-logit` | Loss function: `mse`, `bce`, `bce-logit` |
 | `--group-layer-size` | `5,2,1` | Comma-separated per-group widths for masked NetVAE layers |
 | `--save-stats` | false | Save training statistics |
+
+`NetVAE` now accepts only `group_layer_size` in model configs/serialization. The legacy alias `group_layer_scaling` has been removed.
 
 **Example**
 
@@ -175,6 +179,33 @@ embkit matrix normalize SRCS... --out OUTPUT [OPTIONS]
 embkit matrix normalize cohort1.tsv cohort2.tsv \
     --out combined.normalized.tsv \
     --quantile-max 0.9
+```
+
+### matrix pca
+
+Run PCA on a TSV matrix and write principal components to TSV.
+
+```bash
+embkit matrix pca INPUT_PATH --pca-size N [OPTIONS]
+```
+
+**Arguments**
+
+| Argument | Description |
+|----------|-------------|
+| `INPUT_PATH` | Input `.tsv` matrix path |
+
+**Options**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--pca-size` | required | Number of principal components |
+| `--out`, `-o` | auto-named | Output TSV path (`<input_stem>.pca.tsv`) |
+
+**Example**
+
+```bash
+embkit matrix pca data/rna.tsv --pca-size 64 --out rna.pca.tsv
 ```
 
 ---

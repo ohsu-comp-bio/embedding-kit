@@ -172,3 +172,4 @@ The embedding has one column per pathway group, making it directly interpretable
 - The intersection step (`feature_map_intersect`) intersects genes/features (columns) with the pathway file and drops genes that are not present there, subsetting the matrix columns accordingly. Check `isect` before training to see how many genes are retained.
 - `gcounts` controls the number of hidden nodes per group at each depth. More nodes = more expressiveness per group but larger model.
 - The `VAE` built above supports `factory.save` / `factory.load` serialization. The `NetVAE` class (used by the CLI) also supports serialization via `factory.save` / `factory.load`.
+- Constraint class naming is canonicalized to `PathwayConstraintInfo`. The legacy alias `PathwayControlConstraint` has been removed.

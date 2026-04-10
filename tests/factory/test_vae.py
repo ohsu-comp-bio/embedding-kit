@@ -56,17 +56,15 @@ class TestVAESave(unittest.TestCase):
         self.assertEqual(loaded.features, features)
         self.assertEqual(loaded.latent_groups, latent_groups)
         self.assertEqual(loaded.group_layer_size, [2, 1])
-        self.assertEqual(loaded.group_layer_scaling, [2, 1])
 
-    def test_netvae_from_dict_legacy_group_layer_scaling(self):
+    def test_netvae_from_dict_rejects_deprecated_group_layer_scaling(self):
         desc = {
             "features": ["G1", "G2"],
             "latent_groups": {"TF1": ["G1"], "TF2": ["G2"]},
             "group_layer_scaling": [3, 1],
         }
-        model = NetVAE.from_dict(desc)
-        self.assertEqual(model.group_layer_size, [3, 1])
-        self.assertEqual(model.group_layer_scaling, [3, 1])
+        with self.assertRaises(ValueError):
+            NetVAE.from_dict(desc)
 
     def test_constraintinfo_from_dict_pathway_dispatch(self):
         payload = {

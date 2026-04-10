@@ -16,9 +16,10 @@ from torch.utils.data import TensorDataset, DataLoader
 
 from .base_vae import BaseVAE
 from .encoder import Encoder
-from ...factory.layers import Layer
+from ...factory.layers import Layer, LayerList
 from ... import get_device
 from ...losses import bce_kl_weighted
+from ... import factory
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +92,7 @@ class RNAEncoder(Encoder):
         return mu, logvar, z
 
 
+@factory.nn_module
 class RNAVAE(BaseVAE):
     """    
     Architecture:
@@ -123,7 +125,7 @@ class RNAVAE(BaseVAE):
         self.encoder = RNAEncoder(
             feature_dim=feature_dim,
             latent_dim=latent_dim,
-            layers=enc_layers,
+            layers=LayerList(enc_layers),
             batch_norm=False  # We add BN to latent heads specifically
         )
 
@@ -135,7 +137,7 @@ class RNAVAE(BaseVAE):
         self.decoder = self.build_decoder(
             feature_dim=feature_dim,
             latent_dim=latent_dim,
-            layers=dec_layers,
+            layers=LayerList(dec_layers),
         )
         
         # Initialize weights with Xavier/Glorot (TensorFlow default)
@@ -199,7 +201,7 @@ class RNAVAE(BaseVAE):
 
         # Convert to tensor
         if isinstance(X, pd.DataFrame):
-            X_tensor = torch.FloatTensor(X.values).to(device)
+            X_tensor = torch.tensor(X.to_numpy(dtype="float32", copy=True), dtype=torch.float32, device=device)
         else:
             X_tensor = X.to(device)
 
@@ -260,8 +262,7 @@ class RNAVAE(BaseVAE):
             self.history["kl"].append(ep_kl)
             self.history["beta"].append(beta)
 
-            # Print like Keras verbose=1
-            print(f'Epoch {epoch+1}/{epochs} - loss: {ep_loss:.4f} - beta: {beta:.4f}')
+            logger.info("Epoch %d/%d - loss: %.4f - beta: %.4f", epoch + 1, epochs, ep_loss, beta)
 
             # Early stopping check
             if ep_loss < best_loss:
@@ -271,12 +272,27 @@ class RNAVAE(BaseVAE):
             else:
                 patience_counter += 1
                 if patience_counter >= early_stopping_patience:
-                    print(f'Early stopping triggered at epoch {epoch+1}')
+                    logger.info("Early stopping triggered at epoch %d", epoch + 1)
                     if best_state is not None:
                         self.load_state_dict(best_state)
                     break
 
         training_time = time.time() - start_time
-        print(f"Training completed in {training_time:.2f} seconds")
+        logger.info("Training completed in %.2f seconds", training_time)
 
         return self.history
+
+    def to_dict(self):
+        return {
+            "features": self.features,
+            "latent_dim": self.latent_dim,
+            "lr": self.lr,
+        }
+
+    @classmethod
+    def from_dict(cls, d):
+        return RNAVAE(
+            features=d["features"],
+            latent_dim=d.get("latent_dim", 768),
+            lr=d.get("lr", 0.0005),
+        )

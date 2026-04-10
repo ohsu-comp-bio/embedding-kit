@@ -1,8 +1,11 @@
 from pathlib import Path
+import logging
 from ..files import LargeCsvReader
 import numpy as np
 import faiss
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 def run_pca(input_file: Path | str, pca_size: int, output_file: Path | str | None = None) -> pd.DataFrame:
     """
@@ -16,7 +19,7 @@ def run_pca(input_file: Path | str, pca_size: int, output_file: Path | str | Non
         pd.DataFrame: DataFrame containing the PCA-transformed data.
     """
     csvfile: LargeCsvReader = LargeCsvReader(input_file, sep="\t",
-                             index_column=0, skip_header=True,
+                             index_column=0, skip_header=False,
                              cache_size=128)
 
     data = np.array(list(csvfile.read(show_progress=True)))
@@ -25,11 +28,11 @@ def run_pca(input_file: Path | str, pca_size: int, output_file: Path | str | Non
         for k, _ in csvfile:
             names.append(k)
 
-    print("calculating PCA")
+    logger.info("Calculating PCA")
     mat = faiss.PCAMatrix(data.shape[1], pca_size)
     mat.train(data)
 
-    print("build pca matrix")
+    logger.info("Building PCA matrix")
     data_pca = mat.apply(data)
 
     df = pd.DataFrame(data_pca, index=names)

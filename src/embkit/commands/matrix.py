@@ -1,5 +1,6 @@
 import click
 import pandas as pd
+from pathlib import Path
 
 matrix = click.Group(name="matrix", help="Model commands.")
 
@@ -33,3 +34,21 @@ def normalize(srcs, out, features, col_quantile, quantile_max, precision):
     else:
         normDF = (df / df.quantile(quantile_max)).clip(upper=1.0, lower=0.0).fillna(0.0)
     normDF.round(decimals=precision).to_csv(out, sep="\t")
+
+
+@matrix.command()
+@click.argument("input_path", type=click.Path(exists=True, dir_okay=False, readable=True, path_type=str))
+@click.option("--pca-size", required=True, type=int, help="Number of principal components.")
+@click.option("--out", "-o", default=None, type=str, help="Output TSV path.")
+def pca(input_path, pca_size, out):
+    if pca_size <= 0:
+        raise click.BadParameter("--pca-size must be a positive integer.")
+
+    from ..utilities.pca import run_pca
+
+    if out is None:
+        out = f"{Path(input_path).stem}.pca.tsv"
+        click.echo(f"No output path provided, using default naming: {out}")
+
+    run_pca(input_file=input_path, pca_size=pca_size, output_file=out)
+    click.echo(f"PCA saved to {out}")
