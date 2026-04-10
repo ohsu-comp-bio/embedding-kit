@@ -64,6 +64,57 @@ class TestPathwayConstraintInfo(unittest.TestCase):
         )
         np.testing.assert_array_equal(mask, expected)
 
+    def test_group_to_features_mask(self):
+        c = PathwayConstraintInfo(
+            "group-to-features",
+            feature_map=self.feature_map,
+            feature_index=self.feature_index,
+            group_index=self.group_index,
+        )
+        mask = c.gen_mask(in_features=2, out_features=4)
+        self.assertEqual(mask.shape, (4, 2))
+        self.assertEqual(mask[0, 0], 1.0)
+        self.assertEqual(mask[2, 1], 1.0)
+
+    def test_group_to_group_mask(self):
+        c = PathwayConstraintInfo(
+            "group-to-group",
+            feature_map=self.feature_map,
+            feature_index=self.feature_index,
+            group_index=self.group_index,
+        )
+        mask = c.gen_mask(in_features=4, out_features=2)
+        self.assertEqual(mask.shape, (2, 4))
+        # group 0 only connects to group 0 inputs
+        self.assertEqual(mask[0, 0], 1.0)
+        self.assertEqual(mask[0, 1], 1.0)
+        self.assertEqual(mask[0, 2], 0.0)
+
+    def test_to_from_dict_roundtrip(self):
+        c = PathwayConstraintInfo(
+            "features-to-group",
+            feature_map=self.feature_map,
+            feature_index=self.feature_index,
+            group_index=self.group_index,
+            in_group_scaling=1,
+            out_group_scaling=2,
+        )
+        c.set_active(False)
+        payload = c.to_dict()
+        loaded = PathwayConstraintInfo.from_dict(payload)
+        self.assertEqual(loaded.op, "features-to-group")
+        self.assertFalse(loaded.active)
+
+    def test_invalid_group_to_group_dimensions_raise(self):
+        c = PathwayConstraintInfo(
+            "group-to-group",
+            feature_map=self.feature_map,
+            feature_index=self.feature_index,
+            group_index=self.group_index,
+        )
+        with self.assertRaises(ValueError):
+            c.gen_mask(in_features=3, out_features=4)
+
 
 if __name__ == "__main__":
     unittest.main()

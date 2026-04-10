@@ -78,7 +78,7 @@ class TSPLayer(nn.Module):
         return votes  # [B, K]
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
     start_time = time.time()
     # Config

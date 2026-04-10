@@ -3,6 +3,7 @@ import os
 import numpy as np
 import torch
 from embkit.files import H5Writer, H5Reader
+from embkit.files.h5 import H5CubeWriter, H5CubeReader
 import tempfile
 
 class TestH5(unittest.TestCase):
@@ -59,3 +60,28 @@ class TestH5(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestH5Extended(unittest.TestCase):
+    def test_writer_with_integer_columns(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "int_cols.h5")
+            writer = H5Writer(path, "g", ["r1", "r2"], 3)
+            writer.set_irow(0, [1.0, 2.0, 3.0])
+            writer.set_irow(1, [4.0, 5.0, 6.0])
+            writer.close()
+
+            self.assertEqual(list(writer.columns), [0, 1, 2])
+
+    def test_h5_cube_roundtrip(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "cube.h5")
+            cube = H5CubeWriter(path, "g", ["a", "b"], xsize=2, ysize=2)
+            cube.set_row("a", np.array([[1.0, 2.0], [3.0, 4.0]], dtype="f"))
+            cube.set_irow(1, np.array([[5.0, 6.0], [7.0, 8.0]], dtype="f"))
+            cube.close()
+
+            reader = H5CubeReader(path, "g")
+            self.assertEqual(reader.get_loc("b"), 1)
+            row_tensor, *_ = reader[0]
+            self.assertEqual(tuple(row_tensor.shape), (2, 2))
