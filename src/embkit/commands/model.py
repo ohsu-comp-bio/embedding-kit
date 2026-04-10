@@ -1,6 +1,7 @@
 
 import click
 import pandas as pd
+import json
 
 from sklearn.preprocessing import MinMaxScaler
 
@@ -230,3 +231,156 @@ def encode(input_path: str, model_path:str, normalize:str, out:str):
     martix = result[2].detach().cpu().numpy()
     out_df = pd.DataFrame(martix, index=df.index)
     out_df.to_csv(out, sep="\t")
+
+
+@model.command()
+@click.argument("model_path", type=click.Path(exists=True, dir_okay=True, readable=True, path_type=str))
+@click.option("--json", "as_json", is_flag=True, help="Emit a machine-readable JSON report.")
+@click.option("--ci", is_flag=True, help="CI mode: same as '--json --fail-on-unhealthy'.")
+@click.option("--fail-on-unhealthy/--no-fail-on-unhealthy", default=False, show_default=True,
+              help="Return non-zero exit code when integrity checks fail.")
+@click.option("--strict", is_flag=True, help="Enable strict identity checks against expected model shape.")
+@click.option("--expected-feature-count", type=int, default=None,
+              help="Expected number of input features in strict mode.")
+@click.option("--expected-latent-dim", type=int, default=None,
+              help="Expected latent dimension in strict mode.")
+@click.option("--expected-features-file",
+              type=click.Path(exists=True, dir_okay=False, readable=True, path_type=str),
+              default=None,
+              help="Path to newline-delimited expected feature names in strict mode.")
+def verify(
+    model_path: str,
+    as_json: bool,
+    ci: bool,
+    fail_on_unhealthy: bool,
+    strict: bool,
+    expected_feature_count: int | None,
+    expected_latent_dim: int | None,
+    expected_features_file: str | None,
+):
+    """
+    Verify model integrity and architecture sanity.
+    """
+    from ..factory.core import run_model_verification
+    from .. import get_device
+
+    try:
+        if ci:
+            as_json = True
+            fail_on_unhealthy = True
+
+        if not as_json:
+            click.secho(f"Starting integrity verification: {model_path}...", fg="cyan", bold=True)
+        report = run_model_verification(model_path, device=get_device())
+        report.setdefault("issues", [])
+
+        expected_features = None
+        if expected_features_file is not None:
+            with open(expected_features_file, encoding="utf-8") as handle:
+                expected_features = [line.strip() for line in handle if line.strip()]
+
+        if strict:
+            strict_issues = []
+            actual_feature_names = report.get("feature_names")
+            actual_feature_count = report.get("features_count")
+
+            if expected_features is not None:
+                if actual_feature_names is None:
+                    strict_issues.append(
+                        "Strict check failed: model report does not expose feature names."
+                    )
+                elif list(actual_feature_names) != list(expected_features):
+                    strict_issues.append(
+                        "Strict check failed: feature names/order do not match expected list."
+                    )
+
+            if expected_feature_count is not None:
+                if actual_feature_count is None:
+                    strict_issues.append(
+                        "Strict check failed: model report does not expose feature count."
+                    )
+                elif int(actual_feature_count) != int(expected_feature_count):
+                    strict_issues.append(
+                        f"Strict check failed: expected feature count {expected_feature_count}, got {actual_feature_count}."
+                    )
+
+            if expected_latent_dim is not None:
+                actual_latent_dim = None
+                deep_audit = report.get("deep_audit")
+                if isinstance(deep_audit, dict):
+                    actual_latent_dim = deep_audit.get("latent_dim")
+                if actual_latent_dim is None:
+                    actual_latent_dim = report.get("declared_latent_dim")
+                if actual_latent_dim is None:
+                    strict_issues.append(
+                        "Strict check failed: model report does not expose latent dim."
+                    )
+                elif int(actual_latent_dim) != int(expected_latent_dim):
+                    strict_issues.append(
+                        f"Strict check failed: expected latent dim {expected_latent_dim}, got {actual_latent_dim}."
+                    )
+
+            report["strict_mode"] = True
+            report["strict_issues"] = strict_issues
+            if strict_issues:
+                report["healthy"] = False
+                report["issues"].extend(strict_issues)
+        else:
+            report["strict_mode"] = False
+            report["strict_issues"] = []
+
+        if as_json:
+            click.echo(json.dumps(report, indent=2, sort_keys=True))
+        else:
+            if report["healthy"]:
+                click.secho("PASS: model integrity checks passed.", fg="green", bold=True)
+            else:
+                click.secho("FAIL: model integrity checks failed.", fg="red", bold=True)
+
+            click.echo(f"Model Type: {report['model_type']}")
+            click.echo("\n--- Integrity Diagnostics ---")
+            param_issues = [i for i in report["issues"] if any(k in i for k in ["parameter", "NaN", "weight norm"])]
+            click.echo(f"  {'PASS' if not param_issues else 'FAIL'} Weight Health: {report.get('weight_norm_max', 0.0):.2f} (max norm)")
+
+            if "history_summary" in report:
+                hist = report["history_summary"]
+                click.echo(f"  PASS Training Trace: {hist['epochs']} epochs, loss improvement {hist['improvement']:.4f}")
+            else:
+                click.secho("  WARN Training Trace: Missing history; cannot assess learning trend.", fg="yellow")
+
+            for issue in report["issues"]:
+                color = "red" if not report["healthy"] else "yellow"
+                click.secho(f"  - {issue}", fg=color)
+
+            if "sparsity_audit" in report:
+                click.echo("\n--- Sparsity & Leakage Audit ---")
+                for layer in report["sparsity_audit"]:
+                    status = "PASS" if layer["is_healthy"] else "FAIL"
+                    leak_str = f"Leakage Sum: {layer['leakage_sum']:.2e}" if layer['leakage_sum'] > 1e-12 else "Zero Leakage"
+                    click.echo(f"  {status} {layer['layer']}:")
+                    click.echo(f"     Mask Sparsity: {layer['effective_sparsity']:.2%}")
+                    click.echo(f"     Raw Sparsity:  {layer['raw_sparsity']:.2%}")
+                    click.echo(f"     {leak_str}")
+
+            if "deep_audit" in report:
+                audit = report["deep_audit"]
+                click.echo("\n--- Latent Manifold Audit ---")
+                click.echo(f"  Latent Units: {audit.get('latent_dim', 'unknown')}")
+                click.echo(f"  Dead Units: {audit.get('dead_units', 'unknown')}")
+                if "reconstruction_mse" in audit:
+                    click.echo(f"  Reconstruction MSE: {audit['reconstruction_mse']:.4f}")
+
+            if "rna_diagnostics" in report:
+                diag = report["rna_diagnostics"]
+                click.echo("\n--- RNA Specific Diagnostics ---")
+                click.echo(f"  Non-negative heads: {'PASS' if diag['is_non_negative'] else 'FAIL'}")
+                click.echo(f"  Min mu: {diag['min_mu']:.4f}, Min logvar: {diag['min_logvar']:.4f}")
+
+        if fail_on_unhealthy and not report["healthy"]:
+            raise click.ClickException("Model integrity check failed.")
+
+    except click.ClickException:
+        raise
+    except Exception as e:
+        click.secho(f"Error during verification: {e}", fg="red")
+        raise click.Abort()

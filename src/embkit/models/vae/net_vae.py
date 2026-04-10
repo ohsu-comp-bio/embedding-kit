@@ -3,7 +3,7 @@ NetVAE implementation
 """
 import logging
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union, Any
 import pandas as pd
 import torch
 import numpy as np
@@ -144,7 +144,7 @@ class NetVAE(BaseVAE):
         self.latent_groups: Dict[str, List[str]] = latent_groups
         self.latent_index: List[str] = latent_index
         self.group_layer_size: List[int] = list(group_layer_size)
-        self.history: Optional[Dict[str, List[float]]] = None
+        self.history: Dict[str, List[float]] = {}
         self.normal_stats: Optional[pd.DataFrame] = None
 
     def _iter_pathway_constraints(self):
@@ -170,7 +170,13 @@ class NetVAE(BaseVAE):
             if hasattr(constraint_info, "update_membership"):
                 constraint_info.update_membership(latent_groups)
 
-    def refresh_masks(self, device: torch.device) -> None:
+    def refresh_masks(self, device: Optional[torch.device] = None) -> None:
+        if device is None:
+            try:
+                device = next(self.parameters()).device
+            except StopIteration:
+                device = torch.device("cpu")
+                
         if self.encoder is not None:
             self.encoder.refresh_mask(device)
         if self.decoder is not None:
@@ -179,7 +185,12 @@ class NetVAE(BaseVAE):
                     constraint_info = getattr(module, "constraint_info", None)
                     if constraint_info is not None:
                         m = constraint_info.gen_mask(module.linear.in_features, module.linear.out_features)
-                        module.set_mask(torch.as_tensor(m, dtype=module.mask.dtype, device=module.mask.device))
+                        module.set_mask(torch.as_tensor(m, dtype=module.mask.dtype, device=device))
+        
+        # Ensure underlying weights are also zeroed
+        with torch.no_grad():
+            for module, _ in self._iter_pathway_constraints():
+                module.linear.weight.mul_(module.mask)
 
     def get_constraint_projection_weights(self) -> Optional[np.ndarray]:
         if self.encoder is None:
@@ -189,12 +200,76 @@ class NetVAE(BaseVAE):
                 return module.linear.weight.detach().cpu().numpy()
         return None
 
-    def to_dict(self):
+    def verify_integrity(self) -> Dict[str, Any]:
+        """
+        In NetVAE, perform a layer-by-layer audit of the effective weights
+        to ensure sparsity constraints are being enforced.
+        Also perform a leakage test to ensure weights outside the
+        mask are strictly zero.
+        """
+        # Snapshot raw constrained weights before parent checks. Parent deep checks
+        # run forwards that enforce masks in-place, which would otherwise hide leakage.
+        raw_snapshots = []
+        for module, constraint_info in self._iter_pathway_constraints():
+            raw_snapshots.append(
+                (
+                    module,
+                    constraint_info,
+                    module.linear.weight.detach().clone(),
+                    module.mask.detach().clone(),
+                )
+            )
+
+        report = super().verify_integrity()
+
+        layer_audit = []
+        for module, constraint_info, weights, mask in raw_snapshots:
+
+            # Leakage test
+            # Check weights that should be masked out (weights * (1-mask))
+            leakage_weights = weights * (1.0 - mask)
+            leakage_sum = float(torch.sum(torch.abs(leakage_weights)))
+
+            # Effective weights (inside mask)
+            effective_weights = weights * mask
+
+            num_params = weights.numel()
+            raw_nonzero = int(torch.count_nonzero(weights))
+            eff_nonzero = int(torch.count_nonzero(effective_weights))
+
+            is_healthy = (eff_nonzero > 0)
+            if leakage_sum > 1e-7: # Numerical tolerance for float32
+                is_healthy = False
+                report["healthy"] = False
+                report["issues"].append(
+                    f"Weight leakage detected in pathway layer '{constraint_info.op}' "
+                    f"(leakage_sum={leakage_sum:.2e}). Weight updates bypassed the mask."
+                )
+
+            layer_audit.append({
+                "layer": constraint_info.op,
+                "in_features": int(module.linear.in_features),
+                "out_features": int(module.linear.out_features),
+                "raw_sparsity": 1.0 - (raw_nonzero / num_params),
+                "effective_sparsity": 1.0 - (eff_nonzero / num_params),
+                "leakage_sum": leakage_sum,
+                "is_healthy": is_healthy
+            })
+
+            if eff_nonzero == 0:
+                report["healthy"] = False
+                report["issues"].append(f"Zero effective weights in pathway layer: {constraint_info.op}")
+
+        report["sparsity_audit"] = layer_audit
+        return report
+
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "features": self.features,
             "latent_groups": self.latent_groups,
             "latent_index": self.latent_index,
             "group_layer_size": self.group_layer_size,
+            "history": getattr(self, "history", {}) or {}
         }
 
     @classmethod
@@ -219,4 +294,5 @@ class NetVAE(BaseVAE):
             latent_index=d.get("latent_index"),
             group_layer_size=d.get("group_layer_size"),
         )
+        model.history = d.get("history") or {}
         return model

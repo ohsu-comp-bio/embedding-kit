@@ -73,6 +73,15 @@ def _move_to_device(value: Any,
     return value
 
 
+def _enforce_model_masks(model: nn.Module) -> None:
+    """Apply post-step hard mask clamping for modules that expose it."""
+    with torch.no_grad():
+        for module in model.modules():
+            clamp = getattr(module, "clamp_masked_weights", None)
+            if callable(clamp):
+                clamp()
+
+
 def _run_training_phases(
                          model,
                          loader: DataLoader,
@@ -118,6 +127,7 @@ def _run_training_phases(
 
                 if (batch_index + 1) % accumulate_steps == 0:
                     optimizer.step()
+                    _enforce_model_masks(model)
                     optimizer.zero_grad(set_to_none=True)
 
                 for key in metric_keys:
@@ -130,6 +140,7 @@ def _run_training_phases(
 
             if batches > 0 and (batches % accumulate_steps) != 0:
                 optimizer.step()
+                _enforce_model_masks(model)
                 optimizer.zero_grad(set_to_none=True)
 
             history = _ensure_history(model, metric_keys)
@@ -272,6 +283,9 @@ def fit_vae(model,
             )
 
     model.to(device)
+    # Ensure biological masks are strictly enforced before training starts
+    if hasattr(model, "refresh_masks"):
+        model.refresh_masks(device)
     model.train()
 
     # Build dataloader once
@@ -333,7 +347,18 @@ def fit_net_vae(
     device: Optional[str] = None,
     grouping_fn: Optional[Callable[[Any, List[str]], Dict[str, List[str]]]] = None,
 ) -> None:
-    """Train a NetVAE with optional alternating constraint phases."""
+    """
+    Train a NetVAE with optional alternating constraint phases.
+
+    This path is intentionally retained even though the CLI currently uses
+    ``fit_vae`` for NetVAE training. It supports two API behaviors that are
+    not exposed by the current CLI:
+    1) alternating constrained/unconstrained training phases via ``phases``
+    2) optional dynamic regrouping via ``grouping_fn``
+
+    TODO: when this behavior is promoted to first-class CLI/config support,
+    unify this implementation with ``fit_vae`` to avoid long-term duplication.
+    """
 
     import numpy as np
     from ..losses import net_vae_loss
@@ -464,30 +489,3 @@ def fit_net_vae(
     normal_pred = pd.DataFrame(recon, index=df.index, columns=df.columns)
     resid = normal_pred - df
     model.normal_stats = pd.DataFrame({"mean": resid.mean(), "std": resid.std(ddof=0)})
-
-
-def fit_alt(model, loader, lr:float = 1e-5, epochs=32, accumulate_steps=8):
-    optimizer = Adam(model.parameters(), lr=lr)
-    criterion = nn.MSELoss()
-
-    model.history = {"loss": []}
-
-    def step_fn(batch, beta_value: float) -> Dict[str, torch.Tensor]:
-        del beta_value
-        x_tensor, y_tensor = batch
-        predictions = model(x_tensor)
-        loss = criterion(predictions, y_tensor)
-        return {"loss": loss}
-
-    _run_training_phases(
-        model=model,
-        loader=loader,
-        optimizer=optimizer,
-        phases=[(1.0, int(epochs))],
-        metric_keys=["loss"],
-        step_fn=step_fn,
-        progress=True,
-        accumulate_steps=int(accumulate_steps),
-    )
-
-    return [{"epoch": i + 1, "loss": loss} for i, loss in enumerate(model.history["loss"])]

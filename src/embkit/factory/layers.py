@@ -157,14 +157,19 @@ class LayerList:
             layers.append(Linear(in_features=cur_dim, out_features=output_dim, device=device, dtype=dtype))
         return Sequential(*layers)
 
-    def __str__(self):
+    def __repr__(self):
         o = []
         for i in self.layers:
             if isinstance(i, Layer):
-                o.append(i.to_dict())
+                # Provide a concise summary instead of full to_dict() serialization
+                constraint_str = f", constraint={i.constraint.op}" if i.constraint else ""
+                o.append(f"Layer(units={i.units}, op={i.op}, act={i.activation}{constraint_str})")
             else:
                 o.append(str(i))
-        return str(o)
+        return f"LayerList([{', '.join(o)}])"
+
+    def __str__(self):
+        return self.__repr__()
 
     def __len__(self):
         return len(self.layers)

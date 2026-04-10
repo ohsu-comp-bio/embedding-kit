@@ -47,6 +47,14 @@ class MaskedLinear(nn.Module):
 
         self.register_buffer("mask", mask, persistent=True)
 
+    @property
+    def in_features(self) -> int:
+        return int(self.linear.in_features)
+
+    @property
+    def out_features(self) -> int:
+        return int(self.linear.out_features)
+
     @torch.no_grad()
     def set_mask(self, mask: torch.Tensor) -> None:
         """
@@ -63,6 +71,13 @@ class MaskedLinear(nn.Module):
                 f"{tuple(self.linear.weight.shape)}."
             )
         self.mask.copy_(mask.to(self.mask.device, self.mask.dtype))
+        # Ensure weights are zeroed out for the new mask
+        self.linear.weight.mul_(self.mask)
+
+    @torch.no_grad()
+    def clamp_masked_weights(self) -> None:
+        """Hard-enforce sparsity constraints on raw parameters."""
+        self.linear.weight.mul_(self.mask)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -73,8 +88,8 @@ class MaskedLinear(nn.Module):
         Returns:
             Output tensor of shape (batch_size, out_features)
         """
-        w = self.linear.weight * self.mask
-        return F.linear(x, w, self.linear.bias)
+        effective_weight = self.linear.weight * self.mask
+        return F.linear(x, effective_weight, self.linear.bias)
 
     def extra_repr(self) -> str:
         """

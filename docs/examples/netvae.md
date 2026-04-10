@@ -37,6 +37,25 @@ The command:
 4. Builds encoder/decoder layers with `MaskedLinear` (connections not in the pathway are zeroed)
 5. Trains and saves the model
 
+### Optional: verify constraint integrity
+
+After training, you can run an explicit integrity audit:
+
+```bash
+embkit model verify netvae.model --ci
+```
+
+For strict identity checks against expected model shape and features:
+
+```bash
+embkit model verify netvae.model \
+    --strict \
+    --expected-feature-count 15425 \
+    --expected-latent-dim 2061 \
+    --expected-features-file expected_features.txt \
+    --fail-on-unhealthy
+```
+
 ---
 
 ## Python API

@@ -7,7 +7,7 @@ TensorFlow architecture with BatchNorm and ReLU on latent heads.
 
 import logging
 import time
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Any
 import torch
 import pandas as pd
 from torch.optim import Adam
@@ -282,17 +282,55 @@ class RNAVAE(BaseVAE):
 
         return self.history
 
-    def to_dict(self):
+    def verify_integrity(self) -> Dict[str, Any]:
+        """
+        Specific check for RNAVAE to ensure the BatchNorm+ReLU latent heads
+        are producing strictly non-negative mu and logvar.
+        """
+        report = super().verify_integrity()
+
+        self.eval()
+        device = next(self.parameters()).device
+        dummy_input = torch.randn(100, len(self.features), device=device)
+        with torch.no_grad():
+            mu, logvar, _ = self.encoder(dummy_input)
+
+            min_mu = float(torch.min(mu))
+            min_logvar = float(torch.min(logvar))
+
+            # Strict numerical tolerance for integrity mode
+            is_non_negative = (min_mu >= -1e-9 and min_logvar >= -1e-9)
+
+            report["rna_diagnostics"] = {
+                "min_mu": min_mu,
+                "min_logvar": min_logvar,
+                "is_non_negative": is_non_negative
+            }
+
+            if not is_non_negative:
+                report["healthy"] = False
+                report["issues"].append(
+                    f"Negative values detected in RNAVAE latent heads "
+                    f"(mu_min={min_mu:.2e}, logvar_min={min_logvar:.2e}). "
+                    f"Architectural constraints violated (ReLU/BatchNorm bypass)."
+                )
+
+        return report
+
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "features": self.features,
             "latent_dim": self.latent_dim,
             "lr": self.lr,
+            "history": getattr(self, "history", {}) or {}
         }
 
     @classmethod
     def from_dict(cls, d):
-        return RNAVAE(
+        model = RNAVAE(
             features=d["features"],
             latent_dim=d.get("latent_dim", 768),
             lr=d.get("lr", 0.0005),
         )
+        model.history = d.get("history") or {}
+        return model

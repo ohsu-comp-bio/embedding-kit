@@ -10,6 +10,13 @@ def build(desc):
 
     if isinstance(desc, dict):
         className = desc["__class__"]
+        if className not in CLASS_REGISTRY:
+            try:
+                from .base_vae import _import_obj
+                _import_obj(className)
+            except Exception as e:
+                pass
+        
         if className in CLASS_REGISTRY:
             return CLASS_REGISTRY[className].from_dict(desc)
         raise Exception(f"Unknown layer type: {className}")
@@ -26,6 +33,13 @@ def build(desc):
     raise Exception(f"Invalid input for build function: {type(desc)}")
 
 def save(model, path):
+    # Safety net: clamp constrained weights before serialization.
+    if isinstance(model, nn.Module):
+        with torch.no_grad():
+            for module in model.modules():
+                clamp = getattr(module, "clamp_masked_weights", None)
+                if callable(clamp):
+                    clamp()
     state = model.state_dict()
     desc = model.to_dict()    
     state["__model__"] = desc
@@ -44,3 +58,43 @@ def load(path, device=None, dtype=None):
     if device is not None or dtype is not None:
         model.to(device=device, dtype=dtype)
     return model
+
+def run_model_verification(model_path, device=None):
+    """
+    Load a model and run its integrity verification logic.
+
+    Args:
+        model_path: Path to the .model file.
+        device: Device to load the model on.
+
+    Returns:
+        A dictionary containing the verification report.
+    """
+    model = load(model_path, device=device)
+    if hasattr(model, "verify_integrity"):
+        report = model.verify_integrity()
+    else:
+        # Fallback for models that don't implement the interface yet
+        report = {
+            "model_type": model.__class__.__name__,
+            "healthy": True,
+            "issues": ["Model does not implement verify_integrity; fallback checks only."],
+            "fallback_audit": True
+        }
+        # Basic NaN/Inf check
+        for name, param in model.named_parameters():
+            if torch.isnan(param).any():
+                report["healthy"] = False
+                report["issues"].append(f"NaN values detected in parameter: {name}")
+            if torch.isinf(param).any():
+                report["healthy"] = False
+                report["issues"].append(f"Infinite values detected in parameter: {name}")
+
+    # Attach lightweight identity metadata when available.
+    if getattr(model, "features", None) is not None:
+        report["feature_names"] = list(model.features)
+        report.setdefault("features_count", len(model.features))
+    if getattr(model, "latent_dim", None) is not None:
+        report["declared_latent_dim"] = int(model.latent_dim)
+
+    return report

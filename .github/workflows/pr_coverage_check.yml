@@ -10,7 +10,7 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     env:
-      THRESHOLD_ALL: 30
+      THRESHOLD_ALL: 80
       THRESHOLD_NEW: 80
       NODE_OPTIONS: "--no-deprecation"
 

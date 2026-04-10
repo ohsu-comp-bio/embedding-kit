@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 import importlib
 from pathlib import Path
+import json
 
 from click.testing import CliRunner
 import torch
@@ -222,6 +223,98 @@ class TestModelCommands(unittest.TestCase):
 
             self.assertEqual(result.exit_code, 0, msg=result.output)
             self.assertTrue(Path("embed.tsv").exists())
+
+    @patch("embkit.factory.core.run_model_verification")
+    def test_verify_json_ci_pass(self, verify_mock):
+        verify_mock.return_value = {
+            "model_type": "NetVAE",
+            "healthy": True,
+            "issues": [],
+            "features_count": 2,
+            "feature_names": ["G1", "G2"],
+            "deep_audit": {"latent_dim": 1},
+        }
+
+        with self.runner.isolated_filesystem():
+            Path("dummy.model").write_text("mock", encoding="utf-8")
+            result = self.runner.invoke(
+                cli_main,
+                ["model", "verify", "dummy.model", "--ci"],
+            )
+
+        self.assertEqual(result.exit_code, 0, msg=result.output)
+        payload = json.loads(result.output)
+        self.assertTrue(payload["healthy"])
+        self.assertTrue(payload["strict_mode"] is False)
+
+    @patch("embkit.factory.core.run_model_verification")
+    def test_verify_strict_mismatch_fails(self, verify_mock):
+        verify_mock.return_value = {
+            "model_type": "NetVAE",
+            "healthy": True,
+            "issues": [],
+            "features_count": 2,
+            "feature_names": ["G1", "G2"],
+            "deep_audit": {"latent_dim": 1},
+        }
+
+        with self.runner.isolated_filesystem():
+            Path("dummy.model").write_text("mock", encoding="utf-8")
+            Path("expected_features.txt").write_text("G1\nG9\n", encoding="utf-8")
+            result = self.runner.invoke(
+                cli_main,
+                [
+                    "model",
+                    "verify",
+                    "dummy.model",
+                    "--strict",
+                    "--expected-features-file",
+                    "expected_features.txt",
+                    "--expected-feature-count",
+                    "2",
+                    "--expected-latent-dim",
+                    "1",
+                    "--fail-on-unhealthy",
+                    "--json",
+                ],
+            )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("Model integrity check failed.", result.output)
+
+    @patch("embkit.factory.core.run_model_verification")
+    def test_verify_strict_match_passes(self, verify_mock):
+        verify_mock.return_value = {
+            "model_type": "NetVAE",
+            "healthy": True,
+            "issues": [],
+            "features_count": 2,
+            "feature_names": ["G1", "G2"],
+            "deep_audit": {"latent_dim": 3},
+        }
+
+        with self.runner.isolated_filesystem():
+            Path("dummy.model").write_text("mock", encoding="utf-8")
+            Path("expected_features.txt").write_text("G1\nG2\n", encoding="utf-8")
+            result = self.runner.invoke(
+                cli_main,
+                [
+                    "model",
+                    "verify",
+                    "dummy.model",
+                    "--strict",
+                    "--expected-features-file",
+                    "expected_features.txt",
+                    "--expected-feature-count",
+                    "2",
+                    "--expected-latent-dim",
+                    "3",
+                    "--fail-on-unhealthy",
+                ],
+            )
+
+        self.assertEqual(result.exit_code, 0, msg=result.output)
+        self.assertIn("PASS: model integrity checks passed.", result.output)
 
 
 if __name__ == "__main__":

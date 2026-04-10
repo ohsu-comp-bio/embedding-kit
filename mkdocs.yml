@@ -2,6 +2,7 @@ site_name: Embedding-Kit
 nav:
   - Home: index.md
   - About: about.md
+  - Change Notes: change-notes.md
   - Core Concepts: concepts.md
   - Training Guide: training.md
   - CLI Reference: cli.md
@@ -13,6 +14,7 @@ nav:
       - Overview: api/index.md
       - Factory:
           - Overview: api/factory/index.md
+          - Decorators Example: examples/factory.md
       - Models:
           - Overview: api/models/index.md
           - VAE: api/models/vae.md
