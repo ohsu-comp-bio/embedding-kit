@@ -34,7 +34,7 @@ class Encoder(nn.Module):
                  batch_norm: bool = False,
                  default_activation: Union[str, None] = "relu",
                  make_latent_heads: bool = True,
-                 sampling : bool = False,
+                 sampling : bool = True,
                  constraint: Optional["NetworkConstraint"] = None,
                  device=None, dtype=None):
         super().__init__()
@@ -117,8 +117,9 @@ class Encoder(nn.Module):
                 std = torch.exp(0.5 * logvar)
                 eps = torch.randn_like(std)
                 z = mu + eps * std
-                return mu, logvar, z
-            return mu, logvar, h
+            else:
+                z = mu
+            return mu, logvar, z
 
         return h
     

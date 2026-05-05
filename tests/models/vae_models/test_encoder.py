@@ -111,6 +111,50 @@ class TestEncoder(unittest.TestCase):
         mu, logvar, z = enc(x)
         assert z.shape == (2, 2)
 
+    def test_sampling_enabled_z_differs_from_mu(self):
+        """When sampling=True, z should differ from mu due to reparameterization noise."""
+        torch.manual_seed(0)
+        enc = Encoder(feature_dim=8, latent_dim=4, layers=None, sampling=True)
+        enc.eval()  # eval mode doesn't disable sampling — it's controlled by the flag
+        x = torch.randn(16, 8)
+
+        mu, logvar, z = enc(x)
+
+        self.assertEqual(mu.shape, z.shape)
+        # With sampling enabled, z should NOT equal mu (reparameterization adds noise)
+        self.assertFalse(torch.allclose(z, mu),
+                         "z should differ from mu when sampling=True")
+
+    def test_sampling_disabled_z_equals_mu(self):
+        """When sampling=False, z should equal mu (no reparameterization noise)."""
+        enc = Encoder(feature_dim=8, latent_dim=4, layers=None, sampling=False)
+        x = torch.randn(16, 8)
+
+        mu, logvar, z = enc(x)
+
+        self.assertEqual(mu.shape, z.shape)
+        # With sampling disabled, z must be identical to mu
+        self.assertTrue(torch.allclose(z, mu),
+                        "z should equal mu when sampling=False")
+
+    def test_default_sampling_is_true(self):
+        """Encoder default should have sampling enabled for proper VAE training."""
+        enc = Encoder(feature_dim=6, latent_dim=3)
+        self.assertTrue(enc._sampling, "Default sampling should be True")
+
+    def test_forward_always_returns_three_tuple_with_latent_heads(self):
+        """forward() must always return (mu, logvar, z) when make_latent_heads=True."""
+        for sampling in (True, False):
+            enc = Encoder(feature_dim=6, latent_dim=3, sampling=sampling)
+            x = torch.randn(4, 6)
+            result = enc(x)
+            self.assertIsInstance(result, tuple)
+            self.assertEqual(len(result), 3,
+                             f"Expected 3-tuple with sampling={sampling}")
+            mu, logvar, z = result
+            self.assertEqual(mu.shape, z.shape)
+            self.assertEqual(mu.shape, logvar.shape)
+
 
 if __name__ == "__main__":
     unittest.main()
