@@ -39,12 +39,14 @@ class BaseVAE(nn.Module, ABC):
     def build_encoder(feature_dim: int, latent_dim: int,
                       layers: Optional[LayerList] = None,
                       batch_norm: bool = False,
+                      sampling: bool = True,
                       device=None, dtype=None) -> Encoder:
         return Encoder(
             feature_dim=feature_dim,
             latent_dim=latent_dim,
             layers=layers,
             batch_norm=batch_norm,
+            sampling=sampling,
             device=device, dtype=dtype
         )
 
@@ -73,11 +75,11 @@ class BaseVAE(nn.Module, ABC):
 
     def encode(self, x:torch.Tensor):
         """
-        Run encoder model and return encoded values
+        Run encoder model and return the latent mean (mu) for stable embeddings.
         """
         with torch.no_grad():
-            _, _, z = self.encoder(x)
-        return z
+            mu, _, _ = self.encoder(x)
+        return mu
 
     @abstractmethod
     def to_dict(self):
@@ -100,8 +102,8 @@ class SimpleEncoder(nn.Module):
         self.encoder = encoder
 
     def forward(self, x):
-        _, _, z = self.encoder(x)
-        return z
+        mu, _, _ = self.encoder(x)
+        return mu
 
 def _import_obj(dotted: str):
     """Import 'pkg.mod.ClassName' -> object."""

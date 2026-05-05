@@ -38,6 +38,7 @@ model = click.Group(name="model", help="VAE Model commands.")
 @click.option("--zero-mask", default=None, type=float)
 @click.option("--seed", default=42, type=int)
 @click.option("--bfloat16", is_flag=True)
+@click.option("--sampling/--no-sampling", default=True, show_default=True, help="Enable reparameterization sampling during training (VAE). Use --no-sampling for a standard autoencoder.")
 def train_vae(input_path: str,
               group: str,
               latent: int,
@@ -52,7 +53,8 @@ def train_vae(input_path: str,
               zero_mask: float,
               save_stats: bool,
               seed: int,
-              bfloat16: bool
+              bfloat16: bool,
+              sampling: bool
               ):
     """
     Train VAE model from a TSV file.
@@ -110,6 +112,7 @@ def train_vae(input_path: str,
               latent_dim=latent,
               encoder_layers=enc_layers_list,
               decoder_layers=dec_layers_list,
+              sampling=sampling,
               device=device, dtype=dtype)
 
     loss_func = bce_with_logits
@@ -228,6 +231,6 @@ def encode(input_path: str, model_path:str, normalize:str, out:str):
     m.to(get_device())
     result = m.encoder(df_tensor)
     
-    martix = result[2].detach().cpu().numpy()
-    out_df = pd.DataFrame(martix, index=df.index)
+    matrix = result[0].detach().cpu().numpy()
+    out_df = pd.DataFrame(matrix, index=df.index)
     out_df.to_csv(out, sep="\t")

@@ -48,6 +48,7 @@ embkit model train-vae INPUT_PATH [OPTIONS]
 | `--seed` | `42` | Random seed |
 | `--bfloat16` | false | Use bfloat16 dtype for reduced memory usage |
 | `--save-stats` | false | Save training statistics alongside the model |
+| `--sampling/--no-sampling` | `true` | Enable reparameterization sampling (VAE). Use `--no-sampling` for a standard autoencoder. |
 
 **Examples**
 
