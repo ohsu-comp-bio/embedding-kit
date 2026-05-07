@@ -148,6 +148,7 @@ def train_vae(input_path: str,
 @click.option("--normalize", "-n", type=str, default="none")
 @click.option("--learning-rate", "-r", type=float, default=0.0001)
 @click.option("--out", "-o", type=str, default=None)
+@click.option("--schedule", "-s", type=str, default=None, help="20:0,20:0.1,40:.3,40:.4")
 @click.option("--loss", type=click.Choice(["mse", "bce", "bce-logit"]), default="bce-logit")
 @click.option("--group-layer-size", default="5,2,1", show_default=True,
               help="Comma-separated per-group widths for NetVAE masked layers.")
@@ -157,6 +158,7 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
                 learning_rate: float,
                 loss:str,
                 group_layer_size: str,
+                schedule: str,
                 save_stats:bool):
     """Train VAE model from a TSV file."""
     df = pd.read_csv(input_path, sep="\t", index_col=0)
@@ -170,6 +172,13 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
         norm = ExpMinMaxScaler()
         norm.fit(df)
         df = pd.DataFrame( norm.transform(df), index=df.index, columns=df.columns)
+
+    beta_schedule = None
+    if schedule is not None:
+        beta_schedule = []
+        for b in schedule.split(","):
+            e, b = b.split(":")
+            beta_schedule.append( (float(b), int(e)) )
 
     batch_size=256
     dataloader = dataframe_loader(df, batch_size=batch_size)
@@ -189,9 +198,10 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
     elif loss == "bce":
         loss_func = bce
 
-    schedule = [(0.0, epochs)]
+    if beta_schedule is None:
+        beta_schedule = [(0.0, epochs)]
     vae = NetVAE(list(df.columns), latent_groups=feature_map, group_layer_size=gcounts)
-    fit_vae(vae, X=dataloader, beta_schedule=schedule, lr=learning_rate, loss=loss_func)
+    fit_vae(vae, X=dataloader, beta_schedule=beta_schedule, lr=learning_rate, loss=loss_func)
 
     click.echo("Training complete.")
 
