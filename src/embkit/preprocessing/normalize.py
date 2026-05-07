@@ -10,7 +10,7 @@ from typing import List
 from torch.utils.data import Dataset
 import torch
 
-def quantile_max_norm(df: pd.DataFrame, quantile_max=0.9):
+def quantile_max_norm(df: pd.DataFrame, quantile_max: float = 0.9) -> pd.DataFrame:
     """
     Normalizes the DataFrame using Quantile Max normalization.
 
@@ -24,7 +24,7 @@ def quantile_max_norm(df: pd.DataFrame, quantile_max=0.9):
     norm_df = (df.transpose() / df.quantile(quantile_max, axis=1)).transpose().clip(upper=1.0, lower=0.0).fillna(0.0)
     return norm_df
 
-def exp_max_norm(df: pd.DataFrame):
+def exp_max_norm(df: pd.DataFrame) -> pd.DataFrame:
     """
     exp_max_norm
 
@@ -41,11 +41,11 @@ class ExpMinMaxScaler(MinMaxScaler, BaseEstimator):
     MinMaxScaler to it. This allows for normalization of data with different scales,
     especially when dealing with non-negative values where logarithmic transformation can help.
     """
-    def fit(self, X: pd.DataFrame):
+    def fit(self, X: pd.DataFrame) -> "ExpMinMaxScaler":
         return MinMaxScaler.fit(self, np.log2(X+1))
-    def transform(self, X):
+    def transform(self, X: pd.DataFrame) -> np.ndarray:
         return MinMaxScaler.transform(self, np.log2(X+1))
-    def inverse_transform(self, X):
+    def inverse_transform(self, X: np.ndarray) -> np.ndarray:
         return np.exp2(MinMaxScaler.inverse_transform(self, X))-1
 
 def get_dataset_nonzero_mask(d: Dataset, threshold: float) -> List[torch.Tensor]:

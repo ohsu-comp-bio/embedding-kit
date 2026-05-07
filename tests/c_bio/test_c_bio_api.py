@@ -20,8 +20,10 @@ class TestCBIOAPI(unittest.TestCase):
     def test_list_studies_request_exception(self, mock_get):
         mock_get.side_effect = requests.RequestException("Network error")
 
-        result = CBIOAPI.list_studies()
-        self.assertIsNone(result)
+        with self.assertLogs("embkit.c_bio.api", level="ERROR") as cm:
+            result = CBIOAPI.list_studies()
+            self.assertIsNone(result)
+            self.assertTrue(any("Error fetching studies: Network error" in log for log in cm.output))
 
     @patch("embkit.c_bio.api.requests.get")
     def test_list_studies_json_exception(self, mock_get):
