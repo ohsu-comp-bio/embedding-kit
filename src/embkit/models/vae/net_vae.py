@@ -37,7 +37,7 @@ class NetVAE(BaseVAE):
             features: List[str],
             latent_groups: Dict[str, List[str]],
             latent_index: Optional[List[str]] = None,
-            group_layer_size: Optional[List[int]] = None,
+            group_layer_scale: Optional[List[int]] = None,
             batch_norm: bool = False,
             device: Optional[torch.device] = None,
             dtype: Optional[torch.dtype] = None,
@@ -45,11 +45,11 @@ class NetVAE(BaseVAE):
         if not latent_groups:
             raise ValueError("latent_groups cannot be empty for NetVAE.")
 
-        if group_layer_size is None:
-            group_layer_size = [1, 1]
-        group_layer_size = [int(v) for v in group_layer_size]
-        if any(v <= 0 for v in group_layer_size):
-            raise ValueError(f"group_layer_size must contain positive integers, got {group_layer_size}.")
+        if group_layer_scale is None:
+            group_layer_scale= [1, 1]
+        group_layer_scale = [int(v) for v in group_layer_scale]
+        if any(v <= 0 for v in group_layer_scale):
+            raise ValueError(f"group_layer_scale must contain positive integers, got {group_layer_scale}.")
 
         if latent_index is None:
             _, group_idx = build_feature_map_indices(latent_groups)
@@ -65,18 +65,18 @@ class NetVAE(BaseVAE):
         # Encoder: features -> groups*s0 -> groups*s1 -> ... -> groups*sN
         enc_layers = [
             factory.Layer(
-                units=latent_size * group_layer_size[0],
+                units=latent_size * group_layer_scale[0],
                 op="masked_linear",
                 constraint=PathwayConstraintInfo(
                     "features-to-group",
                     feature_map=latent_groups,
                     feature_index=feature_list,
                     group_index=latent_index,
-                    out_group_scaling=group_layer_size[0],
+                    out_group_scaling=group_layer_scale[0],
                 ),
             )
         ]
-        for in_scale, out_scale in zip(group_layer_size[:-1], group_layer_size[1:]):
+        for in_scale, out_scale in zip(group_layer_scale[:-1], group_layer_scale[1:]):
             enc_layers.append(
                 factory.Layer(
                     units=latent_size * out_scale,
@@ -94,7 +94,7 @@ class NetVAE(BaseVAE):
 
         # Decoder: groups*sN -> ... -> groups*s1 -> groups*s0 -> features
         dec_layers = []
-        for in_scale, out_scale in zip(reversed(group_layer_size[1:]), reversed(group_layer_size[:-1])):
+        for in_scale, out_scale in zip(reversed(group_layer_scale[1:]), reversed(group_layer_scale[:-1])):
             dec_layers.append(
                 factory.Layer(
                     units=latent_size * out_scale,
@@ -118,7 +118,7 @@ class NetVAE(BaseVAE):
                     feature_map=latent_groups,
                     feature_index=feature_list,
                     group_index=latent_index,
-                    in_group_scaling=group_layer_size[0],
+                    in_group_scaling=group_layer_scale[0],
                 ),
                 activation="none",
             )
@@ -143,7 +143,7 @@ class NetVAE(BaseVAE):
         super().__init__(features=feature_list, encoder=encoder, decoder=decoder)
         self.latent_groups: Dict[str, List[str]] = latent_groups
         self.latent_index: List[str] = latent_index
-        self.group_layer_size: List[int] = list(group_layer_size)
+        self.group_layer_scale: List[int] = list(group_layer_scale)
         self.history: Dict[str, List[float]] = {}
         self.normal_stats: Optional[pd.DataFrame] = None
 
@@ -268,18 +268,12 @@ class NetVAE(BaseVAE):
             "features": self.features,
             "latent_groups": self.latent_groups,
             "latent_index": self.latent_index,
-            "group_layer_size": self.group_layer_size,
+            "group_layer_scale": self.group_layer_scale,
             "history": getattr(self, "history", {}) or {}
         }
 
     @classmethod
     def from_dict(cls, d):
-        if "group_layer_scaling" in d and "group_layer_size" not in d:
-            raise ValueError(
-                "NetVAE config uses deprecated key 'group_layer_scaling'. "
-                "Use 'group_layer_size' instead."
-            )
-
         features = d.get("features")
         if features is None:
             fmap = d.get("latent_groups") or {}
@@ -292,7 +286,7 @@ class NetVAE(BaseVAE):
             features=features,
             latent_groups=d.get("latent_groups"),
             latent_index=d.get("latent_index"),
-            group_layer_size=d.get("group_layer_size"),
+            group_layer_scale=d.get("group_layer_scale"),
         )
         model.history = d.get("history") or {}
         return model

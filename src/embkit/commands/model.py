@@ -150,21 +150,23 @@ def train_vae(input_path: str,
 @click.option("--out", "-o", type=str, default=None)
 @click.option("--schedule", "-s", type=str, default=None, help="20:0,20:0.1,40:.3,40:.4")
 @click.option("--loss", type=click.Choice(["mse", "bce", "bce-logit"]), default="bce-logit")
-@click.option("--group-layer-size", default="5,2,1", show_default=True,
+@click.option("--min-group-size", type=int, default=0, show_default=True, help="Minimum group size filter for pathway feature map (including self if present).")
+@click.option("--group-layer-scale", default="5,2,1", show_default=True,
               help="Comma-separated per-group widths for NetVAE masked layers.")
 @click.option("--save-stats", is_flag=True)
 def train_netvae(input_path: str, pathway_sif:str, out:str,
                 epochs: int, normalize: str,
                 learning_rate: float,
                 loss:str,
-                group_layer_size: str,
+                group_layer_scale: str,
+                min_group_size: int,
                 schedule: str,
                 save_stats:bool):
     """Train VAE model from a TSV file."""
     df = pd.read_csv(input_path, sep="\t", index_col=0)
 
     feature_map = extract_sif_interactions(pathway_sif)
-    feature_map = feature_map_intersect(feature_map, df.columns)
+    feature_map = feature_map_intersect(feature_map, df.columns, min_group_size=min_group_size)
     feature_idx, group_idx = build_feature_map_indices(feature_map)
 
     df = df[feature_idx]
@@ -188,9 +190,9 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
 
     click.echo(f"Feature count {feature_count} latent_size: {group_count}")
 
-    gcounts = [int(v.strip()) for v in group_layer_size.split(",") if v.strip()]
+    gcounts = [int(v.strip()) for v in group_layer_scale.split(",") if v.strip()]
     if not gcounts or any(v <= 0 for v in gcounts):
-        raise click.BadParameter("--group-layer-size must contain one or more positive integers.")
+        raise click.BadParameter("--group-layer-scale must contain one or more positive integers.")
 
     loss_func = bce_with_logits
     if loss == "mse":
@@ -200,7 +202,7 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
 
     if beta_schedule is None:
         beta_schedule = [(0.0, epochs)]
-    vae = NetVAE(list(df.columns), latent_groups=feature_map, group_layer_size=gcounts)
+    vae = NetVAE(list(df.columns), latent_groups=feature_map, group_layer_scale=gcounts)
     fit_vae(vae, X=dataloader, beta_schedule=beta_schedule, lr=learning_rate, loss=loss_func)
 
     click.echo("Training complete.")

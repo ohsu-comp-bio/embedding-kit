@@ -143,6 +143,17 @@ def feature_map_intersect(
             out_map[src] = filtered_members
     return out_map
 
+def feature_map_link_filter(
+                feature_map: Dict[str, List[str]],
+                min_group_size: int = 2) -> Dict[str, List[str]]:
+    """Filter a feature map to only include groups that have at least `min_group_size` members (including self if present)"""
+    out_map = {}
+    for src, members in feature_map.items():
+        unique_members = set(members)
+        if len(unique_members) >= min_group_size:
+            out_map[src] = members
+    return out_map
+
 def build_feature_map_indices(
         feature_map: Dict[str, List[str]]) -> Tuple[pd.Index, pd.Index]:
     """
