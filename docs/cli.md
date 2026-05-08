@@ -49,6 +49,8 @@ embkit model train-vae INPUT_PATH [OPTIONS]
 | `--bfloat16` | false | Use bfloat16 dtype for reduced memory usage |
 | `--save-stats` | false | Save training statistics alongside the model |
 
+For HDF5 input (`--group`), normalization must be `none`.
+
 **Examples**
 
 ```bash
@@ -92,13 +94,14 @@ embkit model train-netvae INPUT_PATH PATHWAY_SIF [OPTIONS]
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--epochs`, `-e` | `20` | Number of training epochs |
-| `--encode-layers` | `400,200` | Encoder hidden layer sizes |
-| `--decode-layers` | `200,400` | Decoder hidden layer sizes |
 | `--normalize`, `-n` | `none` | Pre-normalization: `none`, `expMinMax` |
 | `--learning-rate`, `-r` | `0.0001` | Adam learning rate |
 | `--out`, `-o` | — | Output model file path |
 | `--loss` | `bce-logit` | Loss function: `mse`, `bce`, `bce-logit` |
+| `--group-layer-size` | `5,2,1` | Comma-separated per-group widths for masked NetVAE layers |
 | `--save-stats` | false | Save training statistics |
+
+`NetVAE` now accepts only `group_layer_size` in model configs/serialization. The legacy alias `group_layer_scaling` has been removed.
 
 **Example**
 
@@ -141,6 +144,54 @@ embkit model encode data/test.tsv vae.model --out test_embeddings.tsv
 
 ---
 
+### model verify
+
+Run integrity/sanity checks on a saved model artifact.
+
+```bash
+embkit model verify MODEL_PATH [OPTIONS]
+```
+
+This command is intended as a **sanity audit** (numerical health, mask leakage, architecture consistency), not cryptographic provenance validation.
+
+**Arguments**
+
+| Argument | Description |
+|----------|-------------|
+| `MODEL_PATH` | Path to a saved model file |
+
+**Options**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--json` | false | Emit machine-readable JSON report |
+| `--ci` | false | CI mode (`--json` + fail on unhealthy) |
+| `--fail-on-unhealthy` | false | Exit non-zero when report is unhealthy |
+| `--strict` | false | Enable strict identity checks |
+| `--expected-feature-count` | — | Required feature count in strict mode |
+| `--expected-latent-dim` | — | Required latent dim in strict mode |
+| `--expected-features-file` | — | Newline-delimited expected feature list in strict mode |
+
+**Examples**
+
+```bash
+# Human-readable summary
+embkit model verify netvae.model
+
+# CI-safe machine output (fails on unhealthy)
+embkit model verify netvae.model --ci
+
+# Strict shape/feature identity checks
+embkit model verify netvae.model \
+  --strict \
+  --expected-feature-count 15425 \
+  --expected-latent-dim 2061 \
+  --expected-features-file expected_features.txt \
+  --fail-on-unhealthy
+```
+
+---
+
 ## matrix
 
 Commands for working with feature matrices.
@@ -176,6 +227,33 @@ embkit matrix normalize SRCS... --out OUTPUT [OPTIONS]
 embkit matrix normalize cohort1.tsv cohort2.tsv \
     --out combined.normalized.tsv \
     --quantile-max 0.9
+```
+
+### matrix pca
+
+Run PCA on a TSV matrix and write principal components to TSV.
+
+```bash
+embkit matrix pca INPUT_PATH --pca-size N [OPTIONS]
+```
+
+**Arguments**
+
+| Argument | Description |
+|----------|-------------|
+| `INPUT_PATH` | Input `.tsv` matrix path |
+
+**Options**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--pca-size` | required | Number of principal components |
+| `--out`, `-o` | auto-named | Output TSV path (`<input_stem>.pca.tsv`) |
+
+**Example**
+
+```bash
+embkit matrix pca data/rna.tsv --pca-size 64 --out rna.pca.tsv
 ```
 
 ---

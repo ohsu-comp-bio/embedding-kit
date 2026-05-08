@@ -1,1 +1,7 @@
-from .network_constraint import NetworkConstraint
+"""
+Constraint entry points.
+"""
+
+from .pathway_constraint import PathwayConstraintInfo
+
+__all__ = ["PathwayConstraintInfo"]

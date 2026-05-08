@@ -2,6 +2,7 @@
 
 import unittest
 import tempfile
+import os
 from pathlib import Path
 from unittest import mock
 
@@ -16,11 +17,12 @@ class DummyDataset(Resource):
 
 class TestDatasetBase(unittest.TestCase):
     def test_default_save_path_created(self):
-        # When save_path is None, a default .embkit dir under HOME should be created
-        ds = DummyDataset(name="tmp", save_path=None, download=False)
-        self.assertTrue(ds.save_path.exists())
-        # Ensure it is a directory
-        self.assertTrue(ds.save_path.is_dir())
+        with tempfile.TemporaryDirectory() as td:
+            embkit_home = Path(td) / "embkit-home"
+            with mock.patch.dict(os.environ, {"EMBKIT_HOME": str(embkit_home)}):
+                ds = DummyDataset(name="tmp", save_path=None, download=False)
+            self.assertTrue(ds.save_path.exists())
+            self.assertTrue(ds.save_path.is_dir())
 
     def test_custom_save_path(self):
         with tempfile.TemporaryDirectory() as td:

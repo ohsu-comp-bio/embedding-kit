@@ -18,11 +18,12 @@ class DummyDataset(Resource):
 
 class TestDatasetBase(unittest.TestCase):
     def test_default_save_path_created(self):
-        ds = DummyDataset(name="test", save_path=None, download=False)
-        # Should create a .embkit directory in home
-        default_dir = Path(Path.home(), ".embkit")
-        self.assertTrue(ds.save_path == default_dir)
-        self.assertTrue(ds.save_path.is_dir())
+        with tempfile.TemporaryDirectory() as tmpdir:
+            embkit_home = Path(tmpdir) / "embkit-home"
+            with mock.patch.dict(os.environ, {"EMBKIT_HOME": str(embkit_home)}):
+                ds = DummyDataset(name="test", save_path=None, download=False)
+            self.assertEqual(ds.save_path.resolve(), embkit_home.resolve())
+            self.assertTrue(ds.save_path.is_dir())
 
     def test_custom_save_path_created(self):
         with tempfile.TemporaryDirectory() as td:
@@ -31,10 +32,13 @@ class TestDatasetBase(unittest.TestCase):
             self.assertTrue(ds.save_path.is_dir())
 
     def test_str_representation(self):
-        ds = DummyDataset(name="test", save_path=None, download=False)
-        s = str(ds)
-        self.assertIn(str(ds.save_path), s)
-        self.assertIn("Unpacked file", s)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            embkit_home = Path(tmpdir) / "embkit-home"
+            with mock.patch.dict(os.environ, {"EMBKIT_HOME": str(embkit_home)}):
+                ds = DummyDataset(name="test", save_path=None, download=False)
+            s = str(ds)
+            self.assertIn(str(ds.save_path), s)
+            self.assertIn("Unpacked file", s)
 
 
 class TestGTExDownloader(unittest.TestCase):

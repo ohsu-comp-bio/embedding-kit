@@ -18,13 +18,14 @@ from ..encoding.protein import ProteinEncoder
 protein = click.Group(name="protein", help="Protein commands.")
 
 def fasta_reader(path, filter=None):
-    for record in SeqIO.parse(path, "fasta"):
-        use = True
-        if filter is not None:
-            if not re.match(filter, record.id):
-                use = False
-        if use:
-            yield (record.id, str(record.seq))
+    with open(path, "rt") as handle:
+        for record in SeqIO.parse(handle, "fasta"):
+            use = True
+            if filter is not None:
+                if not re.match(filter, record.id):
+                    use = False
+            if use:
+                yield (record.id, str(record.seq))
 
 def stringify(l:List[float], trim=None) -> List[str]:
     out = []
@@ -50,8 +51,10 @@ def encode(fasta: str, filter:str, batch_size:int, model:str, trim:int, pool:str
         "sum" : "sum-pool"
     }
     out = sys.stdout
+    should_close = False
     if output is not None:
         out = open(output, "wt")
+        should_close = True
 
     enc = ProteinEncoder(batch_size=batch_size, model=model)
     enc.to(get_device())
@@ -68,4 +71,5 @@ def encode(fasta: str, filter:str, batch_size:int, model:str, trim:int, pool:str
         for i, emb in enc.encode(fasta_reader(fasta, filter=filter), output=pool_map[pool]):
             out.write( f"{i}\t" + "\t".join(stringify(emb.tolist(), trim)))
             out.write("\n")
-    out.close()
+    if should_close:
+        out.close()

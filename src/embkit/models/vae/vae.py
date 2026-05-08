@@ -87,16 +87,18 @@ class VAE(BaseVAE):
             "latent_dim": self.latent_dim,
             "encoder_layers": self._layers_to_dict(self._encoder_layers_cfg),
             "decoder_layers": self._layers_to_dict(self._decoder_layers_cfg),
-            "batch_norm": self._batch_norm
+            "batch_norm": self._batch_norm,
+            "history": getattr(self, "history", {}) or {}
         }
 
     @classmethod
     def from_dict(cls, desc):
-        return VAE(
+        model = VAE(
             features=desc["features"],
             latent_dim=desc["latent_dim"],
             encoder_layers=LayerList([Layer.from_dict(li) for li in (desc.get("encoder_layers") or [])]),
             decoder_layers=LayerList([Layer.from_dict(li) for li in (desc.get("decoder_layers") or [])]),
             batch_norm=desc.get("batch_norm", False)
         )
-
+        model.history = desc.get("history") or {}
+        return model

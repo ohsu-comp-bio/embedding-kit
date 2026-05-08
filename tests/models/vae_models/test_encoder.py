@@ -5,7 +5,7 @@ from torch import nn
 from embkit.models.vae.encoder import Encoder
 from embkit.factory.layers import Layer, LayerList
 from embkit.modules import MaskedLinear
-from embkit.constraints import NetworkConstraint
+from embkit.constraints import PathwayConstraintInfo
 
 
 class TestEncoder(unittest.TestCase):
@@ -46,12 +46,17 @@ class TestEncoder(unittest.TestCase):
 
     def test_encoder_initializes_with_constraint_and_sets_mask(self):
         feature_index = ["f1", "f2"]
-        latent_index = ["z1", "z2"]  # updated to 2 rows
+        latent_index = ["z1", "z2"]
         latent_membership = {
             "z1": ["f1"],
-            "z2": ["f2"]
+            "z2": ["f2"],
         }
-        constraint = NetworkConstraint(feature_index, latent_index, latent_membership)
+        constraint = PathwayConstraintInfo(
+            "features-to-group",
+            feature_map=latent_membership,
+            feature_index=feature_index,
+            group_index=latent_index,
+        )
 
         layers = LayerList([Layer(units=2, op="masked_linear")])  # matches latent_index length
         enc = Encoder(feature_dim=2, latent_dim=2, layers=layers, constraint=constraint)

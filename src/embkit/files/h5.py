@@ -2,31 +2,39 @@ import h5py
 
 import numpy as np
 import pandas as pd
-import numpy as np
 import torch
 from torch.utils.data import Dataset
 
 
-class H5Reader(Dataset):
+def _decode_index(values):
+    return pd.Index(v.decode("utf-8") if isinstance(v, (bytes, bytearray)) else str(v) for v in values)
+
+
+class _H5BaseReader(Dataset):
     def __init__(self, filename, group, device="cpu"):
         self.hfile = h5py.File(filename)
         self.group = group
         self.data = self.hfile[self.group]["X"]
-        self.index = pd.Index(i.decode("utf-8") for i in self.hfile[self.group]["obs/_index"])
-        self.columns = pd.Index(i.decode("utf-8") for i in self.hfile[self.group]["var/_index"])
+        self.index = _decode_index(self.hfile[self.group]["obs/_index"])
         self.shape = self.data.shape
         self.dest_device = device
 
     def __len__(self):
         return self.shape[0]
-    
+
     def to(self, dev):
         self.dest_device = dev
 
     def __getitem__(self, idx):
-        x_sample = np.nan_to_num( self.data[idx] )
+        x_sample = np.nan_to_num(self.data[idx])
         x_tensor = torch.from_numpy(x_sample).float()
-        return (x_tensor.to(self.dest_device), )
+        return (x_tensor.to(self.dest_device),)
+
+
+class H5Reader(_H5BaseReader):
+    def __init__(self, filename, group, device="cpu"):
+        super().__init__(filename, group, device=device)
+        self.columns = _decode_index(self.hfile[self.group]["var/_index"])
 
 class H5Writer:
     def __init__(self, filename, group, index, columns):
@@ -102,30 +110,13 @@ class H5CubeWriter:
     def close(self):
         self.h5f.close()
 
-# TODO: find better way to abstract this with H5Reader
-class H5CubeReader:
+class H5CubeReader(_H5BaseReader):
     """
     Store indexed set of 2d matrices
     """
 
     def __init__(self, filename, group, device="cpu"):
-        self.hfile = h5py.File(filename)
-        self.group = group
-        self.data = self.hfile[self.group]["X"]
-        self.index = pd.Index(i.decode("utf-8") for i in self.hfile[self.group]["obs/_index"])
-        self.shape = self.data.shape
-        self.dest_device = device
-
-    def __len__(self):
-        return self.shape[0]
-    
-    def to(self, dev):
-        self.dest_device = dev
+        super().__init__(filename, group, device=device)
     
     def get_loc(self, name):
         return self.index.get_loc(name)
-
-    def __getitem__(self, idx):
-        x_sample = np.nan_to_num( self.data[idx] )
-        x_tensor = torch.from_numpy(x_sample).float()
-        return (x_tensor.to(self.dest_device), )

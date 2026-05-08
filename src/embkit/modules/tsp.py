@@ -1,8 +1,11 @@
 import time
+import logging
 
 import torch
 import torch.nn as nn
 from typing import Iterable, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class TSPLayer(nn.Module):
@@ -75,7 +78,8 @@ class TSPLayer(nn.Module):
         return votes  # [B, K]
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
+    logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
     start_time = time.time()
     # Config
     D = 20_000  # number of features
@@ -94,10 +98,10 @@ if __name__ == "__main__":
     x = torch.randn(B, D, dtype=torch.float32)
 
     votes = layer(x)
-    print("x shape:", x.shape)
-    print("num pairs:", len(vpairs))
-    print("votes shape:", votes.shape)
-    print(votes)
+    logger.info("x shape: %s", tuple(x.shape))
+    logger.info("num pairs: %d", len(vpairs))
+    logger.info("votes shape: %s", tuple(votes.shape))
+    logger.info("votes sample: %s", votes)
 
     end_time = time.time()
-    print(f'Elapsed time: {end_time - start_time:.2f} seconds.')
+    logger.info("Elapsed time: %.2f seconds.", end_time - start_time)

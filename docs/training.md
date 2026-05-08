@@ -159,6 +159,8 @@ plt.tight_layout()
 plt.show()
 ```
 
+Training history is persisted into saved model artifacts (when present), and is consumed by `model verify` to report whether loss trends improved over the training trace.
+
 ---
 
 ## General supervised training: fit
@@ -220,3 +222,7 @@ vae2 = load("model.file")
 ```
 
 The model file stores both weights and architecture. See [Factory API](api/factory/index.md) for details.
+
+### Constraint-safe serialization
+
+If a model contains constrained `MaskedLinear` layers, Embedding Kit clamps masked weights during `save(...)` before writing the checkpoint. This ensures the serialized raw parameters obey the constraint exactly, even if optimizer state previously introduced drift into blocked entries.

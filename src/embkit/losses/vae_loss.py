@@ -101,8 +101,13 @@ def net_vae_loss(model: "BaseVAE", x: torch.Tensor, beta: float = 1.0) -> Tuple[
     """
     mu, logvar, z = model.encoder(x)
     reconstruction = model.decoder(z)
-    # keras: x.shape[1] * binary_crossentropy(x, reconstruction)
-    bce_per_sample = F.binary_cross_entropy(reconstruction, x, reduction="none").mean(dim=1)
+    # If decoder output is logits, use BCE-with-logits; otherwise use BCE on probabilities.
+    recon_min = float(reconstruction.detach().min())
+    recon_max = float(reconstruction.detach().max())
+    if recon_min < 0.0 or recon_max > 1.0:
+        bce_per_sample = F.binary_cross_entropy_with_logits(reconstruction, x, reduction="none").mean(dim=1)
+    else:
+        bce_per_sample = F.binary_cross_entropy(reconstruction, x, reduction="none").mean(dim=1)
     reconstruction_loss = x.size(1) * bce_per_sample
     kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp(), dim=1)
     total_loss = reconstruction_loss + beta * kl_loss

@@ -37,6 +37,25 @@ The command:
 4. Builds encoder/decoder layers with `MaskedLinear` (connections not in the pathway are zeroed)
 5. Trains and saves the model
 
+### Optional: verify constraint integrity
+
+After training, you can run an explicit integrity audit:
+
+```bash
+embkit model verify netvae.model --ci
+```
+
+For strict identity checks against expected model shape and features:
+
+```bash
+embkit model verify netvae.model \
+    --strict \
+    --expected-feature-count 15425 \
+    --expected-latent-dim 2061 \
+    --expected-features-file expected_features.txt \
+    --fail-on-unhealthy
+```
+
 ---
 
 ## Python API
@@ -77,7 +96,7 @@ Each `Layer` uses `op="masked_linear"` with `PathwayConstraintInfo` that describ
 
 ```python
 from embkit.factory.layers import Layer
-from embkit.pathway import PathwayConstraintInfo
+from embkit.constraints import PathwayConstraintInfo
 from embkit import dataframe_loader
 
 # How many nodes per group at each encoder depth
@@ -172,3 +191,4 @@ The embedding has one column per pathway group, making it directly interpretable
 - The intersection step (`feature_map_intersect`) intersects genes/features (columns) with the pathway file and drops genes that are not present there, subsetting the matrix columns accordingly. Check `isect` before training to see how many genes are retained.
 - `gcounts` controls the number of hidden nodes per group at each depth. More nodes = more expressiveness per group but larger model.
 - The `VAE` built above supports `factory.save` / `factory.load` serialization. The `NetVAE` class (used by the CLI) also supports serialization via `factory.save` / `factory.load`.
+- Constraint class naming is canonicalized to `PathwayConstraintInfo`. The legacy alias `PathwayControlConstraint` has been removed.

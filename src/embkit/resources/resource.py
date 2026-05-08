@@ -29,10 +29,20 @@ class Resource(os.PathLike[str]):
         self.name = name
 
         if save_path is None:
-            # Use default repository directory under home
-            default_path = Path(Path.home(), REPO_DIR)
-            default_path.mkdir(parents=True, exist_ok=True)
-            self.save_path = default_path
+            # Use default repository directory under home (overridable by EMBKIT_HOME).
+            env_home = os.environ.get("EMBKIT_HOME")
+            default_path = Path(env_home) if env_home else Path(Path.home(), REPO_DIR)
+            try:
+                default_path.mkdir(parents=True, exist_ok=True)
+                self.save_path = default_path
+            except PermissionError:
+                fallback = Path(tempfile.mkdtemp(prefix="embkit-"))
+                warnings.warn(
+                    f"Could not create default resource path '{default_path}'. "
+                    f"Falling back to temporary directory '{fallback}'.",
+                    stacklevel=2,
+                )
+                self.save_path = fallback
         else:
             logger.debug(f"Using save_path={save_path}")
             self.save_path = Path(save_path)
@@ -42,8 +52,8 @@ class Resource(os.PathLike[str]):
             try:
                 self.download()
                 self._download_called_from_init = True
-            except Exception as e:
-                logger.error(e)
+            except (RuntimeError, requests.RequestException, OSError, ValueError) as e:
+                logger.error("Download failed for resource '%s': %s", self.name, e)
         else:
             # When not downloading, set target file based on the resolved save_path
             target_file: Path = Path(self.save_path, self.name)
@@ -117,12 +127,15 @@ class SingleFileDownloader(Resource):
             # Use a temporary file
             with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
                 tmp_path = Path(tmp_file.name)
+                # disable tqdm in CI environments
+                is_ci = os.environ.get("GITHUB_ACTIONS") == "true"
                 with tqdm(
                     desc=f"Downloading {self.name}",
                     total=total_size,
                     unit="B",
                     unit_scale=True,
                     unit_divisor=1024,
+                    disable=is_ci,
                 ) as bar:
                     for chunk in response.iter_content(chunk_size=8192):
                         if chunk:
