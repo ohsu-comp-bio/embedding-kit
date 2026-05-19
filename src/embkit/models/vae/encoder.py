@@ -113,7 +113,7 @@ class Encoder(nn.Module):
         if self._make_latent_heads and (self.z_mean is not None) and (self.z_log_var is not None):
             mu = self.z_mean(h)
             logvar = self.z_log_var(h)
-            if self._sampling:
+            if self._sampling and self.training:
                 std = torch.exp(0.5 * logvar)
                 eps = torch.randn_like(std)
                 z = mu + eps * std
