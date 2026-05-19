@@ -111,19 +111,19 @@ class TestEncoder(unittest.TestCase):
         mu, logvar, z = enc(x)
         assert z.shape == (2, 2)
 
-    def test_sampling_enabled_z_differs_from_mu(self):
-        """When sampling=True, z should differ from mu due to reparameterization noise."""
+    def test_sampling_enabled_eval_z_same_as_mu(self):
+        """When sampling=True and eval mode is true, z should not differ from mu, sampling is only on during training."""
         torch.manual_seed(0)
         enc = Encoder(feature_dim=8, latent_dim=4, layers=None, sampling=True)
-        enc.eval()  # eval mode doesn't disable sampling — it's controlled by the flag
+        enc.eval()  # eval mode disables sampling
         x = torch.randn(16, 8)
 
         mu, logvar, z = enc(x)
 
         self.assertEqual(mu.shape, z.shape)
-        # With sampling enabled, z should NOT equal mu (reparameterization adds noise)
-        self.assertFalse(torch.allclose(z, mu),
-                         "z should differ from mu when sampling=True")
+        # With sampling enabled, z should equal mu (reparameterization is disabled durning eval)
+        self.assertTrue(torch.allclose(z, mu),
+                         "z should not differ from mu when sampling=True and Eval mode is on")
 
     def test_sampling_disabled_z_equals_mu(self):
         """When sampling=False, z should equal mu (no reparameterization noise)."""
