@@ -25,6 +25,7 @@ class VAE(BaseVAE):
             encoder_layers: Optional[LayerList] = None,
             decoder_layers: Optional[LayerList] = None,
             batch_norm: bool = False,
+            sampling: bool = True,
             device: Optional[torch.device] = None,
             dtype: Optional[torch.dtype] = None
     ):
@@ -35,6 +36,8 @@ class VAE(BaseVAE):
             encoder_layers: list of layer configs for Encoder
             decoder_layers: list of layer configs for Decoder
             batch_norm: enable encoder batch normalization blocks
+            sampling: enable reparameterization sampling during the forward pass (VAE).
+                      Set to False for a deterministic autoencoder (mu is used as z).
             device: torch device used for module initialization
             dtype: torch dtype used for module initialization
         """
@@ -52,6 +55,7 @@ class VAE(BaseVAE):
         self._encoder_layers_cfg = encoder_layers
         self._decoder_layers_cfg = decoder_layers
         self._batch_norm = batch_norm
+        self._sampling = sampling
         self.latent_dim = latent_dim
 
         feature_dim = len(features)
@@ -63,6 +67,7 @@ class VAE(BaseVAE):
             latent_dim=latent_dim,
             layers=encoder_layers,
             batch_norm=batch_norm,
+            sampling=sampling,
             device=device, dtype=dtype
         )
         self.decoder = self.build_decoder(
@@ -87,7 +92,8 @@ class VAE(BaseVAE):
             "latent_dim": self.latent_dim,
             "encoder_layers": self._layers_to_dict(self._encoder_layers_cfg),
             "decoder_layers": self._layers_to_dict(self._decoder_layers_cfg),
-            "batch_norm": self._batch_norm
+            "batch_norm": self._batch_norm,
+            "sampling": self._sampling,
         }
 
     @classmethod
@@ -97,6 +103,7 @@ class VAE(BaseVAE):
             latent_dim=desc["latent_dim"],
             encoder_layers=LayerList([Layer.from_dict(li) for li in (desc.get("encoder_layers") or [])]),
             decoder_layers=LayerList([Layer.from_dict(li) for li in (desc.get("decoder_layers") or [])]),
-            batch_norm=desc.get("batch_norm", False)
+            batch_norm=desc.get("batch_norm", False),
+            sampling=desc.get("sampling", True),
         )
 
