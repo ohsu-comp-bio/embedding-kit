@@ -36,10 +36,14 @@ def row_format(row):
         "alt" : ",".join( str(i) for i in row.ALT)
     }
 
-def vcf_to_dataframe(vcf_reader):
+def vcf_to_dataframe(vcf_reader, row_filter=None):
+    """
+    vcf_to_dataframe take a PyVCF reader and create a pandas DataFrame
+    """
     vals = []
     for record in vcf_reader:
-        vals.append( row_format(record) )
+        if row_filter is None or row_filter(record):
+            vals.append( row_format(record) )
     return pd.DataFrame(vals)
 
 def vectorize_variant_count( variant_df, bin_size=1000000, seq_col="chr", pos_col="pos"):
