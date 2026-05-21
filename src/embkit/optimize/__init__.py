@@ -14,6 +14,8 @@ from torch import nn
 from torch.optim import Adam
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 from tqdm.autonotebook import tqdm
+import numpy as np
+from ..losses import net_vae_loss
 
 from .. import get_device, dataframe_loader
 
@@ -359,9 +361,6 @@ def fit_net_vae(
     TODO: when this behavior is promoted to first-class CLI/config support,
     unify this implementation with ``fit_vae`` to avoid long-term duplication.
     """
-
-    import numpy as np
-    from ..losses import net_vae_loss
 
     if isinstance(X, torch.Tensor):
         if not getattr(model, "features", None):
