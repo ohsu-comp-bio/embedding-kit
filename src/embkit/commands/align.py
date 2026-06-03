@@ -25,6 +25,6 @@ def pair(matrix1, matrix2, method, cutoff):
     m2 = pd.read_csv(matrix2, sep="\t", index_col=0)
     
     if method == "linear":
-        out = matrix_spearman_alignment_linear(m1, m2, cutoff)
-        for k, v in out.items():
-            print(f"{k}\t{v[0]}\t{v[1]}")
+        out_a, out_b, out_score = matrix_spearman_alignment_linear(m1, m2, cutoff)
+        for a_id, b_id, score in zip(out_a, out_b, out_score):
+            click.echo(f"{a_id}\t{b_id}\t{score}")

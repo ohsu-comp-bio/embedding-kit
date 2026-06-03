@@ -1,4 +1,7 @@
 import requests
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class CBIOAPI:
@@ -9,5 +12,5 @@ class CBIOAPI:
             studies = requests.get("https://www.cbioportal.org/api/studies").json()
             return studies
         except requests.RequestException as e:
-            print(f"Error fetching studies: {e}")
+            logger.error("Error fetching studies: %s", e)
             return None
