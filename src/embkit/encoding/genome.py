@@ -1,4 +1,5 @@
 
+import pandas as pd
 
 # chromosome lengths (GRCh38)
 chromosome_length={'chr1':248956422, 
@@ -27,6 +28,24 @@ chromosome_length={'chr1':248956422,
                    'chrY':57227415}
 
 
+def row_format(row):
+    return {
+        "chr" : row.CHROM,
+        "pos" : row.POS,
+        "ref" : row.REF,
+        "alt" : ",".join( str(i) for i in row.ALT)
+    }
+
+def vcf_to_dataframe(vcf_reader, row_filter=None):
+    """
+    vcf_to_dataframe take a PyVCF reader and create a pandas DataFrame
+    """
+    vals = []
+    for record in vcf_reader:
+        if row_filter is None or row_filter(record):
+            vals.append( row_format(record) )
+    return pd.DataFrame(vals)
+
 def vectorize_variant_count( variant_df, bin_size=1000000, seq_col="chr", pos_col="pos"):
     """
     Vectorize the variant count in bins of specified size across the genome.
@@ -41,7 +60,7 @@ def vectorize_variant_count( variant_df, bin_size=1000000, seq_col="chr", pos_co
     counter=0
     for chrom, length in chromosome_length.items():
         for i in range(1, length, bin_size): # last bin for each chromosome might not equal 1MB depending on the chr length
-            bin_label = f'{chrom}_{counter}'
+            bin_label = f'{chrom}_{counter:04d}'
             bins.append((chrom, i, min(i + bin_size, length), bin_label))
             bin_labels.append(bin_label)
             counter+=1

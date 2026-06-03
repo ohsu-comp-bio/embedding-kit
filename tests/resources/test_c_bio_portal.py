@@ -2,9 +2,9 @@ import unittest
 from unittest.mock import patch, MagicMock
 from pathlib import Path
 import tempfile
+import os
 from requests.exceptions import RequestException
 import tarfile
-import shutil
 
 from embkit.resources import CBIOPortal
 from embkit.resources.resource import REPO_DIR
@@ -132,14 +132,12 @@ class TestCBIOPortal(unittest.TestCase):
                 dataset.download()  # triggers the warning path
 
     def test_default_save_path_creation(self):
-        default_path = Path.home() / REPO_DIR
-        if default_path.exists():
-            shutil.rmtree(default_path)
-        self.assertFalse(default_path.exists())
-
-        dataset = CBIOPortal(study_id=self.study_id, save_path=None, download=False)
-        self.assertTrue(Path(dataset.save_path).exists())
-        self.assertEqual(Path(dataset.save_path).resolve(), default_path.resolve())
+        with tempfile.TemporaryDirectory() as tmpdir:
+            default_path = Path(tmpdir) / REPO_DIR
+            with patch.dict(os.environ, {"EMBKIT_HOME": str(default_path)}):
+                dataset = CBIOPortal(study_id=self.study_id, save_path=None, download=False)
+            self.assertTrue(Path(dataset.save_path).exists())
+            self.assertEqual(Path(dataset.save_path).resolve(), default_path.resolve())
 
     # ✅ Covers lines 69–70 (target_file and unpacked_folder path logic)
     @patch("embkit.resources.c_bio_portal.requests.get")
@@ -164,29 +162,27 @@ class TestCBIOPortal(unittest.TestCase):
 
     @patch("embkit.resources.c_bio_portal.requests.get")
     def test_default_embkit_path_created_if_missing(self, mock_get):
-        default_path = Path.home() / REPO_DIR
+        with tempfile.TemporaryDirectory() as tmpdir:
+            default_path = Path(tmpdir) / REPO_DIR
+            self.assertFalse(default_path.exists())
 
-        # Clean up before test
-        if default_path.exists():
-            shutil.rmtree(default_path)
-        self.assertFalse(default_path.exists())
+            # Setup mock for download
+            mock_response = MagicMock()
+            mock_response.iter_content = lambda chunk_size: [b"x" * 10]
+            mock_response.headers = {"Content-Length": "10"}
+            mock_response.status_code = 200
+            mock_response.raise_for_status = MagicMock()
+            mock_get.return_value = mock_response
 
-        # Setup mock for download
-        mock_response = MagicMock()
-        mock_response.iter_content = lambda chunk_size: [b"x" * 10]
-        mock_response.headers = {"Content-Length": "10"}
-        mock_response.status_code = 200
-        mock_response.raise_for_status = MagicMock()
-        mock_get.return_value = mock_response
+            with patch.dict(os.environ, {"EMBKIT_HOME": str(default_path)}):
+                dataset = CBIOPortal(study_id=self.study_id, save_path=None, download=False)
+                self.assertEqual(Path(dataset.save_path).resolve(), default_path.resolve())
 
-        # Run
-        dataset = CBIOPortal(study_id=self.study_id, save_path=None, download=False)
-        self.assertEqual(Path(dataset.save_path).resolve(), default_path.resolve())
+                # Should be created in download
+                dataset.download()
 
-        # Should be created in download
-        dataset.download()
-        self.assertTrue(default_path.exists())
-        self.assertTrue((default_path / f"{self.study_id}.tar.gz").exists())
+            self.assertTrue(default_path.exists())
+            self.assertTrue((default_path / f"{self.study_id}.tar.gz").exists())
 
     @patch("embkit.resources.c_bio_portal.requests.get")
     @patch("embkit.resources.c_bio_portal.logger")

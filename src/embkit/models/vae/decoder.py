@@ -10,6 +10,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _module_out_features(module: nn.Module) -> Optional[int]:
+    if isinstance(module, MaskedLinear):
+        return int(module.linear.out_features)
+    if isinstance(module, nn.Linear):
+        return int(module.out_features)
+    return None
+
+
 @factory.nn_module
 class Decoder(nn.Module):
     """
@@ -34,11 +42,16 @@ class Decoder(nn.Module):
         in_features = latent_dim
 
         if layers:
-            logger.info("Building decoder with %d layers %s", len(layers), layers)
+            logger.info("Building decoder with %d layers", len(layers))
             dec_net = layers.build( latent_dim, feature_dim, device=device, dtype=dtype )
             self.net.extend(dec_net)
-            in_features = dec_net[-1].out_features
-            logger.info("Decoder info: %s", dec_net)
+            in_features = self.feature_dim
+            for module in reversed(dec_net):
+                width = _module_out_features(module)
+                if width is not None:
+                    in_features = width
+                    break
+            logger.debug("Decoder net built with %d modules", len(dec_net))
             
         # Final projection to feature_dim if not already there
         if in_features != self.feature_dim or not layers:

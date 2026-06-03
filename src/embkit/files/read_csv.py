@@ -3,8 +3,11 @@ import json
 import os
 import functools
 import numpy as np
+import logging
 
 from tqdm import tqdm
+
+logger = logging.getLogger(__name__)
 
 
 class CsvReader:
@@ -140,7 +143,7 @@ class LargeCsvReader:
 
     def _generate_index(self):
         """Generates the byte-offset index from the CSV file."""
-        print(f"Generating index for '{self.csv_path}'...")
+        logger.info("Generating index for '%s'...", self.csv_path)
         with open(self.csv_path, 'r', newline='') as f:
             
             key_column_index = self._get_index_column_and_header(f)
@@ -161,13 +164,13 @@ class LargeCsvReader:
         if self.save_index:
             with open(self.index_path, 'w') as f:
                 json.dump(self._index, f)
-            print("Index generation and saving complete.")
+            logger.info("Index generation and saving complete.")
         else:
-            print("Index generated in memory only.")
+            logger.info("Index generated in memory only.")
 
     def _load_index(self):
         """Loads a pre-existing index file into memory."""
-        print(f"Loading index from '{self.index_path}'...")
+        logger.info("Loading index from '%s'...", self.index_path)
         with open(self.index_path, 'r') as f:
             self._index = json.load(f)
         
@@ -176,10 +179,12 @@ class LargeCsvReader:
             with open(self.csv_path, 'r', newline='') as f:
                 self._header = f.readline().strip().split(self.sep)
         
-        print("Index loaded.")
+        logger.info("Index loaded.")
 
     def __enter__(self):
         """Opens the CSV file for reading when entering a context manager."""
+        if self._file and not self._file.closed:
+            self._file.close()
         self._file = open(self.csv_path, 'r', newline='')
         return self
 
@@ -252,11 +257,25 @@ class LargeCsvReader:
         return dict(zip(self._header, row_list))
     
     def read(self, show_progress=False):
+        def _extract_values(row):
+            if isinstance(row, zip):
+                row = list(row)
+            if isinstance(row, dict):
+                values = list(row.values())
+            else:
+                row = list(row)
+                if row and isinstance(row[0], tuple) and len(row[0]) == 2:
+                    values = [v for _, v in row]
+                else:
+                    values = row
+            return values[1:]
+
         with self:
             if show_progress:
-                for k, v in tqdm(self, total=self.shape[0]):
-                    yield np.array(v[1:], dtype=np.float32)
+                # disable tqdm in CI environments
+                is_ci = os.environ.get("GITHUB_ACTIONS") == "true"
+                for k, v in tqdm(self, total=self.shape[0], disable=is_ci):
+                    yield np.array(_extract_values(v), dtype=np.float32)
             else:
                 for k, v in self:
-                    yield np.array(v[1:], dtype=np.float32)
-
+                    yield np.array(_extract_values(v), dtype=np.float32)

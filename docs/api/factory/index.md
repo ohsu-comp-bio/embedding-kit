@@ -13,6 +13,7 @@ It is used by CLI training commands to:
 - `factory.Layer` and `factory.LayerList` for layer configuration
 - `factory.build(...)` for rebuilding modules from dict/list specs
 - `factory.save(...)` and `factory.load(...)` for model serialization
+- `factory.run_model_verification(...)` for integrity audits of saved artifacts
 
 ## Example: train-vae style layer setup
 
@@ -70,5 +71,7 @@ print(type(relu).__name__)
 ## Notes
 
 - `factory.save` stores both `state_dict` and model description (`__model__`).
+- `factory.save` also applies a final mask clamp on constrained layers before writing checkpoints.
 - `factory.load` reconstructs the model via `factory.build` and then loads weights.
+- `factory.run_model_verification` executes model-specific `verify_integrity()` when available, with a fallback NaN/Inf audit.
 - Unknown class names or unsupported build inputs raise explicit exceptions.
