@@ -3,10 +3,12 @@ import numpy as np
 
 import torch
 import torch.nn.functional as F
+from .. import factory
 
+@factory.nn_module
 class OneHotEncoder:
-    def __init__(self, labels, device=None):
-        self.classes = sorted(labels)
+    def __init__(self, classes, device=None):
+        self.classes = sorted(classes)
         self.num_classes = len(self.classes)
         self.mapping = {}
         self.class_idx = {}
@@ -38,13 +40,22 @@ class OneHotEncoder:
             indices.append(idx)
 
         idx_tensor = torch.tensor(indices, device=self.device)
-        return F.one_hot(idx_tensor, num_classes=self.num_classes).to(self.mapping[self.classes[0]].device)
+        return F.one_hot(idx_tensor, num_classes=self.num_classes).to(self.device)
 
     def __len__(self):
         return self.num_classes
 
     def __iter__(self):
         return iter(self.classes)
+
+    def to_dict(self):
+        return {
+            "classes": self.classes,
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(classes=data["classes"])
 
 amino_acids = 'ARNDCEQGHILKMFPSTWYV'
 
