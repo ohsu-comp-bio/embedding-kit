@@ -13,6 +13,7 @@ class OneHotEncoder:
         self.mapping = {}
         self.class_idx = {}
         self.device = device
+        self.shape = (self.num_classes,)
         for i, n in enumerate(self.classes):
             self.mapping[n] = F.one_hot( torch.tensor(i), self.num_classes ).to(device)
             self.class_idx[n] = i
@@ -59,6 +60,7 @@ class OneHotEncoder:
 
 amino_acids = 'ARNDCEQGHILKMFPSTWYV'
 
+@factory.nn_module
 class ProteinOneHotEncoder:
     """
     Converts an amino acid sequence string into a one-hot encoded matrix.
@@ -108,6 +110,11 @@ class ProteinOneHotEncoder:
             self.alphabet = amino_acids + 'X'
         else:
             self.alphabet = amino_acids
+        
+        if self.full_len is not None:
+            self.shape = (self.full_len, len(self.alphabet) + (1 if self.encode_pos else 0)) 
+        else:
+            self.shape = (len(self.alphabet) + (1 if self.encode_pos else 0),)  # +1 for position encoding
 
         # 3. Create a mapping dictionary for quick lookup
         # e.g., {'A': 0, 'R': 1, ..., 'V': 19, 'X': 20}
@@ -164,3 +171,31 @@ class ProteinOneHotEncoder:
         if is_single:
             return one_hot_matrix[0]
         return one_hot_matrix
+
+    def to_dict(self):
+        return {
+            "full_len": self.full_len,
+            "encode_x": self.encode_x,
+            "encode_pos": self.encode_pos,
+            "device": self.device,
+            "dtype": str(self.dtype),
+            "backend": self.backend
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        dtype_str = data.get("dtype", "float32")
+        if dtype_str == "float32":
+            dtype = np.float32
+        elif dtype_str == "float64":
+            dtype = np.float64
+        else:
+            dtype = None  # default to torch's default dtype
+        return cls(
+            full_len=data.get("full_len"),
+            encode_x=data.get("encode_x", True),
+            encode_pos=data.get("encode_pos", False),
+            device=data.get("device"),
+            dtype=dtype,
+            backend=data.get("backend", 'torch')
+        )
