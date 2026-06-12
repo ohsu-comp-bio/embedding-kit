@@ -83,6 +83,12 @@ def _enforce_model_masks(model: nn.Module) -> None:
             if callable(clamp):
                 clamp()
 
+class TrainingPhase:
+    def __init__(self, lr, beta: float, n_epochs: int):
+        self.lr = lr
+        self.beta = beta
+        self.n_epochs = n_epochs
+
 
 def _run_training_phases(
                          model,
@@ -113,8 +119,10 @@ def _run_training_phases(
             metric_sums = {key: 0.0 for key in metric_keys}
             batches = 0
             optimizer.zero_grad(set_to_none=True)
-
-            epoch_desc = f"epoch {epoch_number}/{total_epochs} β={beta_value:.3f}"
+            if beta_value is not None:
+                epoch_desc = f"epoch {epoch_number}/{total_epochs} β={beta_value:.3f}"
+            else:
+                epoch_desc = f"epoch {epoch_number}/{total_epochs}"
             batch_bar = tqdm(loader,
                              total=_loader_length(loader),
                              disable=not progress,
@@ -153,7 +161,7 @@ def _run_training_phases(
                 for key in metric_keys:
                     history[key].append(float("nan"))
 
-            if "beta" in history:
+            if "beta" in history and beta_value is not None:
                 history["beta"].append(beta_value)
 
             if progress:
@@ -168,7 +176,6 @@ def fit(model, X: Union[torch.Tensor, Dataset, DataLoader],
     y: Optional[torch.Tensor] = None, 
         epochs: int = 20, 
         lr: Optional[float] = 1e-3, 
-        beta: float = 1.0,
         optimizer: Optional[torch.optim.Optimizer] = None, 
         loss: Optional[Callable] = None, 
         device: Optional[torch.device] = None, 
@@ -217,7 +224,7 @@ def fit(model, X: Union[torch.Tensor, Dataset, DataLoader],
     else:
         raise TypeError("X must be a Tensor, Dataset, or DataLoader")
 
-    phases = _resolve_phases(epochs=epochs, beta=beta, beta_schedule=None)
+    phases = _resolve_phases(epochs=epochs, beta=None, beta_schedule=None)
 
     def recognizer_step(batch, beta_value: float) -> Dict[str, torch.Tensor]:
         del beta_value
