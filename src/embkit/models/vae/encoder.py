@@ -1,4 +1,4 @@
-from typing import Optional, List, Union, TYPE_CHECKING
+from typing import Optional, List, Union
 from torch import nn
 import torch
 
@@ -6,13 +6,19 @@ from ... import factory
 from ...modules import MaskedLinear
 from ...factory.layers import Layer, LayerList
 from ...factory.mapping import get_activation
+from ...factory.layers import ConstraintInfo
 
 import logging
 
-if TYPE_CHECKING:
-    from ...constraints import NetworkConstraint
-
 logger = logging.getLogger(__name__)
+
+
+def _module_out_features(module: nn.Module) -> Optional[int]:
+    if isinstance(module, MaskedLinear):
+        return int(module.linear.out_features)
+    if isinstance(module, nn.Linear):
+        return int(module.out_features)
+    return None
 
 
 @factory.nn_module
@@ -35,7 +41,7 @@ class Encoder(nn.Module):
                  default_activation: Union[str, None] = "relu",
                  make_latent_heads: bool = True,
                  sampling : bool = True,
-                 constraint: Optional["NetworkConstraint"] = None,
+                 constraint: Optional[ConstraintInfo] = None,
                  device=None, dtype=None):
         super().__init__()
         self.feature_dim = int(feature_dim)
@@ -57,8 +63,12 @@ class Encoder(nn.Module):
             logger.info("Building encoder with %d layers", len(layers))
             enc_net = layers.build( input_dim=in_features, output_dim=self.latent_dim, device=device, dtype=dtype)
             self.net.extend(enc_net)
-
-            in_features = enc_net[-1].out_features
+            in_features = self.latent_dim
+            for module in reversed(enc_net):
+                width = _module_out_features(module)
+                if width is not None:
+                    in_features = width
+                    break
 
             # Latent heads requirement
             self.z_mean = None
@@ -81,7 +91,9 @@ class Encoder(nn.Module):
             if self.constraint is not None:
                 proj = MaskedLinear(in_features, self.latent_dim, bias=True, device=device, dtype=dtype)
                 self.net.append(proj)
-                proj.set_mask(self.constraint.as_torch(device=proj.mask.device))
+                m = self.constraint.gen_mask(in_features, self.latent_dim)
+                proj.set_mask(torch.as_tensor(m, dtype=proj.mask.dtype, device=proj.mask.device))
+                setattr(proj, "constraint_info", self.constraint)
             else:
                 proj = nn.Linear(in_features, self.latent_dim, bias=True, device=device, dtype=dtype)
                 self.net.append(proj)
@@ -136,8 +148,7 @@ class Encoder(nn.Module):
 
     @classmethod
     def from_dict(cls, d):
-        from ...constraints import NetworkConstraint
-        constraint = NetworkConstraint.from_dict(d["constraint"]) if d.get("constraint") else None
+        constraint = ConstraintInfo.from_dict(d["constraint"]) if d.get("constraint") else None
         return Encoder(
             feature_dim=d["feature_dim"],
             latent_dim=d["latent_dim"],
@@ -156,11 +167,14 @@ class Encoder(nn.Module):
         Args:
             device: The device to move the mask tensor to
         """
-        if self.constraint is None:
-            return
-        
-        mask_tensor = self.constraint.as_torch(device)
-        
+        fallback_constraint = self.constraint
+
         for module in self.net:
             if isinstance(module, MaskedLinear):
-                module.set_mask(mask_tensor)
+                constraint_info = getattr(module, "constraint_info", None)
+                if constraint_info is not None:
+                    m = constraint_info.gen_mask(module.linear.in_features, module.linear.out_features)
+                    module.set_mask(torch.as_tensor(m, dtype=module.mask.dtype, device=module.mask.device))
+                elif fallback_constraint is not None:
+                    m = fallback_constraint.gen_mask(module.linear.in_features, module.linear.out_features)
+                    module.set_mask(torch.as_tensor(m, dtype=module.mask.dtype, device=module.mask.device))

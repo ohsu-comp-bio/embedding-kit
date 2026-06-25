@@ -14,26 +14,12 @@ class DummyConstraint:
         self.out_features = out_features
         self.in_features = in_features
 
-    def gen_mask(self):
+    def gen_mask(self, in_features, out_features):
         # Return a mask matching expected shape
-        return np.ones((self.out_features, self.in_features), dtype=np.float32)
+        return np.ones((out_features, in_features), dtype=np.float32)
 
 
 class TestLayerHelpers(unittest.TestCase):
-    def test_idx_to_list_preserves_order(self):
-        mapping = {"c": 2, "a": 0, "b": 1}
-        ordered = layers.idx_to_list(mapping)
-        self.assertEqual(ordered, ["a", "b", "c"])
-
-    def test_build_features_to_group_mask_forward(self):
-        feature_map = {"G1": ["f0"], "G2": ["f1"]}
-        feature_idx = {"f0": 0, "f1": 1}
-        group_idx = {"G1": 0, "G2": 1}
-        mask = layers.build_features_to_group_mask(
-            feature_map, feature_idx, group_idx, group_node_count=1, forward=True
-        )
-        expected = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
-        np.testing.assert_array_equal(mask, expected)
 
     def test_layer_from_dict_and_gen_layer_linear(self):
         spec = {

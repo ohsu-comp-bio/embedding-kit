@@ -14,6 +14,8 @@ from torch import nn
 from torch.optim import Adam
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 from tqdm.autonotebook import tqdm
+import numpy as np
+from ..losses import net_vae_loss
 
 from .. import get_device, dataframe_loader
 
@@ -73,6 +75,21 @@ def _move_to_device(value: Any,
     return value
 
 
+def _enforce_model_masks(model: nn.Module) -> None:
+    """Apply post-step hard mask clamping for modules that expose it."""
+    with torch.no_grad():
+        for module in model.modules():
+            clamp = getattr(module, "clamp_masked_weights", None)
+            if callable(clamp):
+                clamp()
+
+class TrainingPhase:
+    def __init__(self, lr, beta: float, n_epochs: int):
+        self.lr = lr
+        self.beta = beta
+        self.n_epochs = n_epochs
+
+
 def _run_training_phases(
                          model,
                          loader: DataLoader,
@@ -102,8 +119,10 @@ def _run_training_phases(
             metric_sums = {key: 0.0 for key in metric_keys}
             batches = 0
             optimizer.zero_grad(set_to_none=True)
-
-            epoch_desc = f"epoch {epoch_number}/{total_epochs} β={beta_value:.3f}"
+            if beta_value is not None:
+                epoch_desc = f"epoch {epoch_number}/{total_epochs} β={beta_value:.3f}"
+            else:
+                epoch_desc = f"epoch {epoch_number}/{total_epochs}"
             batch_bar = tqdm(loader,
                              total=_loader_length(loader),
                              disable=not progress,
@@ -118,6 +137,7 @@ def _run_training_phases(
 
                 if (batch_index + 1) % accumulate_steps == 0:
                     optimizer.step()
+                    _enforce_model_masks(model)
                     optimizer.zero_grad(set_to_none=True)
 
                 for key in metric_keys:
@@ -130,6 +150,7 @@ def _run_training_phases(
 
             if batches > 0 and (batches % accumulate_steps) != 0:
                 optimizer.step()
+                _enforce_model_masks(model)
                 optimizer.zero_grad(set_to_none=True)
 
             history = _ensure_history(model, metric_keys)
@@ -140,7 +161,7 @@ def _run_training_phases(
                 for key in metric_keys:
                     history[key].append(float("nan"))
 
-            if "beta" in history:
+            if "beta" in history and beta_value is not None:
                 history["beta"].append(beta_value)
 
             if progress:
@@ -155,7 +176,6 @@ def fit(model, X: Union[torch.Tensor, Dataset, DataLoader],
     y: Optional[torch.Tensor] = None, 
         epochs: int = 20, 
         lr: Optional[float] = 1e-3, 
-        beta: float = 1.0,
         optimizer: Optional[torch.optim.Optimizer] = None, 
         loss: Optional[Callable] = None, 
         device: Optional[torch.device] = None, 
@@ -204,7 +224,7 @@ def fit(model, X: Union[torch.Tensor, Dataset, DataLoader],
     else:
         raise TypeError("X must be a Tensor, Dataset, or DataLoader")
 
-    phases = _resolve_phases(epochs=epochs, beta=beta, beta_schedule=None)
+    phases = _resolve_phases(epochs=epochs, beta=None, beta_schedule=None)
 
     def recognizer_step(batch, beta_value: float) -> Dict[str, torch.Tensor]:
         del beta_value
@@ -272,6 +292,9 @@ def fit_vae(model,
             )
 
     model.to(device)
+    # Ensure biological masks are strictly enforced before training starts
+    if hasattr(model, "refresh_masks"):
+        model.refresh_masks(device)
     model.train()
 
     # Build dataloader once
@@ -333,14 +356,18 @@ def fit_net_vae(
     device: Optional[str] = None,
     grouping_fn: Optional[Callable[[Any, List[str]], Dict[str, List[str]]]] = None,
 ) -> None:
-    """Train a NetVAE with optional alternating constraint phases."""
+    """
+    Train a NetVAE with optional alternating constraint phases.
 
-    import numpy as np
-    from ..constraints import NetworkConstraint
-    from ..losses import net_vae_loss
-    from ..models.vae.encoder import Encoder
-    from ..models.vae.base_vae import BaseVAE
-    from ..modules import MaskedLinear
+    This path is intentionally retained even though the CLI currently uses
+    ``fit_vae`` for NetVAE training. It supports two API behaviors that are
+    not exposed by the current CLI:
+    1) alternating constrained/unconstrained training phases via ``phases``
+    2) optional dynamic regrouping via ``grouping_fn``
+
+    TODO: when this behavior is promoted to first-class CLI/config support,
+    unify this implementation with ``fit_vae`` to avoid long-term duplication.
+    """
 
     if isinstance(X, torch.Tensor):
         if not getattr(model, "features", None):
@@ -356,6 +383,14 @@ def fit_net_vae(
     else:
         latent_index = list(latent_index)
 
+    if not hasattr(model, "set_constraint_active") or not hasattr(model, "refresh_masks"):
+        raise TypeError(
+            "fit_net_vae requires model constraint hooks: set_constraint_active(...) and refresh_masks(...)."
+        )
+
+    if latent_groups is not None and hasattr(model, "update_membership"):
+        model.update_membership(latent_groups)
+
     if device is None:
         if torch.cuda.is_available():
             device = "cuda"
@@ -365,13 +400,8 @@ def fit_net_vae(
             device = "cpu"
     torch_device = torch.device(device)
 
-    constraint = NetworkConstraint(list(df.columns), latent_index, latent_groups)
     if getattr(model, "encoder", None) is None or getattr(model, "decoder", None) is None:
-        feature_dim = len(df.columns)
-        model.encoder = Encoder(feature_dim=feature_dim, latent_dim=len(latent_index), constraint=constraint)
-        model.decoder = BaseVAE.build_decoder(feature_dim=feature_dim, latent_dim=len(latent_index))
-    else:
-        model.encoder.constraint = constraint
+        raise RuntimeError("Model encoder/decoder must be initialized before fit_net_vae.")
 
     model.latent_index = list(latent_index)
 
@@ -383,35 +413,30 @@ def fit_net_vae(
     model.history = {"loss": [], "reconstruction_loss": [], "kl_loss": []}
 
     def refresh_mask():
-        if model.encoder is None:
-            raise RuntimeError("Encoder must be initialized before refreshing mask.")
-        model.encoder.refresh_mask(torch_device)
+        model.refresh_masks(torch_device)
 
     def start_constrained_phase():
         if grouping_fn is not None and model.encoder is not None:
             with torch.no_grad():
-                weight_tensor = None
-                for module in model.encoder.net:
-                    if isinstance(module, MaskedLinear) and hasattr(module.linear, "weight"):
-                        weight_tensor = module.linear.weight
-                        break
-                if weight_tensor is not None:
-                    weights = weight_tensor.detach().cpu().numpy()
+                get_weights = getattr(model, "get_constraint_projection_weights", None)
+                weights = get_weights() if callable(get_weights) else None
+                if weights is not None:
                     new_groups = grouping_fn(weights, list(df.columns))
-                    constraint.update_membership(new_groups)
+                    if hasattr(model, "update_membership"):
+                        model.update_membership(new_groups)
                 else:
                     logger.warning(
-                        "Could not locate encoder projection weights for constrained regrouping; "
+                        "Could not obtain projection weights for constrained regrouping; "
                         "skipping grouping_fn-based membership update."
                     )
-        constraint.set_active(True)
+        model.set_constraint_active(True)
         refresh_mask()
 
     def start_unconstrained_phase():
-        constraint.set_active(False)
+        model.set_constraint_active(False)
         refresh_mask()
 
-    constraint.set_active(False)
+    model.set_constraint_active(False)
     refresh_mask()
 
     total_epochs = sum(phases) if phases else epochs
@@ -448,12 +473,6 @@ def fit_net_vae(
         _append_history("kl_loss", epoch_kl / batch_count)
 
         if epoch % 2 == 0:
-            print(f"Epoch {epoch + 1}/{total_epochs} | ")
-            print(
-                f"loss={model.history['loss'][-1]:.4f} | "
-                f"recon={model.history['reconstruction_loss'][-1]:.4f} | "
-                f"kl={model.history['kl_loss'][-1]:.4f}"
-            )
             logger.info(
                 "Epoch %d/%d | loss=%.4f | recon=%.4f | kl=%.4f",
                 epoch + 1,
@@ -463,7 +482,8 @@ def fit_net_vae(
                 model.history["kl_loss"][-1],
             )
 
-    model.latent_groups = constraint.latent_membership
+    if latent_groups is not None:
+        model.latent_groups = latent_groups
 
     model.eval()
     with torch.no_grad():
@@ -475,30 +495,3 @@ def fit_net_vae(
     normal_pred = pd.DataFrame(recon, index=df.index, columns=df.columns)
     resid = normal_pred - df
     model.normal_stats = pd.DataFrame({"mean": resid.mean(), "std": resid.std(ddof=0)})
-
-
-def fit_alt(model, loader, lr:float = 1e-5, epochs=32, accumulate_steps=8):
-    optimizer = Adam(model.parameters(), lr=lr)
-    criterion = nn.MSELoss()
-
-    model.history = {"loss": []}
-
-    def step_fn(batch, beta_value: float) -> Dict[str, torch.Tensor]:
-        del beta_value
-        x_tensor, y_tensor = batch
-        predictions = model(x_tensor)
-        loss = criterion(predictions, y_tensor)
-        return {"loss": loss}
-
-    _run_training_phases(
-        model=model,
-        loader=loader,
-        optimizer=optimizer,
-        phases=[(1.0, int(epochs))],
-        metric_keys=["loss"],
-        step_fn=step_fn,
-        progress=True,
-        accumulate_steps=int(accumulate_steps),
-    )
-
-    return [{"epoch": i + 1, "loss": loss} for i, loss in enumerate(model.history["loss"])]
