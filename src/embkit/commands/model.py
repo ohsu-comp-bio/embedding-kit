@@ -37,6 +37,7 @@ model = click.Group(name="model", help="VAE Model commands.")
 @click.option("--schedule", "-s", type=str, default=None, help="20:0,20:0.1,40:.3,40:.4")
 @click.option("--loss", type=click.Choice(["mse", "bce", "bce-logit"]), default="bce-logit")
 @click.option("--save-stats", is_flag=True)
+@click.option("--save-latent", is_flag=True)
 @click.option("--zero-mask", default=None, type=float)
 @click.option("--seed", default=42, type=int)
 @click.option("--bfloat16", is_flag=True)
@@ -54,6 +55,7 @@ def train_vae(input_path: str,
               schedule:str,
               zero_mask: float,
               save_stats: bool,
+              save_latent:bool,
               seed: int,
               bfloat16: bool,
               sampling: bool
@@ -142,6 +144,44 @@ def train_vae(input_path: str,
         stats_path = f"{out}.stats.tsv"
         stats.to_csv(stats_path, sep="\t")
         click.echo(f"Stats saved, to {stats_path}")
+
+    if save_latent:
+        vae.eval() # Makes output deterministic. Otherwise, model in training.
+        losses_df = pd.DataFrame({
+            "epoch": range(1, len(vae.history["loss"]) + 1),
+            "loss": vae.history["loss"],
+            "recon": vae.history["recon"],
+            "kl": vae.history["kl"]})
+        
+        losses_df.to_csv(f"{out}.losses_stats.tsv", sep="\t", index=False)
+        click.echo(f"Training losses saved, to {out}.losses_stats.tsv")
+
+        exportloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+        all_mu = []
+        all_logvar = []
+
+        with torch.no_grad():
+            for batch in exportloader:
+                    x_tensor = batch[0] if isinstance(batch, (tuple, list)) else batch
+                    x_tensor = x_tensor.to(device=device, dtype=dtype)
+                    _, mu, logvar, _ = vae(x_tensor)
+                    all_mu.append(mu.cpu())
+                    all_logvar.append(logvar.cpu())
+
+        mu = torch.cat(all_mu, dim=0)
+        logvar = torch.cat(all_logvar, dim=0)
+        std = torch.sqrt(torch.exp(logvar)) # sigma
+
+        index = df.index if df is not None else None
+
+        mu_df = pd.DataFrame(mu.numpy(), index=index, columns=[f"mu_{i}" for i in range(mu.shape[1])])
+        std_df = pd.DataFrame(std.numpy(), index=index, columns=[f"std_{i}" for i in range(std.shape[1])])
+        mu_path = f"{out}.latent_mu.tsv"
+        std_path = f"{out}.latent_std.tsv"
+        mu_df.to_csv(mu_path, sep="\t")
+        std_df.to_csv(std_path, sep="\t")
+        click.echo(f"Latent mu saved, to {mu_path}")
+        click.echo(f"Latent std (sigma) saved, to {std_path}")
 
 
 @model.command()
