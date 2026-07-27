@@ -86,10 +86,10 @@ def procrustes(X, Y):
 
 def procrustes_scale(X, Y):
     """
-    Compute the procrustes transformation (R), then compute a factor (k) to rescale the src matrix. 
+    Compute the procrustes transformation (R), then compute scaling factors (k) to rescale the src matrix. 
     
     To apply transformtion:
-    src.dot(R) * k
+    src.dot(R) * k # element-wise multiplication w per-dim scaling factors
 
     
     Args:
@@ -98,7 +98,7 @@ def procrustes_scale(X, Y):
 
     Returns:
         R: The optimal rotation matrix (guaranteed det(R) = +1).
-        k: Scaling factor
+        k: Per-dimension Scaling factors (shape: (N_dims,)), one scaling value per dim
 
     """
     R = procrustes(X,Y)
