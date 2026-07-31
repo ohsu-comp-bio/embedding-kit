@@ -1,4 +1,6 @@
 
+import math
+
 import numpy as np
 
 import torch
@@ -7,7 +9,7 @@ from .. import factory
 
 @factory.nn_module
 class OneHotEncoder:
-    def __init__(self, classes, device=None):
+    def __init__(self, classes, device=None, dtype=None):
         self.classes = sorted(classes)
         self.num_classes = len(self.classes)
         self.mapping = {}
@@ -15,7 +17,7 @@ class OneHotEncoder:
         self.device = device
         self.shape = (self.num_classes,)
         for i, n in enumerate(self.classes):
-            self.mapping[n] = F.one_hot( torch.tensor(i), self.num_classes ).to(device)
+            self.mapping[n] = F.one_hot( torch.tensor(i), self.num_classes ).to(device=device, dtype=dtype)
             self.class_idx[n] = i
 
     def __call__(self, x):
@@ -79,10 +81,11 @@ class ProteinOneHotEncoder:
         A torch tensor (matrix) of shape (L, oneof[20,21,22)), where L is the sequence length.
     """
 
-    def __init__(self, full_len=None, encode_x=True, encode_pos=False, device=None, dtype=torch.float32, backend='torch'):
+    def __init__(self, full_len=None, encode_x=True, encode_pos=False, pe_dim=2, device=None, dtype=torch.float32, backend='torch'):
         self.full_len = full_len
         self.encode_x = encode_x
         self.encode_pos = encode_pos
+        self.pe_dim = pe_dim
         self.device = device
         self.dtype = dtype
         self.backend = backend
@@ -112,9 +115,9 @@ class ProteinOneHotEncoder:
             self.alphabet = amino_acids
         
         if self.full_len is not None:
-            self.shape = (self.full_len, len(self.alphabet) + (1 if self.encode_pos else 0)) 
+            self.shape = (self.full_len, len(self.alphabet) + (self.pe_dim if self.encode_pos else 0)) 
         else:
-            self.shape = (len(self.alphabet) + (1 if self.encode_pos else 0),)  # +1 for position encoding
+            self.shape = (len(self.alphabet) + (1 if self.encode_pos else 0) + self.pe_dim,)
 
         # 3. Create a mapping dictionary for quick lookup
         # e.g., {'A': 0, 'R': 1, ..., 'V': 19, 'X': 20}
@@ -142,8 +145,7 @@ class ProteinOneHotEncoder:
         else:
             seqs = list(sequence)
             FL = self.full_len if self.full_len is not None else (max(len(s) for s in seqs) if len(seqs) > 0 else 0)
-
-        dim = len(self.alphabet) + (1 if self.encode_pos else 0)
+        dim = len(self.alphabet) + (self.pe_dim if self.encode_pos else 0)
         batch_size = len(seqs)
         if self._use_numpy_backend():
             np_dtype = self.np_dtype or np.float32
@@ -164,6 +166,14 @@ class ProteinOneHotEncoder:
                         one_hot_matrix[b, i, len(self.alphabet)] = float(i) / float(self.full_len)
                     else:
                         one_hot_matrix[b, i, len(self.alphabet)] = float(i)
+            if self.encode_pos and self.pe_dim > 0 and not self._use_numpy_backend():
+                # Fill PE channels for this sequence
+                pe = torch.stack([position_sin_cos_tensor(i, self.pe_dim, device=self.device, dtype=self.torch_dtype) for i in range(FL)], dim=0)
+                one_hot_matrix[b, :, -self.pe_dim:] = pe
+            elif self.encode_pos and self.pe_dim > 0 and self._use_numpy_backend():
+                # numpy fallback: compute via torch then convert
+                pe = np.stack([position_sin_cos(i, self.pe_dim) for i in range(FL)], axis=0)
+                one_hot_matrix[b, :, -self.pe_dim:] = pe
             for i in range(L, FL):
                 index = self.aa_to_index['X']
                 if index is not None:
@@ -177,6 +187,7 @@ class ProteinOneHotEncoder:
             "full_len": self.full_len,
             "encode_x": self.encode_x,
             "encode_pos": self.encode_pos,
+            "pe_dim": self.pe_dim,
             "device": self.device,
             "dtype": str(self.dtype),
             "backend": self.backend
@@ -199,3 +210,47 @@ class ProteinOneHotEncoder:
             dtype=dtype,
             backend=data.get("backend", 'torch')
         )
+
+
+### Positional Encoding Functions
+
+def position_fractional(pos: int, full_len: int) -> float:
+    """Fraction-based positional encoding for position `pos`."""
+    if full_len is None or full_len == 0:
+        return float(pos)
+    return float(pos) / float(full_len)
+
+
+def position_sin_cos(pos: int, pe_dim: int, log_base: float = 10000.0) -> np.ndarray:
+    """Sinusoidal positional encoding for a single position."""
+    if pe_dim == 0:
+        return np.array([])
+    
+    # Ensure even dimension
+    dim = pe_dim if pe_dim % 2 == 0 else pe_dim + 1
+    vec = np.zeros(dim, dtype=np.float64)
+    
+    for i in range(0, dim, 2):
+        freq = np.exp(i * -(np.log(log_base) / dim))
+        vec[i] = np.sin(pos * freq)
+        if i + 1 < dim:
+            vec[i + 1] = np.cos(pos * freq)
+    
+    return vec[:pe_dim]
+
+
+def position_sin_cos_tensor(pos: int, pe_dim: int, log_base: float = 10000.0, device=None, dtype=torch.float32) -> torch.Tensor:
+    """Sinusoidal positional encoding for a single position (torch version)."""
+    if pe_dim == 0:
+        return torch.tensor([], device=device, dtype=dtype)
+    
+    dim = pe_dim if pe_dim % 2 == 0 else pe_dim + 1
+    vec = torch.zeros(dim, device=device, dtype=dtype)
+    
+    for i in range(0, dim, 2):
+        freq = torch.exp(torch.tensor(i * -(np.log(log_base) / dim), dtype=dtype, device=device))
+        vec[i] = torch.sin(pos * freq)
+        if i + 1 < dim:
+            vec[i + 1] = torch.cos(pos * freq)
+    
+    return vec[:pe_dim]
