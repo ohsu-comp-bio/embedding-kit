@@ -128,10 +128,87 @@ class TestModelCommands(unittest.TestCase):
         self.assertEqual(result.exit_code, 0, msg=result.output)
         self.assertIn("No output path provided, using default naming.", result.output)
         self.assertIn("Stats saved, to vae_latent256_epochs20.model.stats.tsv", result.output)
+
         fit_mock.assert_called_once()
         self.assertEqual(fit_mock.call_args.kwargs["loss"], model_cmd.mse)
         self.assertEqual(fit_mock.call_args.kwargs["beta_schedule"], [(0.2, 1), (0.4, 1)])
         save_mock.assert_called_once()
+
+    def test_train_vae_save_latent(self):
+        with self.runner.isolated_filesystem():
+            with open("rna.tsv", "w", encoding="utf-8") as f:
+                f.write(
+                    "sample\tG1\tG2\tG3\tG4\n"
+                    "s1\t1\t2\t3\t4\n"
+                    "s2\t4\t3\t2\t1\n"
+                    "s3\t2\t2\t2\t2\n"
+                )
+            # not bflot16... possible training bug?  
+            result = self.runner.invoke(
+                cli_main,
+                [
+                    "model",
+                    "train-vae",
+                    "rna.tsv",
+                    "--epochs",
+                    "2",
+                    "--latent",
+                    "2",
+                    "--encode-layers",
+                    "4",
+                    "--decode-layers",
+                    "4",
+                    "--save-stats",
+                    "--save-latent",
+                    "--out",
+                    "vae.model",
+                ],
+            )
+
+            self.assertEqual(result.exit_code, 0, msg=result.output)
+            self.assertTrue(Path("vae.model.stats.tsv").exists())
+            losses_lines = Path("vae.model.losses_stats.tsv").read_text(encoding="utf-8").splitlines()
+            self.assertEqual(losses_lines[0].split("\t"), ["epoch", "loss", "recon", "kl"])
+            self.assertEqual(len(losses_lines) - 1, 2)
+            mu_lines = Path("vae.model.latent_mu.tsv").read_text(encoding="utf-8").splitlines()
+            self.assertEqual(mu_lines[0].split("\t"), ["sample", "mu_0", "mu_1"])
+            self.assertEqual([line.split("\t")[0] for line in mu_lines[1:]], ["s1", "s2", "s3"])
+            std_lines = Path("vae.model.latent_std.tsv").read_text(encoding="utf-8").splitlines()
+            std_values = [float(v) for line in std_lines[1:] for v in line.split("\t")[1:]]
+            self.assertTrue(all(v > 0 for v in std_values))
+
+        with self.runner.isolated_filesystem():
+            writer = H5Writer("matrix.h5", "rna", index=["s1", "s2"], columns=["G1", "G2"])
+            writer.set_irow(0, [1.0, 2.0])
+            writer.set_irow(1, [3.0, 4.0])
+            writer.close()
+
+            result = self.runner.invoke(
+                cli_main,
+                [
+                    "model",
+                    "train-vae",
+                    "matrix.h5",
+                    "--group",
+                    "rna",
+                    "--epochs",
+                    "1",
+                    "--latent",
+                    "2",
+                    "--encode-layers",
+                    "4",
+                    "--decode-layers",
+                    "4",
+                    "--save-latent",
+                    "--out",
+                    "vae_h5.model",
+                ],
+            )
+
+            self.assertEqual(result.exit_code, 0, msg=result.output)
+            mu_lines = Path("vae_h5.model.latent_mu.tsv").read_text(encoding="utf-8").splitlines()
+            self.assertEqual(mu_lines[0].split("\t"), ["", "mu_0", "mu_1"])
+            self.assertEqual([line.split("\t")[0] for line in mu_lines[1:]], ["0", "1"])
 
     @patch.object(model_cmd, "save")
     @patch.object(model_cmd, "fit_vae")
