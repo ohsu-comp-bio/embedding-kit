@@ -174,8 +174,10 @@ def train_vae(input_path: str,
 
         index = df.index if df is not None else None
 
-        mu_df = pd.DataFrame(mu.numpy(), index=index, columns=[f"mu_{i}" for i in range(mu.shape[1])])
-        std_df = pd.DataFrame(std.numpy(), index=index, columns=[f"std_{i}" for i in range(std.shape[1])])
+        mu_np = mu.to(device="cpu", dtype=torch.float32).detach().numpy()
+        std_np = std.to(device="cpu", dtype=torch.float32).detach().numpy()
+        mu_df = pd.DataFrame(mu_np, index=index, columns=[f"mu_{i}" for i in range(mu.shape[1])])
+        std_df = pd.DataFrame(std_np, index=index, columns=[f"std_{i}" for i in range(std.shape[1])])
         mu_path = f"{out}.latent_mu.tsv"
         std_path = f"{out}.latent_std.tsv"
         mu_df.to_csv(mu_path, sep="\t")
