@@ -90,6 +90,8 @@ class ProteinOneHotEncoder:
         self.device = device
         self.dtype = dtype
         self.backend = backend
+        if encode_pos and pe_dim <= 0:
+            raise ValueError(f"pe_dim must be > 0 when encode_pos=True, got pe_dim={pe_dim}")
         # determine torch and numpy dtype representations
         self.np_dtype = None
         if dtype is None:
@@ -116,9 +118,9 @@ class ProteinOneHotEncoder:
             self.alphabet = amino_acids
         
         if self.full_len is not None:
-            self.shape = (self.full_len, len(self.alphabet) + (self.pe_dim if self.encode_pos else 0)) 
+            self.shape = (self.full_len, len(self.alphabet) + (self.pe_dim if self.encode_pos else 0))
         else:
-            self.shape = (len(self.alphabet) + (1 if self.encode_pos else 0) + self.pe_dim,)
+            self.shape = (len(self.alphabet) + (self.pe_dim if self.encode_pos else 0),)
 
         # 3. Create a mapping dictionary for quick lookup
         # e.g., {'A': 0, 'R': 1, ..., 'V': 19, 'X': 20}
@@ -162,11 +164,6 @@ class ProteinOneHotEncoder:
                 index = self.aa_to_index.get(aa, self.aa_to_index['X'])
                 if index is not None:
                     one_hot_matrix[b, i, index] = 1.0
-                if self.encode_pos:
-                    if self.full_len is not None:
-                        one_hot_matrix[b, i, len(self.alphabet)] = float(i) / float(self.full_len)
-                    else:
-                        one_hot_matrix[b, i, len(self.alphabet)] = float(i)
             if self.encode_pos and self.pe_dim > 0 and not self._use_numpy_backend():
                 # Fill PE channels for this sequence
                 pe = torch.stack([position_sin_cos_tensor(i, self.pe_dim, device=self.device, dtype=self.torch_dtype) for i in range(FL)], dim=0)
@@ -184,13 +181,20 @@ class ProteinOneHotEncoder:
         return one_hot_matrix
 
     def to_dict(self):
+        # Serialize dtype as a canonical string for reliable round-tripping
+        if self.dtype == np.float32 or self.torch_dtype == torch.float32:
+            dtype_str = "float32"
+        elif self.dtype == np.float64 or self.torch_dtype == torch.float64:
+            dtype_str = "float64"
+        else:
+            dtype_str = "float32"
         return {
             "full_len": self.full_len,
             "encode_x": self.encode_x,
             "encode_pos": self.encode_pos,
             "pe_dim": self.pe_dim,
             "device": self.device,
-            "dtype": str(self.dtype),
+            "dtype": dtype_str,
             "backend": self.backend
         }
 
@@ -207,6 +211,7 @@ class ProteinOneHotEncoder:
             full_len=data.get("full_len"),
             encode_x=data.get("encode_x", True),
             encode_pos=data.get("encode_pos", False),
+            pe_dim=data.get("pe_dim", 2),
             device=data.get("device"),
             dtype=dtype,
             backend=data.get("backend", 'torch')
@@ -249,7 +254,7 @@ def position_sin_cos_tensor(pos: int, pe_dim: int, log_base: float = 10000.0, de
     vec = torch.zeros(dim, device=device, dtype=dtype)
     
     for i in range(0, dim, 2):
-        freq = torch.exp(torch.tensor(i * -(np.log(log_base) / dim), dtype=dtype, device=device))
+        freq = torch.exp(torch.tensor(i * -(math.log(log_base) / dim), dtype=dtype, device=device))
         vec[i] = torch.sin(pos * freq)
         if i + 1 < dim:
             vec[i + 1] = torch.cos(pos * freq)
