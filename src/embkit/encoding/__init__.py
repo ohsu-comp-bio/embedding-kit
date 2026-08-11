@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from .. import factory
+from ..files import CsvReader
 
 @factory.nn_module
 class OneHotEncoder:
@@ -254,3 +255,31 @@ def position_sin_cos_tensor(pos: int, pe_dim: int, log_base: float = 10000.0, de
             vec[i + 1] = torch.cos(pos * freq)
     
     return vec[:pe_dim]
+
+
+
+class PreEncoded:
+    def __init__(self, path, backend="numpy"):
+        self.path = path
+        self.backend = backend
+        reader = CsvReader(path, index_column=0, header=None, sep="\t")
+        self.cache = {}
+        dim = None
+        count = 0
+        for k, v in reader:
+            if backend == "numpy":
+                self.cache[k] = np.array(v, dtype=np.float32)
+            elif backend == "torch":
+                self.cache[k] = torch.tensor(np.array(v, dtype=np.float32), dtype=torch.float32)
+            if dim is None:
+                dim = self.cache[k].shape[0]
+            count += 1
+        self.shape = (count, dim)
+
+    def __call__(self, names):
+        if isinstance(names, str):
+            return self.cache[names]
+        if self.backend == "numpy":
+            return np.array([self.cache[n] for n in names], dtype=np.float32)
+        elif self.backend == "torch":
+            return torch.stack([self.cache[n] for n in names])

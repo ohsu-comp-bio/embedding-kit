@@ -49,3 +49,32 @@ class DatasetMask(Dataset):
             else:
                 o.append( x[i][self.mask[i]] )
         return o
+
+
+class DataFrameMapper(Dataset):
+    def __init__(self, data, mappers, device=None, dtype=None):
+        self.data = data
+        self.mappers = mappers
+        self.device = device
+        self.dtype = dtype
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        row = self.data.iloc[idx]
+        out = []
+        for k, v in self.mappers:
+            out.append( v(row[k]).to(self.device, dtype=self.dtype) )
+        return out
+
+class ConstantLabel(Dataset):
+    def __init__(self, data, label):
+        self.data = data
+        self.label = label
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return [self.data[idx], self.label]
