@@ -15,7 +15,7 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 from tqdm.autonotebook import tqdm
 import numpy as np
-from ..losses import net_vae_loss
+from ..losses import net_vae_loss, VAELoss, BCELoss, BCEWithLogitsLoss
 
 from .. import get_device, dataframe_loader
 
@@ -322,7 +322,15 @@ def fit_vae(model,
         x_tensor = x_tensor.to(device).float()
 
         recon, mu, logvar, _ = model(x_tensor)
-        total_loss, recon_loss, kl_loss = loss(recon, x_tensor, mu, logvar, beta=beta_value)
+
+        if isinstance(loss, VAELoss):
+            # nn.Module-based loss: update beta state then call forward
+            if beta_value is not None:
+                loss.beta = beta_value
+            total_loss, recon_loss, kl_loss = loss(recon, x_tensor, mu, logvar)
+        else:
+            # Legacy callable: pass beta as keyword argument
+            total_loss, recon_loss, kl_loss = loss(recon, x_tensor, mu, logvar, beta=beta_value)
 
         return {
             "loss": total_loss,
@@ -456,7 +464,15 @@ def fit_net_vae(
 
         for (batch_x,) in data_loader:
             optimizer.zero_grad()
-            total_loss, recon_loss, kl_loss = net_vae_loss(model, batch_x)
+            mu, logvar, z = model.encoder(batch_x)
+            reconstruction = model.decoder(z)
+            recon_min = float(reconstruction.detach().min())
+            recon_max = float(reconstruction.detach().max())
+            if recon_min < 0.0 or recon_max > 1.0:
+                _loss_fn = BCEWithLogitsLoss(beta=1.0)
+            else:
+                _loss_fn = BCELoss(beta=1.0)
+            total_loss, recon_loss, kl_loss = _loss_fn(reconstruction, batch_x, mu, logvar)
             total_loss.backward()
             optimizer.step()
             epoch_tot += float(total_loss.item())

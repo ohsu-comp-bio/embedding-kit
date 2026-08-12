@@ -18,7 +18,7 @@ from .base_vae import BaseVAE
 from .encoder import Encoder
 from ...factory.layers import Layer, LayerList
 from ... import get_device
-from ...losses import bce_kl_weighted
+from ...losses import BCEKLWeightedLoss
 from ... import factory
 
 logger = logging.getLogger(__name__)
@@ -212,8 +212,10 @@ class RNAVAE(BaseVAE):
         # Optimizer
         optimizer = Adam(self.parameters(), lr=self.lr)
 
-        # Beta warmup and early stopping
-        beta = 0.0
+        # Loss function — RNA VAE uses kl_weight=5.0; beta starts at 0.0 and warms up
+        loss_fn = BCEKLWeightedLoss(beta=0.0, kl_weight=5.0)
+
+        # Early stopping
         best_loss = float('inf')
         patience_counter = 0
         best_state = None
@@ -222,8 +224,8 @@ class RNAVAE(BaseVAE):
         start_time = time.time()
         
         for epoch in range(epochs):
-            # Beta warmup
-            beta = min(beta + kappa, 1.0)
+            # Beta warmup via loss object
+            loss_fn.step_beta(kappa=kappa, max_beta=1.0)
             
             # Train epoch
             epoch_loss_sum = 0.0
@@ -238,9 +240,7 @@ class RNAVAE(BaseVAE):
                 recon, mu, logvar, z = self(batch_x)
 
                 # Compute loss with current beta and kl_weight=5.0 (RNA VAE specific)
-                total_loss, recon_loss, kl_loss = bce_kl_weighted(
-                    recon, batch_x, mu, logvar, beta=beta, kl_weight=5.0
-                )
+                total_loss, recon_loss, kl_loss = loss_fn(recon, batch_x, mu, logvar)
 
                 # Backprop
                 total_loss.backward()
@@ -260,9 +260,9 @@ class RNAVAE(BaseVAE):
             self.history["loss"].append(ep_loss)
             self.history["recon"].append(ep_recon)
             self.history["kl"].append(ep_kl)
-            self.history["beta"].append(beta)
+            self.history["beta"].append(loss_fn.beta)
 
-            logger.info("Epoch %d/%d - loss: %.4f - beta: %.4f", epoch + 1, epochs, ep_loss, beta)
+            logger.info("Epoch %d/%d - loss: %.4f - beta: %.4f", epoch + 1, epochs, ep_loss, loss_fn.beta)
 
             # Early stopping check
             if ep_loss < best_loss:

@@ -9,6 +9,7 @@ import torch
 
 from embkit.__main__ import cli_main
 from embkit.files import H5Writer
+from embkit.losses import MSELoss, BCELoss, BCEWithLogitsLoss
 
 model_cmd = importlib.import_module("embkit.commands.model")
 
@@ -130,7 +131,7 @@ class TestModelCommands(unittest.TestCase):
         self.assertIn("Stats saved, to vae_latent256_epochs20.model.stats.tsv", result.output)
 
         fit_mock.assert_called_once()
-        self.assertEqual(fit_mock.call_args.kwargs["loss"], model_cmd.mse)
+        self.assertIsInstance(fit_mock.call_args.kwargs["loss"], MSELoss)
         self.assertEqual(fit_mock.call_args.kwargs["beta_schedule"], [(0.2, 1), (0.4, 1)])
         save_mock.assert_called_once()
 
@@ -248,7 +249,7 @@ class TestModelCommands(unittest.TestCase):
         self.assertEqual(result.exit_code, 0, msg=result.output)
         self.assertIn("No output path provided, using default naming.", result.output)
         self.assertIn("Stats saved, to netvae_latent1_epochs3.model.stats.tsv", result.output)
-        self.assertEqual(fit_mock.call_args.kwargs["loss"], model_cmd.bce)
+        self.assertIsInstance(fit_mock.call_args.kwargs["loss"], BCELoss)
         loader_mock.assert_called_once()
         save_mock.assert_called_once()
 
