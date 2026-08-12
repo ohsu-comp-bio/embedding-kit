@@ -88,7 +88,7 @@ class TestAlignmentUtils(unittest.TestCase):
     def test_procrustes_identity(self):
         X = np.eye(3)
         Y = np.eye(3)
-        R = procrustes(X, Y)
+        R, _ = procrustes(X, Y)
         np.testing.assert_array_almost_equal(R, np.eye(3))
 
     def test_procrustes_pure_rotation(self):
@@ -100,7 +100,7 @@ class TestAlignmentUtils(unittest.TestCase):
         rng = np.random.default_rng(0)
         X = rng.standard_normal((60, 2))
         Y = X @ R_true
-        R = procrustes(X, Y)
+        R, _ = procrustes(X, Y)
         np.testing.assert_array_almost_equal(R, R_true, decimal=6)
 
     def test_procrustes_reflection_is_corrected_and_optimal(self):
@@ -115,7 +115,7 @@ class TestAlignmentUtils(unittest.TestCase):
         X = rng.standard_normal((120, 2))
         Y = X @ (R_rot @ F)
 
-        R = procrustes(X, Y)
+        R, _ = procrustes(X, Y)
         self.assertGreater(np.linalg.det(R), 0.0)
         np.testing.assert_array_almost_equal(R @ R.T, np.eye(2), decimal=6)
 
@@ -123,6 +123,21 @@ class TestAlignmentUtils(unittest.TestCase):
         err_R = np.linalg.norm(X @ R - Y)
         err_Rrot = np.linalg.norm(X @ R_rot - Y)
         self.assertLess(err_R, err_Rrot)
+
+    def test_procrustes_singular_values_identity(self):
+        X = np.eye(3)
+        Y = np.eye(3)
+        R, S = procrustes(X, Y)
+        np.testing.assert_array_almost_equal(S, np.ones(3))
+
+    def test_procrustes_singular_values_are_sorted_nonnegative(self):
+        rng = np.random.default_rng(2)
+        X = rng.standard_normal((50, 4))
+        Y = rng.standard_normal((50, 4))
+        R, S = procrustes(X, Y)
+        self.assertEqual(S.shape, (4,))
+        self.assertTrue(np.all(S >= 0))
+        np.testing.assert_array_equal(S, np.sort(S)[::-1])
 
 
 if __name__ == '__main__':

@@ -67,6 +67,7 @@ def procrustes(X, Y):
 
     Returns:
         R: The optimal rotation matrix (guaranteed det(R) = +1).
+        S: Singular values of X.T @ Y
     """
     assert X.shape == Y.shape
 
@@ -81,7 +82,7 @@ def procrustes(X, Y):
         Vt_corrected[-1, :] *= -1
         R = np.dot(U, Vt_corrected)
 
-    return R
+    return R,S
 
 
 def procrustes_scale(X, Y):
@@ -99,12 +100,13 @@ def procrustes_scale(X, Y):
     Returns:
         R: The optimal rotation matrix (guaranteed det(R) = +1).
         k: Per-dimension Scaling factors (shape: (N_dims,)), one scaling value per dim
+        S: Singular values of X.T @ Y
 
     """
-    R = procrustes(X,Y)
+    R,S = procrustes(X,Y)
     A = np.array(X.dot(R))
     B = np.array(Y)
     numerators = np.sum(A * B, axis=0)
     denominators = np.sum(A * A, axis=0)
     k = np.divide(numerators, denominators, out=np.zeros_like(numerators), where=denominators!=0)
-    return R, k
+    return R, k, S
