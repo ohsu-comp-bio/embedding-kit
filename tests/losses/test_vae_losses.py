@@ -1,54 +1,33 @@
 import unittest
-import warnings
 import torch
 from torch import nn
 from embkit.losses import (
-    bce, net_vae_loss,
+    MSEVAELoss, BCEVAELoss, BCEWithLogitsVAELoss, BCEKLWeightedVAELoss,
     MSELoss, BCELoss, BCEWithLogitsLoss, BCEKLWeightedLoss,
-    VAELoss, get_loss, LOSS_REGISTRY,
+    VAELoss, get_vae_loss, VAE_LOSS_REGISTRY, get_loss, LOSS_REGISTRY,
 )
-
-
-class DummyVAE:
-    def __init__(self, output_dim=10):
-        self.encoder_called = False
-        self.decoder_called = False
-        self.output_dim = output_dim
-
-    def encoder(self, x):
-        self.encoder_called = True
-        batch_size = x.size(0)
-        mu = torch.zeros(batch_size, 4)
-        logvar = torch.zeros(batch_size, 4)
-        z = torch.randn(batch_size, 4)
-        return mu, logvar, z
-
-    def decoder(self, z):
-        self.decoder_called = True
-        batch_size = z.size(0)
-        return torch.sigmoid(torch.randn(batch_size, self.output_dim))  # match input dim
 
 
 class TestVAELossBase(unittest.TestCase):
     """Tests for the VAELoss base class and BetaWarmupMixin."""
 
     def test_vae_loss_is_nn_module(self):
-        for cls in (MSELoss, BCELoss, BCEWithLogitsLoss, BCEKLWeightedLoss):
+        for cls in (MSEVAELoss, BCEVAELoss, BCEWithLogitsVAELoss, BCEKLWeightedVAELoss):
             self.assertIsInstance(cls(), nn.Module)
             self.assertIsInstance(cls(), VAELoss)
 
     def test_step_beta_increments(self):
-        loss = BCELoss(beta=0.0)
+        loss = BCEVAELoss(beta=0.0)
         loss.step_beta(kappa=0.1)
         self.assertAlmostEqual(loss.beta, 0.1)
 
     def test_step_beta_clamps_at_max(self):
-        loss = BCELoss(beta=0.95)
+        loss = BCEVAELoss(beta=0.95)
         loss.step_beta(kappa=0.1, max_beta=1.0)
         self.assertAlmostEqual(loss.beta, 1.0)
 
     def test_beta_can_be_updated_directly(self):
-        loss = BCELoss(beta=1.0)
+        loss = BCEVAELoss(beta=1.0)
         loss.beta = 0.5
         self.assertAlmostEqual(loss.beta, 0.5)
 
@@ -61,7 +40,7 @@ class TestVAELossBase(unittest.TestCase):
         self.assertTrue(torch.allclose(kl, torch.zeros(4)))
 
 
-class TestMSELoss(unittest.TestCase):
+class TestMSEVAELoss(unittest.TestCase):
     def setUp(self):
         torch.manual_seed(42)
         self.batch = 5
@@ -72,12 +51,12 @@ class TestMSELoss(unittest.TestCase):
         self.logvar = torch.zeros(self.batch, 4)
 
     def test_output_shapes(self):
-        total, recon, kl = MSELoss()(self.recon, self.x, self.mu, self.logvar)
+        total, recon, kl = MSEVAELoss()(self.recon, self.x, self.mu, self.logvar)
         for t in (total, recon, kl):
             self.assertEqual(t.shape, ())
 
     def test_reduction_kwarg(self):
-        loss = MSELoss(reduction="sum")
+        loss = MSEVAELoss(reduction="sum")
         total, _, _ = loss(self.recon, self.x, self.mu, self.logvar)
         self.assertEqual(total.shape, ())
 
@@ -85,14 +64,14 @@ class TestMSELoss(unittest.TestCase):
         # Use non-trivial mu/logvar so KL != 0
         mu = torch.randn(self.batch, 4)
         logvar = torch.randn(self.batch, 4)
-        total_b0, recon_b0, _ = MSELoss(beta=0.0)(self.recon, self.x, mu, logvar)
-        total_b1, recon_b1, _ = MSELoss(beta=1.0)(self.recon, self.x, mu, logvar)
+        total_b0, recon_b0, _ = MSEVAELoss(beta=0.0)(self.recon, self.x, mu, logvar)
+        total_b1, recon_b1, _ = MSEVAELoss(beta=1.0)(self.recon, self.x, mu, logvar)
         self.assertAlmostEqual(float(recon_b0), float(recon_b1), places=5)
         # total differs because of KL term
         self.assertNotAlmostEqual(float(total_b0), float(total_b1), places=3)
 
 
-class TestBCELoss(unittest.TestCase):
+class TestBCEVAELoss(unittest.TestCase):
     def setUp(self):
         torch.manual_seed(0)
         self.batch = 5
@@ -103,7 +82,7 @@ class TestBCELoss(unittest.TestCase):
         self.logvar = torch.zeros(self.batch, 4)
 
     def test_output_shapes_and_sign(self):
-        total, recon, kl = BCELoss()(self.recon, self.x, self.mu, self.logvar)
+        total, recon, kl = BCEVAELoss()(self.recon, self.x, self.mu, self.logvar)
         for t in (total, recon, kl):
             self.assertEqual(t.shape, ())
         self.assertGreaterEqual(total.item(), 0)
@@ -113,12 +92,12 @@ class TestBCELoss(unittest.TestCase):
     def test_beta_affects_total(self):
         mu = torch.randn(self.batch, 4)
         logvar = torch.randn(self.batch, 4)
-        total_b0, _, _ = BCELoss(beta=0.0)(self.recon, self.x, mu, logvar)
-        total_b1, _, _ = BCELoss(beta=1.0)(self.recon, self.x, mu, logvar)
+        total_b0, _, _ = BCEVAELoss(beta=0.0)(self.recon, self.x, mu, logvar)
+        total_b1, _, _ = BCEVAELoss(beta=1.0)(self.recon, self.x, mu, logvar)
         self.assertNotAlmostEqual(float(total_b0), float(total_b1), places=3)
 
 
-class TestBCEWithLogitsLoss(unittest.TestCase):
+class TestBCEWithLogitsVAELoss(unittest.TestCase):
     def setUp(self):
         torch.manual_seed(1)
         self.batch = 5
@@ -129,17 +108,17 @@ class TestBCEWithLogitsLoss(unittest.TestCase):
         self.logvar = torch.zeros(self.batch, 4)
 
     def test_output_shapes(self):
-        total, recon, kl = BCEWithLogitsLoss()(self.logits, self.x, self.mu, self.logvar)
+        total, recon, kl = BCEWithLogitsVAELoss()(self.logits, self.x, self.mu, self.logvar)
         for t in (total, recon, kl):
             self.assertEqual(t.shape, ())
 
     def test_accepts_logits_outside_01(self):
         # Should not raise even with values far outside [0, 1]
         logits = torch.randn(self.batch, self.dim) * 10
-        BCEWithLogitsLoss()(logits, self.x, self.mu, self.logvar)
+        BCEWithLogitsVAELoss()(logits, self.x, self.mu, self.logvar)
 
 
-class TestBCEKLWeightedLoss(unittest.TestCase):
+class TestBCEKLWeightedVAELoss(unittest.TestCase):
     def setUp(self):
         torch.manual_seed(2)
         self.batch = 5
@@ -150,7 +129,7 @@ class TestBCEKLWeightedLoss(unittest.TestCase):
         self.logvar = torch.zeros(self.batch, 4)
 
     def test_output_shapes(self):
-        total, recon, kl = BCEKLWeightedLoss(beta=1.0, kl_weight=5.0)(
+        total, recon, kl = BCEKLWeightedVAELoss(beta=1.0, kl_weight=5.0)(
             self.recon, self.x, self.mu, self.logvar)
         for t in (total, recon, kl):
             self.assertEqual(t.shape, ())
@@ -158,63 +137,41 @@ class TestBCEKLWeightedLoss(unittest.TestCase):
     def test_kl_weight_scales_total(self):
         mu = torch.randn(self.batch, 4)
         logvar = torch.randn(self.batch, 4)
-        total_w1, _, _ = BCEKLWeightedLoss(beta=1.0, kl_weight=1.0)(
+        total_w1, _, _ = BCEKLWeightedVAELoss(beta=1.0, kl_weight=1.0)(
             self.recon, self.x, mu, logvar)
-        total_w5, _, _ = BCEKLWeightedLoss(beta=1.0, kl_weight=5.0)(
+        total_w5, _, _ = BCEKLWeightedVAELoss(beta=1.0, kl_weight=5.0)(
             self.recon, self.x, mu, logvar)
         self.assertNotAlmostEqual(float(total_w1), float(total_w5), places=3)
 
 
 class TestGetLoss(unittest.TestCase):
     def test_registry_keys(self):
-        self.assertIn("mse", LOSS_REGISTRY)
-        self.assertIn("bce", LOSS_REGISTRY)
-        self.assertIn("bce-logit", LOSS_REGISTRY)
+        self.assertIn("mse", VAE_LOSS_REGISTRY)
+        self.assertIn("bce", VAE_LOSS_REGISTRY)
+        self.assertIn("bce-logit", VAE_LOSS_REGISTRY)
+        self.assertEqual(VAE_LOSS_REGISTRY, LOSS_REGISTRY)
 
     def test_get_loss_returns_correct_type(self):
-        self.assertIsInstance(get_loss("mse"), MSELoss)
-        self.assertIsInstance(get_loss("bce"), BCELoss)
-        self.assertIsInstance(get_loss("bce-logit"), BCEWithLogitsLoss)
+        self.assertIsInstance(get_vae_loss("mse"), MSEVAELoss)
+        self.assertIsInstance(get_vae_loss("bce"), BCEVAELoss)
+        self.assertIsInstance(get_vae_loss("bce-logit"), BCEWithLogitsVAELoss)
+        self.assertIsInstance(get_loss("mse"), MSEVAELoss)
 
     def test_get_loss_passes_kwargs(self):
-        loss = get_loss("bce", beta=0.5)
+        loss = get_vae_loss("bce", beta=0.5)
         self.assertAlmostEqual(loss.beta, 0.5)
 
     def test_get_loss_unknown_raises(self):
         with self.assertRaises(KeyError):
-            get_loss("unknown")
+            get_vae_loss("unknown")
 
 
-class TestDeprecatedFunctions(unittest.TestCase):
-    """Deprecated free functions still work (with DeprecationWarning)."""
-
-    def setUp(self):
-        torch.manual_seed(42)
-        self.batch = 5
-        self.dim = 10
-        self.x = torch.rand(self.batch, self.dim)
-        self.recon = torch.rand_like(self.x)
-        self.mu = torch.zeros(self.batch, 4)
-        self.logvar = torch.zeros(self.batch, 4)
-
-    def test_bce_deprecated_warns(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            total, recon, kl = bce(self.recon, self.x, self.mu, self.logvar)
-            self.assertTrue(any(issubclass(x.category, DeprecationWarning) for x in w))
-        self.assertEqual(total.shape, ())
-        self.assertGreaterEqual(total.item(), 0)
-
-    def test_net_vae_loss_deprecated_warns(self):
-        model = DummyVAE()
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            total, recon, kl = net_vae_loss(model, self.x)
-            self.assertTrue(any(issubclass(x.category, DeprecationWarning) for x in w))
-        self.assertTrue(model.encoder_called)
-        self.assertTrue(model.decoder_called)
-        self.assertEqual(total.shape, ())
-        self.assertGreaterEqual(total.item(), 0)
+class TestCompatibilityAliases(unittest.TestCase):
+    def test_class_aliases(self):
+        self.assertIs(MSELoss, MSEVAELoss)
+        self.assertIs(BCELoss, BCEVAELoss)
+        self.assertIs(BCEWithLogitsLoss, BCEWithLogitsVAELoss)
+        self.assertIs(BCEKLWeightedLoss, BCEKLWeightedVAELoss)
 
 
 if __name__ == '__main__':

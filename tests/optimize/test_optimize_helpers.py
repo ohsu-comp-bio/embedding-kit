@@ -11,7 +11,7 @@ from embkit.optimize import (
     fit,
     fit_vae,
 )
-from embkit.losses import bce_with_logits
+from embkit.losses import BCEWithLogitsVAELoss
 from embkit.models.vae.vae import VAE
 
 
@@ -50,13 +50,13 @@ class TestOptimizeHelpers(unittest.TestCase):
 
         bad_df = pd.DataFrame([[0.1, 0.2]], columns=["X1", "X2"])
         with self.assertRaises(ValueError):
-            fit_vae(vae, bad_df, epochs=1, loss=bce_with_logits, progress=False)
+            fit_vae(vae, bad_df, epochs=1, loss=BCEWithLogitsVAELoss(), progress=False)
 
     def test_fit_vae_accepts_dataloader(self):
         vae = VAE(features=["G1", "G2"], latent_dim=1)
         x = torch.tensor([[0.1, 0.2], [0.2, 0.3]], dtype=torch.float32)
         loader = DataLoader(TensorDataset(x), batch_size=1, shuffle=False)
-        out = fit_vae(vae, loader, epochs=1, loss=bce_with_logits, progress=False)
+        out = fit_vae(vae, loader, epochs=1, loss=BCEWithLogitsVAELoss(), progress=False)
         self.assertIsInstance(out, float)
 
 

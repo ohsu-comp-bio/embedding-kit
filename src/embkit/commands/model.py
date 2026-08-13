@@ -17,7 +17,7 @@ from ..models.vae.vae import VAE
 from ..models.vae.net_vae import NetVAE
 from ..preprocessing import ExpMinMaxScaler, get_dataset_nonzero_mask
 from ..datasets import DatasetMask
-from ..losses import get_loss
+from ..losses import get_vae_loss
 from ..pathway import extract_sif_interactions, feature_map_intersect, build_feature_map_indices
 
 model = click.Group(name="model", help="VAE Model commands.")
@@ -122,7 +122,7 @@ def train_vae(input_path: str,
               sampling=sampling,
               device=device, dtype=dtype)
 
-    loss_func = get_loss(loss)
+    loss_func = get_vae_loss(loss)
 
     fit_vae(vae, dataloader, epochs=epochs,
             beta_schedule=beta_schedule, lr=learning_rate, loss=loss_func)
@@ -235,7 +235,7 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
     if not gcounts or any(v <= 0 for v in gcounts):
         raise click.BadParameter("--group-layer-scale must contain one or more positive integers.")
 
-    loss_func = get_loss(loss)
+    loss_func = get_vae_loss(loss)
 
     if beta_schedule is None:
         beta_schedule = [(0.0, epochs)]

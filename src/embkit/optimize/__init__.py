@@ -15,7 +15,7 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 from tqdm.autonotebook import tqdm
 import numpy as np
-from ..losses import net_vae_loss, VAELoss, BCEWithLogitsLoss
+from ..losses import net_vae_loss, VAELoss, BCEWithLogitsVAELoss
 
 from .. import get_device, dataframe_loader
 
@@ -450,7 +450,7 @@ def fit_net_vae(
     total_epochs = sum(phases) if phases else epochs
     boundaries = np.cumsum(phases).tolist() if phases else []
     # Allocate loss once — NetVAE decoder outputs raw logits
-    _loss_fn = BCEWithLogitsLoss(beta=1.0)
+    _loss_fn = BCEWithLogitsVAELoss(beta=1.0)
 
     for epoch in range(total_epochs):
         if boundaries and epoch in boundaries:

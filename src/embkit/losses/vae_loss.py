@@ -27,7 +27,7 @@ from .base import VAELoss
 # Concrete loss classes
 # ---------------------------------------------------------------------------
 
-class MSELoss(VAELoss):
+class MSEVAELoss(VAELoss):
     """VAE loss using Mean-Squared-Error reconstruction (regression VAE).
 
     Args:
@@ -53,7 +53,7 @@ class MSELoss(VAELoss):
         return total, recon_loss, kl
 
 
-class BCELoss(VAELoss):
+class BCEVAELoss(VAELoss):
     """VAE loss using Binary Cross-Entropy on probabilities.
 
     The decoder output must be in ``[0, 1]`` (i.e. after a sigmoid).
@@ -79,7 +79,7 @@ class BCELoss(VAELoss):
         return total, recon_loss.mean(), kl_loss.mean()
 
 
-class BCEWithLogitsLoss(VAELoss):
+class BCEWithLogitsVAELoss(VAELoss):
     """VAE loss using Binary Cross-Entropy with logits (numerically stable).
 
     Use this when the decoder produces raw logits (no final sigmoid).
@@ -105,7 +105,7 @@ class BCEWithLogitsLoss(VAELoss):
         return total, recon_loss.mean(), kl_loss.mean()
 
 
-class BCEKLWeightedLoss(VAELoss):
+class BCEKLWeightedVAELoss(VAELoss):
     """VAE loss with a separate KL weight multiplier (RNA-VAE variant).
 
     The effective KL coefficient is ``kl_weight * beta``, allowing fine-grained
@@ -139,14 +139,14 @@ class BCEKLWeightedLoss(VAELoss):
 # Registry + factory helper
 # ---------------------------------------------------------------------------
 
-LOSS_REGISTRY: dict = {
-    "mse": MSELoss,
-    "bce": BCELoss,
-    "bce-logit": BCEWithLogitsLoss,
+VAE_LOSS_REGISTRY: dict = {
+    "mse": MSEVAELoss,
+    "bce": BCEVAELoss,
+    "bce-logit": BCEWithLogitsVAELoss,
 }
 
 
-def get_loss(name: str, **kwargs) -> VAELoss:
+def get_vae_loss(name: str, **kwargs) -> VAELoss:
     """Instantiate a :class:`VAELoss` by registry name.
 
     Args:
@@ -157,13 +157,26 @@ def get_loss(name: str, **kwargs) -> VAELoss:
         A configured :class:`VAELoss` instance.
 
     Raises:
-        KeyError: If *name* is not in :data:`LOSS_REGISTRY`.
+        KeyError: If *name* is not in :data:`VAE_LOSS_REGISTRY`.
     """
-    if name not in LOSS_REGISTRY:
+    if name not in VAE_LOSS_REGISTRY:
         raise KeyError(
-            f"Unknown loss '{name}'. Valid choices: {sorted(LOSS_REGISTRY)}"
+            f"Unknown loss '{name}'. Valid choices: {sorted(VAE_LOSS_REGISTRY)}"
         )
-    return LOSS_REGISTRY[name](**kwargs)
+    return VAE_LOSS_REGISTRY[name](**kwargs)
+
+
+# Backwards-compatible aliases
+MSELoss = MSEVAELoss
+BCELoss = BCEVAELoss
+BCEWithLogitsLoss = BCEWithLogitsVAELoss
+BCEKLWeightedLoss = BCEKLWeightedVAELoss
+LOSS_REGISTRY = VAE_LOSS_REGISTRY
+
+
+def get_loss(name: str, **kwargs) -> VAELoss:
+    """Backward-compatible alias for :func:`get_vae_loss`."""
+    return get_vae_loss(name, **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -171,10 +184,18 @@ def get_loss(name: str, **kwargs) -> VAELoss:
 # ---------------------------------------------------------------------------
 
 def _deprecated(fn_name: str) -> None:
+    class_name_by_fn = {
+        "mse": "MSEVAELoss",
+        "bce": "BCEVAELoss",
+        "bce_with_logits": "BCEWithLogitsVAELoss",
+        "bce_kl_weighted": "BCEKLWeightedVAELoss",
+        "net_vae_loss": "VAELoss subclass",
+    }
+    class_name = class_name_by_fn.get(fn_name, "VAELoss subclass")
     warnings.warn(
         f"embkit.losses.{fn_name} is deprecated and will be removed in a future "
         "release. Use the corresponding nn.Module class instead "
-        f"(e.g. embkit.losses.{fn_name.upper().replace('_', '')}Loss or "
+        f"(e.g. embkit.losses.{class_name} or "
         "embkit.losses.get_loss()).",
         DeprecationWarning,
         stacklevel=3,
@@ -182,27 +203,27 @@ def _deprecated(fn_name: str) -> None:
 
 
 def mse(recon, x, mu, logvar, beta=1.0, reduction="mean") -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Deprecated — use :class:`MSELoss` instead."""
+    """Deprecated — use :class:`MSEVAELoss` instead."""
     _deprecated("mse")
-    return MSELoss(beta=beta, reduction=reduction)(recon, x, mu, logvar)
+    return MSEVAELoss(beta=beta, reduction=reduction)(recon, x, mu, logvar)
 
 
 def bce(recon_x, x, mu, logvar, beta=1.0) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Deprecated — use :class:`BCELoss` instead."""
+    """Deprecated — use :class:`BCEVAELoss` instead."""
     _deprecated("bce")
-    return BCELoss(beta=beta)(recon_x, x, mu, logvar)
+    return BCEVAELoss(beta=beta)(recon_x, x, mu, logvar)
 
 
 def bce_with_logits(recon_logits, x, mu, logvar, beta=1.0) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Deprecated — use :class:`BCEWithLogitsLoss` instead."""
+    """Deprecated — use :class:`BCEWithLogitsVAELoss` instead."""
     _deprecated("bce_with_logits")
-    return BCEWithLogitsLoss(beta=beta)(recon_logits, x, mu, logvar)
+    return BCEWithLogitsVAELoss(beta=beta)(recon_logits, x, mu, logvar)
 
 
 def bce_kl_weighted(recon_x, x, mu, logvar, beta=1.0, kl_weight=1.0) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Deprecated — use :class:`BCEKLWeightedLoss` instead."""
+    """Deprecated — use :class:`BCEKLWeightedVAELoss` instead."""
     _deprecated("bce_kl_weighted")
-    return BCEKLWeightedLoss(beta=beta, kl_weight=kl_weight)(recon_x, x, mu, logvar)
+    return BCEKLWeightedVAELoss(beta=beta, kl_weight=kl_weight)(recon_x, x, mu, logvar)
 
 
 def net_vae_loss(model, x: torch.Tensor, beta: float = 1.0) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -214,7 +235,7 @@ def net_vae_loss(model, x: torch.Tensor, beta: float = 1.0) -> Tuple[torch.Tenso
     recon_min = float(reconstruction.detach().min())
     recon_max = float(reconstruction.detach().max())
     if recon_min < 0.0 or recon_max > 1.0:
-        loss_fn = BCEWithLogitsLoss(beta=beta)
+        loss_fn = BCEWithLogitsVAELoss(beta=beta)
     else:
-        loss_fn = BCELoss(beta=beta)
+        loss_fn = BCEVAELoss(beta=beta)
     return loss_fn(reconstruction, x, mu, logvar)

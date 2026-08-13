@@ -18,7 +18,7 @@ from .base_vae import BaseVAE
 from .encoder import Encoder
 from ...factory.layers import Layer, LayerList
 from ... import get_device
-from ...losses import BCEKLWeightedLoss
+from ...losses import BCEKLWeightedVAELoss
 from ... import factory
 
 logger = logging.getLogger(__name__)
@@ -213,7 +213,7 @@ class RNAVAE(BaseVAE):
         optimizer = Adam(self.parameters(), lr=self.lr)
 
         # Loss function — RNA VAE uses kl_weight=5.0; beta starts at 0.0 and warms up
-        loss_fn = BCEKLWeightedLoss(beta=0.0, kl_weight=5.0)
+        loss_fn = BCEKLWeightedVAELoss(beta=0.0, kl_weight=5.0)
 
         # Early stopping
         best_loss = float('inf')

@@ -8,7 +8,7 @@ import pandas as pd
 
 from ..models.vae.vae import VAE
 from ..models.vae.base_vae import BaseVAE
-from ..losses import BCEWithLogitsLoss
+from ..losses import BCEWithLogitsVAELoss
 
 class VAEEstimator(BaseEstimator):
     """
@@ -49,7 +49,7 @@ class VAEEstimator(BaseEstimator):
         x = torch.tensor(X.values, dtype=torch.float32, device=device)
         loader = DataLoader(TensorDataset(x), batch_size=self.batch_size, shuffle=True)
         opt = Adam(vae.parameters(), lr=self.learning_rate)
-        loss_fn = BCEWithLogitsLoss(beta=self.beta)
+        loss_fn = BCEWithLogitsVAELoss(beta=self.beta)
 
         loss_hist = []
         for _ in range(self.epochs):
@@ -79,4 +79,3 @@ class VAEEstimator(BaseEstimator):
             mu, _, _ = self.model.encoder(x)
             recon = self.model.decoder(mu).cpu().numpy()
         return -mean_squared_error(X.values, recon)
-
