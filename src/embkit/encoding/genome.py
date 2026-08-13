@@ -50,7 +50,7 @@ def vectorize_variant_count( variant_df, bin_size=1000000, seq_col="chr", pos_co
     """
     Vectorize the variant count in bins of specified size across the genome.
     Assumes a GRCh38 reference genome. 
-    The output is a dictionary where keys are bin labels (e.g., 'chr1_0', 'chr1_1', etc.) 
+    The output is a dictionary where keys are bin labels (e.g., 'chr1_0000', 'chr1_0001', etc.) 
     and values are the count of variants in each bin.
     """
 

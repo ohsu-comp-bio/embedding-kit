@@ -45,7 +45,7 @@ class TestVAESave(unittest.TestCase):
             "TF1": ["G1", "G3"],
             "TF2": ["G2"],
         }
-        model = NetVAE(features=features, latent_groups=latent_groups, group_layer_size=[2, 1])
+        model = NetVAE(features=features, latent_groups=latent_groups, group_layer_scale=[2, 1])
 
         with tempfile.TemporaryDirectory() as temp_dir:
             model_path = Path(temp_dir) / "netvae.pth"
@@ -55,7 +55,7 @@ class TestVAESave(unittest.TestCase):
         self.assertIsInstance(loaded, NetVAE)
         self.assertEqual(loaded.features, features)
         self.assertEqual(loaded.latent_groups, latent_groups)
-        self.assertEqual(loaded.group_layer_size, [2, 1])
+        self.assertEqual(loaded.group_layer_scale, [2, 1])
 
     def test_netvae_from_dict_rejects_deprecated_group_layer_scaling(self):
         desc = {

@@ -59,7 +59,7 @@ class TestNetVAE(unittest.TestCase):
             "TF2": ["G2"],
         }
 
-        model = NetVAE(features=list(df.columns), latent_groups=latent_groups, latent_index=latent_index, group_layer_size=[1,1])
+        model = NetVAE(features=list(df.columns), latent_groups=latent_groups, latent_index=latent_index, group_layer_scale=[1,1])
         fit_vae(
             model,
             df,
@@ -105,7 +105,7 @@ class TestNetVAE(unittest.TestCase):
             "TF2": ["G2"],
         }
 
-        model = NetVAE(features=list(df.columns), latent_groups=latent_groups, latent_index=latent_index, group_layer_size=[1, 1])
+        model = NetVAE(features=list(df.columns), latent_groups=latent_groups, latent_index=latent_index, group_layer_scale=[1, 1])
         fit_net_vae(
             model=model,
             X=df,

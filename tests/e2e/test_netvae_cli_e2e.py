@@ -47,7 +47,7 @@ class TestNetVAECLIE2E(unittest.TestCase):
                     str(self.pathway_sif),
                     "--epochs",
                     "2",
-                    "--group-layer-size",
+                    "--group-layer-scale",
                     "1",
                     "--save-stats",
                     "--out",
