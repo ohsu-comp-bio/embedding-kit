@@ -1,7 +1,7 @@
 """
 Base VAE class
 """
-from typing import Type, Any, List, Optional, Dict, overload, TypeVar, Union
+from typing import Type, Any, List, Optional, Dict, overload, TypeVar, Union, NamedTuple
 from abc import ABC, abstractmethod
 from pathlib import Path
 import json
@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 from torch import nn
 import torch
-from .encoder import Encoder
+from .encoder import Encoder, EncoderOutput
 from .decoder import Decoder
 from ...factory.layers import Layer, LayerList
 from ... import get_device
@@ -19,6 +19,14 @@ import inspect
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
+
+
+class VAEOutput(NamedTuple):
+    """Named output of :meth:`BaseVAE.forward`."""
+    recon: torch.Tensor
+    mu: torch.Tensor
+    logvar: torch.Tensor
+    z: torch.Tensor
 
 
 class BaseVAE(nn.Module, ABC):
@@ -70,17 +78,17 @@ class BaseVAE(nn.Module, ABC):
     def forward(self, x: torch.Tensor):
         if self.encoder is None or self.decoder is None:
             raise RuntimeError("VAE encoder/decoder not initialized.")
-        mu, logvar, z = self.encoder(x)
-        recon = self.decoder(z)
-        return recon, mu, logvar, z
+        encoder_out = self.encoder(x)
+        recon = self.decoder(encoder_out.z)
+        return VAEOutput(recon=recon, mu=encoder_out.mu, logvar=encoder_out.logvar, z=encoder_out.z)
 
     def encode(self, x:torch.Tensor):
         """
         Run encoder model and return the latent mean (mu) for stable embeddings.
         """
         with torch.no_grad():
-            mu, _, _ = self.encoder(x)
-        return mu
+            encoder_out = self.encoder(x)
+        return encoder_out.mu
 
     @abstractmethod
     def to_dict(self) -> Dict[str, Any]:

@@ -14,13 +14,20 @@ removed in a future release.
 """
 
 import warnings
-from typing import Tuple
+from typing import Tuple, NamedTuple
 
 import torch
 import torch.nn.functional as F
 from torch import Tensor
 
 from .base import VAELoss
+
+
+class VAELossOutput(NamedTuple):
+    """Named output of :meth:`VAELoss.forward`."""
+    total: Tensor
+    recon: Tensor
+    kl: Tensor
 
 
 # ---------------------------------------------------------------------------
@@ -50,7 +57,7 @@ class MSEVAELoss(VAELoss):
         recon_loss = F.mse_loss(recon, x, reduction=self.reduction)
         kl = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
         total = recon_loss + self.beta * kl
-        return total, recon_loss, kl
+        return VAELossOutput(total=total, recon=recon_loss, kl=kl)
 
 
 class BCEVAELoss(VAELoss):
@@ -76,7 +83,7 @@ class BCEVAELoss(VAELoss):
         recon_loss = x.size(1) * bce_per_sample
         kl_loss = self._kl_divergence(mu, logvar)
         total = (recon_loss + self.beta * kl_loss).mean()
-        return total, recon_loss.mean(), kl_loss.mean()
+        return VAELossOutput(total=total, recon=recon_loss.mean(), kl=kl_loss.mean())
 
 
 class BCEWithLogitsVAELoss(VAELoss):
@@ -102,7 +109,7 @@ class BCEWithLogitsVAELoss(VAELoss):
         recon_loss = x.size(1) * bce_per_sample
         kl_loss = self._kl_divergence(mu, logvar)
         total = (recon_loss + self.beta * kl_loss).mean()
-        return total, recon_loss.mean(), kl_loss.mean()
+        return VAELossOutput(total=total, recon=recon_loss.mean(), kl=kl_loss.mean())
 
 
 class BCEKLWeightedVAELoss(VAELoss):
@@ -132,7 +139,7 @@ class BCEKLWeightedVAELoss(VAELoss):
         recon_loss = x.size(1) * bce_per_sample
         kl_loss = self._kl_divergence(mu, logvar)
         total = (recon_loss + self.kl_weight * self.beta * kl_loss).mean()
-        return total, recon_loss.mean(), kl_loss.mean()
+        return VAELossOutput(total=total, recon=recon_loss.mean(), kl=kl_loss.mean())
 
 
 # ---------------------------------------------------------------------------
@@ -230,12 +237,12 @@ def net_vae_loss(model, x: torch.Tensor, beta: float = 1.0) -> Tuple[torch.Tenso
     """Deprecated — run the forward pass outside the loss function and call a
     :class:`VAELoss` subclass directly instead."""
     _deprecated("net_vae_loss")
-    mu, logvar, z = model.encoder(x)
-    reconstruction = model.decoder(z)
+    encoder_out = model.encoder(x)
+    reconstruction = model.decoder(encoder_out.z)
     recon_min = float(reconstruction.detach().min())
     recon_max = float(reconstruction.detach().max())
     if recon_min < 0.0 or recon_max > 1.0:
         loss_fn = BCEWithLogitsVAELoss(beta=beta)
     else:
         loss_fn = BCEVAELoss(beta=beta)
-    return loss_fn(reconstruction, x, mu, logvar)
+    return loss_fn(reconstruction, x, encoder_out.mu, encoder_out.logvar)

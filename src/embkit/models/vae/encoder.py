@@ -1,6 +1,13 @@
-from typing import Optional, List, Union
+from typing import Optional, List, Union, NamedTuple
 from torch import nn
 import torch
+
+
+class EncoderOutput(NamedTuple):
+    """Named output of :meth:`Encoder.forward`."""
+    mu: torch.Tensor
+    logvar: torch.Tensor
+    z: torch.Tensor
 
 from ... import factory
 from ...modules import MaskedLinear
@@ -131,7 +138,7 @@ class Encoder(nn.Module):
                 z = mu + eps * std
             else:
                 z = mu
-            return mu, logvar, z
+            return EncoderOutput(mu=mu, logvar=logvar, z=z)
 
         return h
     
