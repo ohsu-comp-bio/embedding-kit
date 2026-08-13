@@ -191,7 +191,7 @@ def train_vae(input_path: str,
 @click.option("--out", "-o", type=str, default=None)
 @click.option("--schedule", "-s", type=str, default=None, help="20:0,20:0.1,40:.3,40:.4")
 @click.option("--loss", type=click.Choice(["mse", "bce", "bce-logit"]), default="bce-logit")
-@click.option("--min-group-size", type=int, default=0, show_default=True, help="Minimum group size filter for pathway feature map (including self if present).")
+@click.option("--min-group-size", type=int, default=2, show_default=True, help="Minimum group size filter for pathway feature map (including self if present).")
 @click.option("--group-layer-scale", default="5,2,1", show_default=True,
               help="Comma-separated per-group widths for NetVAE masked layers.")
 @click.option("--save-stats", is_flag=True)
@@ -277,7 +277,7 @@ def encode(input_path: str, model_path:str, normalize:str, out:str):
     m.to(get_device())
     result = m.encoder(df_tensor)
     
-    matrix = result[0].detach().cpu().numpy()
+    matrix = result[2].detach().cpu().numpy()
     out_df = pd.DataFrame(matrix, index=df.index)
     out_df.to_csv(out, sep="\t")
 
