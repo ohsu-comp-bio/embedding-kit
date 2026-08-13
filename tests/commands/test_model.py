@@ -50,7 +50,7 @@ class TestModelCommands(unittest.TestCase):
                     "pathway.sif",
                     "--epochs",
                     "1",
-                    "--group-layer-size",
+                    "--group-layer-scale",
                     "4,2,1",
                     "--out",
                     "netvae.model",
@@ -62,7 +62,7 @@ class TestModelCommands(unittest.TestCase):
         netvae_args = netvae_cls.call_args.args
         netvae_kwargs = netvae_cls.call_args.kwargs
         self.assertEqual(netvae_args[0], ["G1", "G2", "G3", "G4"])
-        self.assertEqual(netvae_kwargs["group_layer_size"], [4, 2, 1])
+        self.assertEqual(netvae_kwargs["group_layer_scale"], [4, 2, 1])
         self.assertEqual(set(netvae_kwargs["latent_groups"].keys()), {"TF1", "TF2"})
 
         loader_mock.assert_called_once()
@@ -267,13 +267,13 @@ class TestModelCommands(unittest.TestCase):
                     "train-netvae",
                     "rna.tsv",
                     "pathway.sif",
-                    "--group-layer-size",
+                    "--group-layer-scale",
                     "0",
                 ],
             )
 
         self.assertNotEqual(result.exit_code, 0)
-        self.assertIn("--group-layer-size must contain one or more positive integers", result.output)
+        self.assertIn("--group-layer-scale must contain one or more positive integers", result.output)
 
     @patch.object(model_cmd, "load")
     @patch.object(model_cmd, "get_device", return_value=torch.device("cpu"))
