@@ -3,14 +3,15 @@ LayerInfo - Layer Build description
 """
 
 from abc import ABC, abstractmethod
-import pandas as pd
+from typing import Optional, List, Dict, Any
+
 import numpy as np
-from typing import Optional, List, Literal, Dict, Any
 import torch
 from torch import nn
-from ..modules import MaskedLinear
+from .core import build
+from .registry import nn_module
 from .mapping import Linear, Sequential, get_activation
-
+from ..modules import MaskedLinear
 
 class ConstraintInfo(ABC):
     """Abstract interface for constraints that produce masked-linear connectivity."""
@@ -25,17 +26,10 @@ class ConstraintInfo(ABC):
 
     @staticmethod
     def from_dict(d: Dict[str, Any]) -> "ConstraintInfo":
-        """Deserialize constraint configuration from a dict."""
-        if d is None:
-            raise ValueError("ConstraintInfo.from_dict requires a non-null dict.")
+        raise ValueError(f"This needs to be implemented")
 
-        op = d.get("op")
-        if op in {"features-to-group", "group-to-features", "group-to-group"}:
-            from ..constraints.pathway_constraint import PathwayConstraintInfo
-            return PathwayConstraintInfo.from_dict(d)
 
-        raise ValueError(f"Unknown constraint payload: {d}")
-
+@nn_module
 class Layer:
     """
     Layer information for building a neural network layer.
@@ -111,7 +105,7 @@ class Layer:
     @classmethod
     def from_dict(cls, d: dict) -> "Layer":
         c = d.get("constraint", None)
-        constraint = ConstraintInfo.from_dict(c) if c is not None else None
+        constraint = build(c) if c is not None else None
         return Layer(
             units=int(d.get("units", d.get("size"))),  # tolerate old files that used "size"
             op=d.get("op", "linear"),
@@ -120,6 +114,24 @@ class Layer:
             bias=bool(d.get("bias", True)),
             constraint=constraint,
         )
+
+@nn_module
+class LayerModule(nn.ModuleList):
+    """
+    LayerModule
+    """
+    def __init__(self, modules = None):
+        super().__init__(modules)
+
+    def to_dict(self):
+        return {
+            "modules" : list( n.to_dict() for n in self )
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        o = list( build(n) for n in data["modules"] )
+        return LayerModule(o)
 
 class LayerList:
     def __init__(self, layers: Optional[List[Layer]] = None, activation="relu", end_activation="relu"):

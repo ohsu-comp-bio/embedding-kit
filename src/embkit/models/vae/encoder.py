@@ -11,6 +11,7 @@ class EncoderOutput(NamedTuple):
 
 from ... import factory
 from ...modules import MaskedLinear
+from ...factory.core import build
 from ...factory.layers import Layer, LayerList
 from ...factory.mapping import get_activation
 from ...factory.layers import ConstraintInfo
@@ -155,7 +156,7 @@ class Encoder(nn.Module):
 
     @classmethod
     def from_dict(cls, d):
-        constraint = ConstraintInfo.from_dict(d["constraint"]) if d.get("constraint") else None
+        constraint = build(d["constraint"]) if d.get("constraint") else None
         return Encoder(
             feature_dim=d["feature_dim"],
             latent_dim=d["latent_dim"],

@@ -9,7 +9,7 @@ import torch
 import numpy as np
 from ...modules import MaskedLinear
 
-from .base_vae import BaseVAE
+from .vae import VAE
 from ... import factory
 from ...pathway import build_feature_map_indices
 from ...constraints import PathwayConstraintInfo
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------
 
 @factory.nn_module
-class NetVAE(BaseVAE):
+class NetVAE(VAE):
     """
     NetVAE
 

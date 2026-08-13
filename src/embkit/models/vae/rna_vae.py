@@ -14,7 +14,7 @@ from torch.optim import Adam
 from torch import nn
 from torch.utils.data import TensorDataset, DataLoader
 
-from .base_vae import BaseVAE
+from .vae import BaseVAE
 from .encoder import Encoder
 from ...factory.layers import Layer, LayerList
 from ... import get_device

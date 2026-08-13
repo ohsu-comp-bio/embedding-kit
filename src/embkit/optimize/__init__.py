@@ -283,7 +283,7 @@ def fit_vae(model,
         logger.info("Using beta_schedule: %s", beta_schedule)
 
     # Column alignment safety check if a DataFrame is passed
-    if hasattr(X, "columns") and model.features is not None:
+    if hasattr(X, "columns") and hasattr(model, "features"):
         if list(X.columns) != list(model.features):
             raise ValueError(
                 "Input DataFrame columns do not match model features.\n"
