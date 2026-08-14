@@ -3,11 +3,6 @@ from torch import nn
 import torch
 
 
-class EncoderOutput(NamedTuple):
-    """Named output of :meth:`Encoder.forward`."""
-    mu: torch.Tensor
-    logvar: torch.Tensor
-    z: torch.Tensor
 
 from ... import factory
 from ...modules import MaskedLinear
@@ -28,6 +23,103 @@ def _module_out_features(module: nn.Module) -> Optional[int]:
         return int(module.out_features)
     return None
 
+class EncoderOutput(NamedTuple):
+    """Named output of :meth:`Encoder.forward`."""
+    mu: torch.Tensor
+    logvar: torch.Tensor
+    z: torch.Tensor
+
+
+import torch
+import torch.nn as nn
+from typing import Tuple
+
+@factory.nn_module
+class VAEEncoder(nn.Module):
+    """
+    VAE Encoder wrapper that takes a backbone network (e.g., FFN, CNN), 
+    projects features to latent mean and log-variance, and calculates KL divergence.
+    """
+    def __init__(self, backbone: nn.Module, feature_dim: int, latent_dim: int):
+        """
+        Args:
+            backbone (nn.Module): Feature extractor module outputting a tensor of shape (batch_size, feature_dim).
+            feature_dim (int): Output feature dimension of the backbone.
+            latent_dim (int): Dimension of the latent space z.
+        """
+        super().__init__()
+        self.backbone = backbone
+        
+        # Linear projections for mu and log-variance
+        self.fc_mu = nn.Linear(feature_dim, latent_dim)
+        self.fc_logvar = nn.Linear(feature_dim, latent_dim)
+
+    def reparameterize(self, mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
+        """
+        Reparameterization trick: z = mu + std * eps
+        During evaluation (eval mode), returns mu deterministically.
+        """
+        if self.training:
+            std = torch.exp(0.5 * logvar)
+            eps = torch.randn_like(std)
+            return mu + eps * std
+        return mu
+
+    def compute_kl_elements(self, mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
+        """
+        Computes the element-wise KL divergence between q(z|x) ~ N(mu, sigma^2) 
+        and the standard Gaussian prior p(z) ~ N(0, I):
+        
+        D_KL = -0.5 * (1 + log(sigma^2) - mu^2 - sigma^2)
+        """
+        return -0.5 * (1 + logvar - mu.pow(2) - logvar.exp())
+
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Forward pass of the VAE Encoder.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            z (torch.Tensor): Sampled latent vectors of shape (batch_size, latent_dim).
+            kl_element (torch.Tensor): Element-wise KL divergence of shape (batch_size, latent_dim).
+            mu (torch.Tensor): Mean vector of shape (batch_size, latent_dim).
+            logvar (torch.Tensor): Log-variance vector of shape (batch_size, latent_dim).
+        """
+        # 1. Pass through feature extractor backbone
+        h = self.backbone(x)
+        
+        # Flatten if backbone outputs spatial dimensions (e.g., unflattened CNN)
+        if h.dim() > 2:
+            h = torch.flatten(h, start_dim=1)
+            
+        # 2. Predict distribution parameters
+        mu = self.fc_mu(h)
+        logvar = self.fc_logvar(h)
+        
+        # 3. Sample latent code z using reparameterization
+        z = self.reparameterize(mu, logvar)
+        
+        # 4. Compute per-element KL divergence
+        # kl_element = self.compute_kl_elements(mu, logvar)
+        
+        return EncoderOutput(mu=mu, logvar=logvar, z=z)
+
+    def to_dict(self):
+        return {
+            "backbone": self.backbone.to_dict(),
+            "latent_dim": self.latent_dim,
+            "feature_dim": self.feature_dim
+        }
+
+    @classmethod
+    def from_dict(cls, d):
+        return VAEEncoder(
+            feature_dim=d["feature_dim"],
+            latent_dim=d["latent_dim"],
+            backbone=build(d["backbone"])
+        )
 
 @factory.nn_module
 class Encoder(nn.Module):

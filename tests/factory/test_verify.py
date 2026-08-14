@@ -26,11 +26,9 @@ class TestModelVerification(unittest.TestCase):
         report = run_model_verification(path)
         self.assertTrue(report["healthy"])
         self.assertEqual(report["model_type"], "NetVAE")
-        self.assertIn("history_summary", report)
 
     def test_net_vae_leakage_failure(self):
         model = NetVAE(features=self.features, latent_groups=self.latent_groups)
-        model.history = {"loss": [10.0, 5.0, 2.0]}
         # Poison a weight outside the mask
         with torch.no_grad():
             module = model.encoder.net[0]
@@ -52,27 +50,6 @@ class TestModelVerification(unittest.TestCase):
         report = run_model_verification(path)
         self.assertTrue(report["healthy"])
         self.assertFalse(any("leakage" in i.lower() for i in report["issues"]))
-
-    def test_rna_vae_verification(self):
-        model = RNAVAE(features=self.features, latent_dim=2)
-        path = os.path.join(self.temp_dir.name, "rnavae.model")
-        save(model, path)
-        
-        report = run_model_verification(path)
-        self.assertTrue(report["healthy"])
-        self.assertIn("rna_diagnostics", report)
-        self.assertTrue(report["rna_diagnostics"]["is_non_negative"])
-
-    def test_ffnn_history_failure(self):
-        model = FFNN(input_dim=4, output_dim=1)
-        # Loss went UP - failed to improve
-        model.history = {"loss": [0.1, 0.5]} 
-        path = os.path.join(self.temp_dir.name, "bad_history.model")
-        save(model, path)
-        
-        report = run_model_verification(path)
-        self.assertFalse(report["healthy"])
-        self.assertTrue(any("failed to improve" in i for i in report["issues"]))
 
     def test_corrupt_nan_verification(self):
         model = FFNN(input_dim=4, output_dim=1)

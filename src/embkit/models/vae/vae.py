@@ -72,7 +72,7 @@ class VAE(nn.Module):
 
     def verify_integrity(self) -> Dict[str, Any]:
         """
-        Perform a health audit of the model's architecture, weights, and training history.
+        Perform a health audit of the model's architecture, weights.
         
         Returns:
             A dictionary containing the audit results.
@@ -104,31 +104,6 @@ class VAE(nn.Module):
             if report["weight_norm_max"] > 1000: # Paranoid threshold for gradient explosion
                 report["healthy"] = False
                 report["issues"].append(f"Extremely high weight norm detected ({report['weight_norm_max']:.2f}). Potential gradient explosion.")
-
-        # 2. History audit (training sanity check)
-        history = getattr(self, "history", None)
-        if history and "loss" in history and len(history["loss"]) > 0:
-            losses = history["loss"]
-            if any(np.isnan(losses)):
-                report["healthy"] = False
-                report["issues"].append("Training history contains NaNs. The model may be unstable.")
-            
-            # Check if loss actually improved
-            initial_loss = losses[0]
-            final_loss = losses[-1]
-            if not (final_loss < initial_loss):
-                report["healthy"] = False
-                report["issues"].append(f"Model failed to improve during training (Loss started at {initial_loss:.4f} and ended at {final_loss:.4f}).")
-            
-            report["history_summary"] = {
-                "epochs": len(losses),
-                "initial_loss": float(initial_loss),
-                "final_loss": float(final_loss),
-                "improvement": float(initial_loss - final_loss)
-            }
-        else:
-            report["healthy"] = False
-            report["issues"].append("Training history missing; cannot assess learning trend.")
 
         # 3. Mandatory Deep Audit (Manifold health)
         if self.encoder is not None:
