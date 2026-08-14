@@ -12,7 +12,7 @@ from embkit.optimize import (
     fit_vae,
 )
 from embkit.losses import BCEWithLogitsVAELoss
-from embkit.models.vae.vae import VAE
+from embkit.models.vae import VAE, BaseVAE
 
 
 class TinyModel(nn.Module):
@@ -53,7 +53,7 @@ class TestOptimizeHelpers(unittest.TestCase):
             fit_vae(vae, bad_df, epochs=1, loss=BCEWithLogitsVAELoss(), progress=False)
 
     def test_fit_vae_accepts_dataloader(self):
-        vae = VAE(features=["G1", "G2"], latent_dim=1)
+        vae = BaseVAE(features=["G1", "G2"], latent_dim=1)
         x = torch.tensor([[0.1, 0.2], [0.2, 0.3]], dtype=torch.float32)
         loader = DataLoader(TensorDataset(x), batch_size=1, shuffle=False)
         out = fit_vae(vae, loader, epochs=1, loss=BCEWithLogitsVAELoss(), progress=False)

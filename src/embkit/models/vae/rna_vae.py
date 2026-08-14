@@ -15,7 +15,7 @@ from torch import nn
 from torch.utils.data import TensorDataset, DataLoader
 
 from .vae import VAE, Decoder
-from .encoder import Encoder
+from .encoder import Encoder, EncoderOutput
 from ...factory.layers import Layer, LayerList
 from ... import get_device
 from ...losses import BCEKLWeightedVAELoss
@@ -89,7 +89,7 @@ class RNAEncoder(Encoder):
         eps = torch.randn_like(std)
         z = mu + eps * std
         
-        return mu, logvar, z
+        return EncoderOutput(mu=mu, logvar=logvar, z=z)
 
 
 @factory.nn_module

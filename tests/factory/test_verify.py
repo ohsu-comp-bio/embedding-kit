@@ -55,7 +55,6 @@ class TestModelVerification(unittest.TestCase):
 
     def test_rna_vae_verification(self):
         model = RNAVAE(features=self.features, latent_dim=2)
-        model.history = {"loss": [1.0, 0.5]}
         path = os.path.join(self.temp_dir.name, "rnavae.model")
         save(model, path)
         

@@ -24,6 +24,7 @@ class VAEOutput(NamedTuple):
     z: torch.Tensor
 
 
+@nn_module
 class VAE(nn.Module):
     """
     Minimal VAE wrapper to hold encoder/decoder and provide forward().
@@ -240,7 +241,7 @@ class BaseVAE(VAE):
 
         if latent_dim is None:
             raise ValueError("latent_dim is required when encoder/decoder are not provided.")
-        encoder = self.build_encoder(
+        encoder = Encoder(
             feature_dim=feature_dim,
             latent_dim=latent_dim,
             layers=encoder_layers,
@@ -248,7 +249,7 @@ class BaseVAE(VAE):
             sampling=sampling,
             device=device, dtype=dtype
         )
-        decoder = self.build_decoder(
+        decoder = Decoder(
             feature_dim=feature_dim,
             latent_dim=latent_dim,
             layers=decoder_layers,
@@ -262,5 +263,5 @@ class BaseVAE(VAE):
             decoder_layers_cfg = decoder_layers,
             batch_norm = batch_norm,
             sampling = sampling,
-            atent_dim = latent_dim
+            latent_dim = latent_dim
         )

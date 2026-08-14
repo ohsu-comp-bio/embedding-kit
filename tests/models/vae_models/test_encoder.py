@@ -145,7 +145,7 @@ class TestEncoder(unittest.TestCase):
     def test_default_sampling_is_true(self):
         """Encoder default should have sampling enabled for proper VAE training."""
         enc = Encoder(feature_dim=6, latent_dim=3)
-        self.assertTrue(enc._sampling, "Default sampling should be True")
+        self.assertTrue(enc.sampling, "Default sampling should be True")
 
     def test_forward_always_returns_three_tuple_with_latent_heads(self):
         """forward() must always return (mu, logvar, z) when make_latent_heads=True."""

@@ -13,7 +13,7 @@ from ..files import H5Reader
 from ..factory import save, load
 from ..factory.layers import Layer, LayerList
 from ..optimize import fit_vae
-from ..models.vae.vae import VAE
+from ..models.vae.vae import BaseVAE
 from ..models.vae.net_vae import NetVAE
 from ..preprocessing import ExpMinMaxScaler, get_dataset_nonzero_mask
 from ..datasets import DatasetMask
@@ -115,7 +115,7 @@ def train_vae(input_path: str,
         for b in schedule.split(","):
             e, b = b.split(":")
             beta_schedule.append( (float(b), int(e)) )
-    vae = VAE(features=features,
+    vae = BaseVAE(features=features,
               latent_dim=latent,
               encoder_layers=enc_layers_list,
               decoder_layers=dec_layers_list,

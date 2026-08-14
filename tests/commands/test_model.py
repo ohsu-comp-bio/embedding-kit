@@ -97,7 +97,7 @@ class TestModelCommands(unittest.TestCase):
 
     @patch.object(model_cmd, "save")
     @patch.object(model_cmd, "fit_vae")
-    @patch.object(model_cmd, "VAE")
+    @patch.object(model_cmd, "BaseVAE")
     def test_train_vae_tsv_branches(self, vae_cls, fit_mock, save_mock):
         dummy_model = MagicMock(name="vae")
         vae_cls.return_value = dummy_model

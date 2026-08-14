@@ -54,9 +54,9 @@ class Encoder(nn.Module):
         super().__init__()
         self.feature_dim = int(feature_dim)
         self.latent_dim = int(latent_dim)
-        self._default_activation = default_activation
-        self._make_latent_heads = make_latent_heads
-        self._sampling = sampling
+        self.default_activation = default_activation
+        self.make_latent_heads = make_latent_heads
+        self.sampling = sampling
         self.constraint = constraint
         self.batch_norm = batch_norm
 
@@ -81,7 +81,7 @@ class Encoder(nn.Module):
             # Latent heads requirement
             self.z_mean = None
             self.z_log_var = None
-            if self._make_latent_heads:
+            if self.make_latent_heads:
                 if in_features != self.latent_dim:
                     raise ValueError(
                         "Final hidden width must equal latent_dim because the encoder "
@@ -107,7 +107,7 @@ class Encoder(nn.Module):
                 self.net.append(proj)
 
             # Optional default activation after the auto-projection
-            act = get_activation(self._default_activation)
+            act = get_activation(self.default_activation)
             if act is not None:
                 self.net.append(act())
 
@@ -119,7 +119,7 @@ class Encoder(nn.Module):
             # Latent heads
             self.z_mean = None
             self.z_log_var = None
-            if self._make_latent_heads:
+            if self.make_latent_heads:
                 self.z_mean = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
                 self.z_log_var = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
 
@@ -130,10 +130,10 @@ class Encoder(nn.Module):
         for layer in self.net:
             h = layer(h)
 
-        if self._make_latent_heads and (self.z_mean is not None) and (self.z_log_var is not None):
+        if self.make_latent_heads and (self.z_mean is not None) and (self.z_log_var is not None):
             mu = self.z_mean(h)
             logvar = self.z_log_var(h)
-            if self._sampling and self.training:
+            if self.sampling and self.training:
                 std = torch.exp(0.5 * logvar)
                 eps = torch.randn_like(std)
                 z = mu + eps * std
@@ -148,9 +148,9 @@ class Encoder(nn.Module):
             "feature_dim": self.feature_dim,
             "latent_dim": self.latent_dim,
             "batch_norm": self.batch_norm,
-            "default_activation": self._default_activation,
-            "make_latent_heads": self._make_latent_heads,
-            "sampling": self._sampling,
+            "default_activation": self.default_activation,
+            "make_latent_heads": self.make_latent_heads,
+            "sampling": self.sampling,
             "constraint": self.constraint.to_dict() if self.constraint else None,
         }
 

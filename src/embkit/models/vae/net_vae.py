@@ -140,12 +140,12 @@ class NetVAE(VAE):
             dtype=dtype,
         )
 
-        super().__init__(features=feature_list, encoder=encoder, decoder=decoder)
+        super().__init__(encoder=encoder, decoder=decoder)
         self.latent_groups: Dict[str, List[str]] = latent_groups
         self.latent_index: List[str] = latent_index
         self.group_layer_scale: List[int] = list(group_layer_scale)
-        self.history: Dict[str, List[float]] = {}
         self.normal_stats: Optional[pd.DataFrame] = None
+        self.features = feature_list
 
     def _iter_pathway_constraints(self):
         modules = []
@@ -269,7 +269,6 @@ class NetVAE(VAE):
             "latent_groups": self.latent_groups,
             "latent_index": self.latent_index,
             "group_layer_scale": self.group_layer_scale,
-            "history": getattr(self, "history", {}) or {}
         }
 
     @classmethod
@@ -288,5 +287,4 @@ class NetVAE(VAE):
             latent_index=d.get("latent_index"),
             group_layer_scale=d.get("group_layer_scale"),
         )
-        model.history = d.get("history") or {}
         return model
