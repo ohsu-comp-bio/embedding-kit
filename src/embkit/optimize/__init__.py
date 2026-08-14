@@ -15,7 +15,7 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 from tqdm.autonotebook import tqdm
 import numpy as np
-from ..losses import net_vae_loss, VAELoss, BCEWithLogitsVAELoss
+from ..losses import net_vae_loss, VAELoss, BCEWithLogitsVAELoss, MSEVAELoss
 
 from .. import get_device, dataframe_loader
 
@@ -271,11 +271,11 @@ def fit_vae(model,
     """
 
     if loss is None:
-        raise ValueError("loss function is required (e.g., from embkit.losses.vae_loss)")
+        criterion = MSEVAELoss()
+    else:
+        criterion = loss
 
     # --- setup ---
-    if lr is None:
-        lr = model.lr
     if device is None:
         device = get_device()
 
@@ -323,14 +323,10 @@ def fit_vae(model,
 
         recon, mu, logvar, _ = model(x_tensor)
 
-        if isinstance(loss, VAELoss):
-            # nn.Module-based loss: update beta state then call forward
-            if beta_value is not None:
-                loss.beta = beta_value
-            total_loss, recon_loss, kl_loss = loss(recon, x_tensor, mu, logvar)
-        else:
-            # Legacy callable: pass beta as keyword argument
-            total_loss, recon_loss, kl_loss = loss(recon, x_tensor, mu, logvar, beta=beta_value)
+        # nn.Module-based loss: update beta state then call forward
+        if beta_value is not None:
+            criterion.beta = beta_value
+        total_loss, recon_loss, kl_loss = criterion(recon, x_tensor, mu, logvar)
 
         return {
             "loss": total_loss,
@@ -338,7 +334,7 @@ def fit_vae(model,
             "kl": kl_loss,
         }
 
-    return _run_training_phases(
+    _run_training_phases(
         model=model,
         loader=data_loader,
         optimizer=opt,
@@ -348,6 +344,8 @@ def fit_vae(model,
         progress=progress,
         accumulate_steps=accumulate_steps,
     )
+
+    return history
 
 
 def fit_net_vae(

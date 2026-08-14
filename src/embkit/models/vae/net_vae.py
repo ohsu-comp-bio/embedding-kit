@@ -3,13 +3,13 @@ NetVAE implementation
 """
 import logging
 
-from typing import Dict, List, Optional, Union, Any
+from typing import Dict, List, Optional, Any
 import pandas as pd
 import torch
 import numpy as np
 from ...modules import MaskedLinear
 
-from .vae import VAE
+from .vae import VAE, Encoder, Decoder
 from ... import factory
 from ...pathway import build_feature_map_indices
 from ...constraints import PathwayConstraintInfo
@@ -124,7 +124,7 @@ class NetVAE(VAE):
             )
         )
 
-        encoder = self.build_encoder(
+        encoder = Encoder(
             feature_dim=len(feature_list),
             latent_dim=latent_size,
             layers=factory.LayerList(enc_layers),
@@ -132,7 +132,7 @@ class NetVAE(VAE):
             device=device,
             dtype=dtype,
         )
-        decoder = self.build_decoder(
+        decoder = Decoder(
             feature_dim=len(feature_list),
             latent_dim=latent_size,
             layers=factory.LayerList(dec_layers),

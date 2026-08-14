@@ -14,7 +14,7 @@ from torch.optim import Adam
 from torch import nn
 from torch.utils.data import TensorDataset, DataLoader
 
-from .vae import BaseVAE
+from .vae import VAE, Decoder
 from .encoder import Encoder
 from ...factory.layers import Layer, LayerList
 from ... import get_device
@@ -93,7 +93,7 @@ class RNAEncoder(Encoder):
 
 
 @factory.nn_module
-class RNAVAE(BaseVAE):
+class RNAVAE(VAE):
     """    
     Architecture:
     - Encoder: feature_dim -> feature_dim//2 -> feature_dim//3 -> latent_dim
@@ -107,12 +107,7 @@ class RNAVAE(BaseVAE):
             self,
             features: List[str],
             latent_dim: int = 768,
-            lr: float = 0.0005,
     ):
-        super().__init__(features=features)
-        self.lr = lr
-        self.latent_dim = latent_dim
-
         feature_dim = len(features)
 
         # Build encoder: feature_dim -> feature_dim//2 -> feature_dim//3
@@ -122,7 +117,7 @@ class RNAVAE(BaseVAE):
         ]
         
         # Use custom RNAEncoder with BatchNorm + ReLU on latent heads
-        self.encoder = RNAEncoder(
+        encoder = RNAEncoder(
             feature_dim=feature_dim,
             latent_dim=latent_dim,
             layers=LayerList(enc_layers),
@@ -134,17 +129,15 @@ class RNAVAE(BaseVAE):
             Layer(units=feature_dim, activation="sigmoid"),
         ]
         
-        self.decoder = self.build_decoder(
+        decoder = Decoder(
             feature_dim=feature_dim,
             latent_dim=latent_dim,
             layers=LayerList(dec_layers),
         )
-        
-        # Initialize weights with Xavier/Glorot (TensorFlow default)
-        self._initialize_weights()
 
-        # History tracking
-        self.history: Dict[str, list] = {"loss": [], "recon": [], "kl": [], "beta": []}
+        super().__init__(encoder=encoder, decoder=decoder)
+        self.features = features
+        self.latent_dim = latent_dim
 
     def _initialize_weights(self):
         """Initialize weights with glorot_uniform like TensorFlow"""
@@ -160,127 +153,6 @@ class RNAVAE(BaseVAE):
         mu, logvar, z = self.encoder(x)
         recon = self.decoder(z)
         return recon, mu, logvar, z
-
-    def fit(
-            self,
-            X: Union[pd.DataFrame, torch.Tensor],
-            epochs: int = 100,
-            batch_size: int = 512,
-            kappa: float = 1.0,
-            early_stopping_patience: int = 3,
-            device: Optional[torch.device] = None,
-            progress: bool = True,
-    ):
-        """
-        Train the RNA VAE with beta warmup.
-        
-        Args:
-            X: Input data (DataFrame or Tensor)
-            epochs: Number of training epochs
-            batch_size: Batch size for training
-            kappa: Beta warmup rate (beta increases by kappa each epoch)
-            early_stopping_patience: Stop if loss doesn't improve for this many epochs
-            device: Device to use ('cuda', 'mps', or 'cpu')
-            progress: Show progress bar
-        """
-        # Setup device
-        if device is None:
-            device = get_device()
-        
-        self.to(device)
-        self.train()
-
-        # Column alignment safety check
-        if hasattr(X, "columns") and self.features is not None:
-            if list(X.columns) != list(self.features):
-                raise ValueError(
-                    f"Input DataFrame columns do not match model features.\n"
-                    f"Data columns: {list(X.columns)[:5]}... (n={len(X.columns)})\n"
-                    f"Model features: {self.features[:5]}... (n={len(self.features)})"
-                )
-
-        # Convert to tensor
-        if isinstance(X, pd.DataFrame):
-            X_tensor = torch.tensor(X.to_numpy(dtype="float32", copy=True), dtype=torch.float32, device=device)
-        else:
-            X_tensor = X.to(device)
-
-        # Build dataloader
-        dataset = TensorDataset(X_tensor)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-
-        # Optimizer
-        optimizer = Adam(self.parameters(), lr=self.lr)
-
-        # Loss function — RNA VAE uses kl_weight=5.0; beta starts at 0.0 and warms up
-        loss_fn = BCEKLWeightedVAELoss(beta=0.0, kl_weight=5.0)
-
-        # Early stopping
-        best_loss = float('inf')
-        patience_counter = 0
-        best_state = None
-
-        # Training loop
-        start_time = time.time()
-        
-        for epoch in range(epochs):
-            # Beta warmup via loss object
-            loss_fn.step_beta(kappa=kappa, max_beta=1.0)
-            
-            # Train epoch
-            epoch_loss_sum = 0.0
-            epoch_recon_sum = 0.0
-            epoch_kl_sum = 0.0
-            epoch_batches = 0
-
-            for (batch_x,) in dataloader:
-                optimizer.zero_grad(set_to_none=True)
-
-                # Forward pass
-                recon, mu, logvar, z = self(batch_x)
-
-                # Compute loss with current beta and kl_weight=5.0 (RNA VAE specific)
-                total_loss, recon_loss, kl_loss = loss_fn(recon, batch_x, mu, logvar)
-
-                # Backprop
-                total_loss.backward()
-                optimizer.step()
-
-                # Accumulate stats
-                epoch_loss_sum += float(total_loss.detach().cpu())
-                epoch_recon_sum += float(recon_loss.detach().cpu())
-                epoch_kl_sum += float(kl_loss.detach().cpu())
-                epoch_batches += 1
-
-            # Compute epoch means
-            ep_loss = epoch_loss_sum / epoch_batches
-            ep_recon = epoch_recon_sum / epoch_batches
-            ep_kl = epoch_kl_sum / epoch_batches
-            
-            self.history["loss"].append(ep_loss)
-            self.history["recon"].append(ep_recon)
-            self.history["kl"].append(ep_kl)
-            self.history["beta"].append(loss_fn.beta)
-
-            logger.info("Epoch %d/%d - loss: %.4f - beta: %.4f", epoch + 1, epochs, ep_loss, loss_fn.beta)
-
-            # Early stopping check
-            if ep_loss < best_loss:
-                best_loss = ep_loss
-                best_state = {k: v.cpu().clone() for k, v in self.state_dict().items()}
-                patience_counter = 0
-            else:
-                patience_counter += 1
-                if patience_counter >= early_stopping_patience:
-                    logger.info("Early stopping triggered at epoch %d", epoch + 1)
-                    if best_state is not None:
-                        self.load_state_dict(best_state)
-                    break
-
-        training_time = time.time() - start_time
-        logger.info("Training completed in %.2f seconds", training_time)
-
-        return self.history
 
     def verify_integrity(self) -> Dict[str, Any]:
         """
@@ -321,16 +193,12 @@ class RNAVAE(BaseVAE):
         return {
             "features": self.features,
             "latent_dim": self.latent_dim,
-            "lr": self.lr,
-            "history": getattr(self, "history", {}) or {}
         }
 
     @classmethod
     def from_dict(cls, d):
         model = RNAVAE(
             features=d["features"],
-            latent_dim=d.get("latent_dim", 768),
-            lr=d.get("lr", 0.0005),
+            latent_dim=d.get("latent_dim", 768)
         )
-        model.history = d.get("history") or {}
         return model

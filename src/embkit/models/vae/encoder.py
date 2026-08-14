@@ -141,7 +141,7 @@ class Encoder(nn.Module):
                 z = mu
             return EncoderOutput(mu=mu, logvar=logvar, z=z)
 
-        return h
+        return EncoderOutput(mu=h)
     
     def to_dict(self):
         return {

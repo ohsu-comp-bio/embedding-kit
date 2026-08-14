@@ -1,22 +1,16 @@
 import logging
-from typing import List, Optional
-import torch
+from typing import Any, List, Optional, Dict, TypeVar, NamedTuple
 
-from ...factory.mapping import nn_module, get_class_name
-from ...factory.layers import Layer, LayerList
-from ...factory import build
-
-from typing import Type, Any, List, Optional, Dict, overload, TypeVar, Union, NamedTuple
-import logging
 import numpy as np
 from torch import nn
 import torch
-from .encoder import Encoder, EncoderOutput
+
+from .encoder import Encoder
 from .decoder import Decoder
-from ...factory.layers import Layer, LayerList
-from ... import get_device
-import importlib
-import inspect
+from ...factory.layers import LayerList
+from ...factory.mapping import nn_module
+from ...factory import build
+
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
