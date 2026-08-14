@@ -238,5 +238,31 @@ class BaseVAE(VAE):
             decoder_layers_cfg = decoder_layers,
             batch_norm = batch_norm,
             sampling = sampling,
-            latent_dim = latent_dim
+            latent_dim = latent_dim, 
+            features=features
+        )
+        self.encoder_layers = encoder_layers
+        self.decoder_layers = decoder_layers
+        self.batch_norm = batch_norm
+        self.sampling = sampling
+        self.latent_dim = latent_dim
+        self.features = features
+
+    def to_dict(self):
+        return {
+            "features": self.features,
+            "latent_dim": self.latent_dim,
+            "encoder_layers": self.encoder_layers.to_dict() if self.encoder_layers else None,
+            "decoder_layers": self.decoder_layers.to_dict() if self.decoder_layers else None,
+            "batch_norm": self.batch_norm,
+            "sampling": self.sampling,
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        return BaseVAE(
+            features=data["features"],
+            latent_dim=data["latent_dim"],
+            encoder_layers=build(data["encoder_layers"]) if data["encoder_layers"] else None,
+            decoder_layers=build(data["decoder_layers"]) if data["decoder_layers"] else None
         )

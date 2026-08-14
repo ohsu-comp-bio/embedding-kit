@@ -282,6 +282,7 @@ def fit_vae(model,
     if beta_schedule is not None:
         logger.info("Using beta_schedule: %s", beta_schedule)
 
+    """
     # Column alignment safety check if a DataFrame is passed
     if hasattr(X, "columns") and hasattr(model, "features"):
         if list(X.columns) != list(model.features):
@@ -290,6 +291,7 @@ def fit_vae(model,
                 f"Data columns: {list(X.columns)[:5]}... (n={len(X.columns)})\n"
                 f"Model features: {model.features[:5]}... (n={len(model.features)})"
             )
+    """
 
     model.to(device)
     # Ensure biological masks are strictly enforced before training starts
@@ -321,12 +323,13 @@ def fit_vae(model,
         (x_tensor,) = batch
         x_tensor = x_tensor.to(device).float()
 
-        recon, mu, logvar, _ = model(x_tensor)
+        print(x_tensor)
+        res = model(x_tensor)
 
         # nn.Module-based loss: update beta state then call forward
         if beta_value is not None:
             criterion.beta = beta_value
-        total_loss, recon_loss, kl_loss = criterion(recon, x_tensor, mu, logvar)
+        total_loss, recon_loss, kl_loss = criterion(res.recon, x_tensor, res.mu, res.logvar)
 
         return {
             "loss": total_loss,

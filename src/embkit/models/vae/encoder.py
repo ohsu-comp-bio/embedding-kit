@@ -150,6 +150,7 @@ class Encoder(nn.Module):
         self.make_latent_heads = make_latent_heads
         self.sampling = sampling
         self.constraint = constraint
+        self.layers = layers
         self.batch_norm = batch_norm
 
         self.net = nn.ModuleList()
@@ -204,7 +205,8 @@ class Encoder(nn.Module):
                 self.net.append(act())
 
             # Optional BN after the auto-projection
-            self.net.append(nn.BatchNorm1d(self.latent_dim, device=device, dtype=dtype))
+            if batch_norm:
+                self.net.append(nn.BatchNorm1d(self.latent_dim, device=device, dtype=dtype))
 
             in_features = self.latent_dim
 
@@ -244,14 +246,17 @@ class Encoder(nn.Module):
             "make_latent_heads": self.make_latent_heads,
             "sampling": self.sampling,
             "constraint": self.constraint.to_dict() if self.constraint else None,
+            "layers": self.layers.to_dict() if self.layers else None,
         }
 
     @classmethod
     def from_dict(cls, d):
         constraint = build(d["constraint"]) if d.get("constraint") else None
+        layers = build(d["layers"]) if d.get("layers") else None
         return Encoder(
             feature_dim=d["feature_dim"],
             latent_dim=d["latent_dim"],
+            layers=layers,
             batch_norm=d.get("batch_norm", False),
             default_activation=d.get("default_activation", "relu"),
             make_latent_heads=d.get("make_latent_heads", True),

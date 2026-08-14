@@ -102,7 +102,6 @@ def train_vae(input_path: str,
     
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     
-
     layer_sizes = list( int(i) for i in encode_layers.split(",") )
     enc_layers_list = LayerList( layer_sizes )
 

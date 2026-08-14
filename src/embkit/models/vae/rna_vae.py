@@ -14,7 +14,7 @@ from torch.optim import Adam
 from torch import nn
 from torch.utils.data import TensorDataset, DataLoader
 
-from .vae import VAE, Decoder
+from .vae import VAE, Decoder, VAEOutput
 from .encoder import Encoder, EncoderOutput
 from ...factory.layers import Layer, LayerList
 from ... import get_device
@@ -152,7 +152,7 @@ class RNAVAE(VAE):
         """Standard VAE forward pass"""
         mu, logvar, z = self.encoder(x)
         recon = self.decoder(z)
-        return recon, mu, logvar, z
+        return VAEOutput(recon=recon, mu=mu, logvar=logvar, z=z)
 
     def verify_integrity(self) -> Dict[str, Any]:
         """

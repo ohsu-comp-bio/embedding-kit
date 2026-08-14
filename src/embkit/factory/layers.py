@@ -26,7 +26,7 @@ class ConstraintInfo(ABC):
 
     @staticmethod
     def from_dict(d: Dict[str, Any]) -> "ConstraintInfo":
-        raise ValueError(f"This needs to be implemented")
+        raise ValueError("This needs to be implemented")
 
 
 @nn_module
@@ -133,6 +133,7 @@ class LayerModule(nn.ModuleList):
         o = list( build(n) for n in data["modules"] )
         return LayerModule(o)
 
+@nn_module
 class LayerList:
     def __init__(self, layers: Optional[List[Layer]] = None, activation="relu", end_activation="relu"):
         new_layers = []
@@ -146,6 +147,8 @@ class LayerList:
                 else:
                     new_layers.append(l)
         self.layers = new_layers
+        self.activation = activation
+        self.end_activation = end_activation
 
     def build(self, input_dim:int, output_dim:int, device=None, dtype=None) -> nn.Module:
         if not self.layers:
@@ -168,6 +171,18 @@ class LayerList:
         if cur_dim != output_dim:
             layers.append(Linear(in_features=cur_dim, out_features=output_dim, device=device, dtype=dtype))
         return Sequential(*layers)
+
+    def to_dict(self):
+        return {
+            "layers": list( l.to_dict() for l in self.layers ),
+            "activation": self.activation,
+            "end_activation": self.end_activation
+        }
+
+    @classmethod
+    def from_dict(cls, d):
+        l = list( build(i) for i in d["layers"] )
+        return LayerList(layers=l, activation=d["activation"], end_activation=d["end_activation"])
 
     def __repr__(self):
         o = []
