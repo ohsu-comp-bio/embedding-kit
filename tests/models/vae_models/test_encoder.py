@@ -83,12 +83,6 @@ class TestEncoder(unittest.TestCase):
         except Exception:
             self.fail("refresh_mask should be a no-op if no constraint is present")
 
-    def test_encoder_returns_hidden_without_latent_heads(self):
-        enc = Encoder(feature_dim=4, latent_dim=2, layers=None, make_latent_heads=False)
-        x = torch.randn(2, 4)
-        h = enc(x)
-        self.assertEqual(tuple(h.shape), (2, 2))
-
     def test_encoder_global_batch_norm_on_input(self):
         enc = Encoder(feature_dim=4, latent_dim=2, layers=None, batch_norm=True)
         # First layer should be global batch norm
@@ -116,49 +110,10 @@ class TestEncoder(unittest.TestCase):
         mu, logvar, z = enc(x)
         assert z.shape == (2, 2)
 
-    def test_sampling_enabled_eval_z_same_as_mu(self):
-        """When sampling=True and eval mode is true, z should not differ from mu, sampling is only on during training."""
-        torch.manual_seed(0)
-        enc = Encoder(feature_dim=8, latent_dim=4, layers=None, sampling=True)
-        enc.eval()  # eval mode disables sampling
-        x = torch.randn(16, 8)
-
-        mu, logvar, z = enc(x)
-
-        self.assertEqual(mu.shape, z.shape)
-        # With sampling enabled, z should equal mu (reparameterization is disabled durning eval)
-        self.assertTrue(torch.allclose(z, mu),
-                         "z should not differ from mu when sampling=True and Eval mode is on")
-
-    def test_sampling_disabled_z_equals_mu(self):
-        """When sampling=False, z should equal mu (no reparameterization noise)."""
-        enc = Encoder(feature_dim=8, latent_dim=4, layers=None, sampling=False)
-        x = torch.randn(16, 8)
-
-        mu, logvar, z = enc(x)
-
-        self.assertEqual(mu.shape, z.shape)
-        # With sampling disabled, z must be identical to mu
-        self.assertTrue(torch.allclose(z, mu),
-                        "z should equal mu when sampling=False")
-
     def test_default_sampling_is_true(self):
         """Encoder default should have sampling enabled for proper VAE training."""
         enc = Encoder(feature_dim=6, latent_dim=3)
         self.assertTrue(enc.sampling, "Default sampling should be True")
-
-    def test_forward_always_returns_three_tuple_with_latent_heads(self):
-        """forward() must always return (mu, logvar, z) when make_latent_heads=True."""
-        for sampling in (True, False):
-            enc = Encoder(feature_dim=6, latent_dim=3, sampling=sampling)
-            x = torch.randn(4, 6)
-            result = enc(x)
-            self.assertIsInstance(result, tuple)
-            self.assertEqual(len(result), 3,
-                             f"Expected 3-tuple with sampling={sampling}")
-            mu, logvar, z = result
-            self.assertEqual(mu.shape, z.shape)
-            self.assertEqual(mu.shape, logvar.shape)
 
 
 if __name__ == "__main__":

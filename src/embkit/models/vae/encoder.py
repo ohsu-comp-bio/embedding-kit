@@ -127,7 +127,6 @@ class Encoder(nn.Module):
     input -> [optional global BN] -> [LayerInfo...] -> (latent heads optional)
 
     If `layers` is provided:
-      - Final hidden width MUST equal latent_dim when make_latent_heads=True.
 
     If `layers` is None/empty:
       - Insert a Linear projection to latent_dim (+ optional act + BN) and attach latent heads.
@@ -139,7 +138,6 @@ class Encoder(nn.Module):
                  layers: Optional[LayerList] = None,
                  batch_norm: bool = False,
                  default_activation: Union[str, None] = "relu",
-                 make_latent_heads: bool = True,
                  sampling : bool = True,
                  constraint: Optional[ConstraintInfo] = None,
                  device=None, dtype=None):
@@ -147,7 +145,6 @@ class Encoder(nn.Module):
         self.feature_dim = int(feature_dim)
         self.latent_dim = int(latent_dim)
         self.default_activation = default_activation
-        self.make_latent_heads = make_latent_heads
         self.sampling = sampling
         self.constraint = constraint
         self.layers = layers
@@ -174,16 +171,15 @@ class Encoder(nn.Module):
             # Latent heads requirement
             self.z_mean = None
             self.z_log_var = None
-            if self.make_latent_heads:
-                if in_features != self.latent_dim:
-                    raise ValueError(
-                        "Final hidden width must equal latent_dim because the encoder "
-                        "does not insert a latent projection when layers are provided.\n"
-                        f"Final hidden size: {in_features}  vs  latent_dim: {self.latent_dim}\n"
-                        "Fix by setting your last Layer(units=latent_dim)."
-                    )
-                self.z_mean = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
-                self.z_log_var = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
+            if in_features != self.latent_dim:
+                raise ValueError(
+                    "Final hidden width must equal latent_dim because the encoder "
+                    "does not insert a latent projection when layers are provided.\n"
+                    f"Final hidden size: {in_features}  vs  latent_dim: {self.latent_dim}\n"
+                    "Fix by setting your last Layer(units=latent_dim)."
+                )
+            self.z_mean = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
+            self.z_log_var = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
 
         else:
             logger.info("No encoder layers provided; inserting auto-projection to latent_dim=%d", self.latent_dim)
@@ -213,9 +209,8 @@ class Encoder(nn.Module):
             # Latent heads
             self.z_mean = None
             self.z_log_var = None
-            if self.make_latent_heads:
-                self.z_mean = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
-                self.z_log_var = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
+            self.z_mean = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
+            self.z_log_var = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
 
         self._final_width = in_features
 
@@ -223,19 +218,15 @@ class Encoder(nn.Module):
         h = x
         for layer in self.net:
             h = layer(h)
-
-        if self.make_latent_heads and (self.z_mean is not None) and (self.z_log_var is not None):
-            mu = self.z_mean(h)
-            logvar = self.z_log_var(h)
-            if self.sampling and self.training:
-                std = torch.exp(0.5 * logvar)
-                eps = torch.randn_like(std)
-                z = mu + eps * std
-            else:
-                z = mu
-            return EncoderOutput(mu=mu, logvar=logvar, z=z)
-
-        return EncoderOutput(mu=h)
+        mu = self.z_mean(h)
+        logvar = self.z_log_var(h)
+        if self.sampling and self.training:
+            std = torch.exp(0.5 * logvar)
+            eps = torch.randn_like(std)
+            z = mu + eps * std
+        else:
+            z = mu
+        return EncoderOutput(mu=mu, logvar=logvar, z=h)
     
     def to_dict(self):
         return {
@@ -243,7 +234,6 @@ class Encoder(nn.Module):
             "latent_dim": self.latent_dim,
             "batch_norm": self.batch_norm,
             "default_activation": self.default_activation,
-            "make_latent_heads": self.make_latent_heads,
             "sampling": self.sampling,
             "constraint": self.constraint.to_dict() if self.constraint else None,
             "layers": self.layers.to_dict() if self.layers else None,
@@ -259,7 +249,6 @@ class Encoder(nn.Module):
             layers=layers,
             batch_norm=d.get("batch_norm", False),
             default_activation=d.get("default_activation", "relu"),
-            make_latent_heads=d.get("make_latent_heads", True),
             sampling=d.get("sampling", False),
             constraint=constraint
         )

@@ -51,7 +51,6 @@ class RNAEncoder(Encoder):
             latent_dim=latent_dim,
             layers=layers,
             batch_norm=batch_norm,
-            make_latent_heads=False  # We'll build custom ones
         )
         
         # Build custom latent heads with BatchNorm + ReLU
