@@ -328,6 +328,10 @@ def fit_vae(model,
         # nn.Module-based loss: update beta state then call forward
         if beta_value is not None:
             criterion.beta = beta_value
+<<<<<<< HEAD
+=======
+        # print(res, x_tensor, res.mu, res.logvar)
+>>>>>>> 3ea8888 (Fixing unit test that broken when positional encoding was updated)
         total_loss, recon_loss, kl_loss = criterion(res.recon, x_tensor, res.mu, res.logvar)
 
         return {
