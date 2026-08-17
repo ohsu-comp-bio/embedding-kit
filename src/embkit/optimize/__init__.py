@@ -328,7 +328,7 @@ def fit_vae(model,
         # nn.Module-based loss: update beta state then call forward
         if beta_value is not None:
             criterion.beta = beta_value
-        print(res, x_tensor, res.mu, res.logvar)
+        # print(res, x_tensor, res.mu, res.logvar)
         total_loss, recon_loss, kl_loss = criterion(res.recon, x_tensor, res.mu, res.logvar)
 
         return {
