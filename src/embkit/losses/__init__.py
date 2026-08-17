@@ -1,4 +1,4 @@
-from .base import VAELoss
+from .base import VAELoss, VAELossOutput
 from .vae_loss import (
     # Concrete nn.Module loss classes
     MSEVAELoss,

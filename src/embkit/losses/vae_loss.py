@@ -20,14 +20,8 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-from .base import VAELoss
+from .base import VAELoss, VAELossOutput
 
-
-class VAELossOutput(NamedTuple):
-    """Named output of :meth:`VAELoss.forward`."""
-    total: Tensor
-    recon: Tensor
-    kl: Tensor
 
 
 # ---------------------------------------------------------------------------
