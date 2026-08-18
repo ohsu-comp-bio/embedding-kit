@@ -13,11 +13,11 @@ from ..files import H5Reader
 from ..factory import save, load
 from ..factory.layers import Layer, LayerList
 from ..optimize import fit_vae
-from ..models.vae.vae import VAE
+from ..models.vae.vae import BaseVAE
 from ..models.vae.net_vae import NetVAE
 from ..preprocessing import ExpMinMaxScaler, get_dataset_nonzero_mask
 from ..datasets import DatasetMask
-from ..losses import bce_with_logits, bce, mse
+from ..losses import get_vae_loss
 from ..pathway import extract_sif_interactions, feature_map_intersect, build_feature_map_indices
 
 model = click.Group(name="model", help="VAE Model commands.")
@@ -102,7 +102,6 @@ def train_vae(input_path: str,
     
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     
-
     layer_sizes = list( int(i) for i in encode_layers.split(",") )
     enc_layers_list = LayerList( layer_sizes )
 
@@ -115,18 +114,14 @@ def train_vae(input_path: str,
         for b in schedule.split(","):
             e, b = b.split(":")
             beta_schedule.append( (float(b), int(e)) )
-    vae = VAE(features=features,
+    vae = BaseVAE(features=features,
               latent_dim=latent,
               encoder_layers=enc_layers_list,
               decoder_layers=dec_layers_list,
               sampling=sampling,
               device=device, dtype=dtype)
 
-    loss_func = bce_with_logits
-    if loss == "mse":
-        loss_func = mse
-    elif loss == "bce":
-        loss_func = bce
+    loss_func = get_vae_loss(loss)
 
     fit_vae(vae, dataloader, epochs=epochs,
             beta_schedule=beta_schedule, lr=learning_rate, loss=loss_func)
@@ -195,7 +190,7 @@ def train_vae(input_path: str,
 @click.option("--out", "-o", type=str, default=None)
 @click.option("--schedule", "-s", type=str, default=None, help="20:0,20:0.1,40:.3,40:.4")
 @click.option("--loss", type=click.Choice(["mse", "bce", "bce-logit"]), default="bce-logit")
-@click.option("--min-group-size", type=int, default=0, show_default=True, help="Minimum group size filter for pathway feature map (including self if present).")
+@click.option("--min-group-size", type=int, default=2, show_default=True, help="Minimum group size filter for pathway feature map (including self if present).")
 @click.option("--group-layer-scale", default="5,2,1", show_default=True,
               help="Comma-separated per-group widths for NetVAE masked layers.")
 @click.option("--save-stats", is_flag=True)
@@ -239,11 +234,7 @@ def train_netvae(input_path: str, pathway_sif:str, out:str,
     if not gcounts or any(v <= 0 for v in gcounts):
         raise click.BadParameter("--group-layer-scale must contain one or more positive integers.")
 
-    loss_func = bce_with_logits
-    if loss == "mse":
-        loss_func = mse
-    elif loss == "bce":
-        loss_func = bce
+    loss_func = get_vae_loss(loss)
 
     if beta_schedule is None:
         beta_schedule = [(0.0, epochs)]
@@ -285,7 +276,7 @@ def encode(input_path: str, model_path:str, normalize:str, out:str):
     m.to(get_device())
     result = m.encoder(df_tensor)
     
-    matrix = result[0].detach().cpu().numpy()
+    matrix = result[2].detach().cpu().numpy()
     out_df = pd.DataFrame(matrix, index=df.index)
     out_df.to_csv(out, sep="\t")
 

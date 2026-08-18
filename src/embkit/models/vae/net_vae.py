@@ -3,13 +3,13 @@ NetVAE implementation
 """
 import logging
 
-from typing import Dict, List, Optional, Union, Any
+from typing import Dict, List, Optional, Any
 import pandas as pd
 import torch
 import numpy as np
 from ...modules import MaskedLinear
 
-from .base_vae import BaseVAE
+from .vae import VAE, Encoder, Decoder
 from ... import factory
 from ...pathway import build_feature_map_indices
 from ...constraints import PathwayConstraintInfo
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------
 
 @factory.nn_module
-class NetVAE(BaseVAE):
+class NetVAE(VAE):
     """
     NetVAE
 
@@ -124,7 +124,7 @@ class NetVAE(BaseVAE):
             )
         )
 
-        encoder = self.build_encoder(
+        encoder = Encoder(
             feature_dim=len(feature_list),
             latent_dim=latent_size,
             layers=factory.LayerList(enc_layers),
@@ -132,7 +132,7 @@ class NetVAE(BaseVAE):
             device=device,
             dtype=dtype,
         )
-        decoder = self.build_decoder(
+        decoder = Decoder(
             feature_dim=len(feature_list),
             latent_dim=latent_size,
             layers=factory.LayerList(dec_layers),
@@ -140,12 +140,12 @@ class NetVAE(BaseVAE):
             dtype=dtype,
         )
 
-        super().__init__(features=feature_list, encoder=encoder, decoder=decoder)
+        super().__init__(encoder=encoder, decoder=decoder)
         self.latent_groups: Dict[str, List[str]] = latent_groups
         self.latent_index: List[str] = latent_index
         self.group_layer_scale: List[int] = list(group_layer_scale)
-        self.history: Dict[str, List[float]] = {}
         self.normal_stats: Optional[pd.DataFrame] = None
+        self.features = feature_list
 
     def _iter_pathway_constraints(self):
         modules = []
@@ -269,7 +269,6 @@ class NetVAE(BaseVAE):
             "latent_groups": self.latent_groups,
             "latent_index": self.latent_index,
             "group_layer_scale": self.group_layer_scale,
-            "history": getattr(self, "history", {}) or {}
         }
 
     @classmethod
@@ -288,5 +287,4 @@ class NetVAE(BaseVAE):
             latent_index=d.get("latent_index"),
             group_layer_scale=d.get("group_layer_scale"),
         )
-        model.history = d.get("history") or {}
         return model
