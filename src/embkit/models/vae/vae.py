@@ -64,11 +64,23 @@ class VAE(nn.Module):
 
     @classmethod
     def from_dict(cls, data):
+        if "encoder" not in data: # Legacy format 
+            def build_layer_list(raw):
+                return LayerList([Layer.from_dict(li) for li in raw]) if raw else None
+            return BaseVAE(
+                features=data["features"],
+                latent_dim=data["latent_dim"],
+                encoder_layers=build_layer_list(data.get("encoder_layers")),
+                decoder_layers=build_layer_list(data.get("decoder_layers")),
+                batch_norm=data.get("batch_norm", False),
+                sampling=data.get("sampling", True),
+            )
         return VAE(
-            encoder=build( data["encoder"]), 
+            encoder=build( data["encoder"]),
             decoder=build( data["decoder"]),
             **data["extra_args"]
         )
+
 
     def verify_integrity(self) -> Dict[str, Any]:
         """
