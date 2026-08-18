@@ -323,7 +323,6 @@ def fit_vae(model,
         (x_tensor,) = batch
         x_tensor = x_tensor.to(device).float()
 
-        print(x_tensor)
         res = model(x_tensor)
 
         # nn.Module-based loss: update beta state then call forward
