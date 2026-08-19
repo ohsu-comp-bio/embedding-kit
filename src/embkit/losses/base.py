@@ -3,7 +3,7 @@ Base classes for VAE loss functions.
 """
 
 from abc import abstractmethod
-from typing import Tuple
+from typing import Tuple, NamedTuple
 
 import torch
 from torch import nn, Tensor
@@ -64,3 +64,11 @@ class VAELoss(nn.Module):
         Returns a 1-D tensor of shape ``(batch_size,)``.
         """
         return -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp(), dim=1)
+
+
+class VAELossOutput(NamedTuple):
+    """Named output of :meth:`VAELoss.forward`."""
+    total: Tensor
+    recon: Tensor
+    kl: Tensor
+
