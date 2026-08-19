@@ -43,17 +43,17 @@ class TestVectorizeVariantCount(unittest.TestCase):
         """A position in [1, 1_000_000] on chr1 should land in chr1_0."""
         df = self._make_df([("chr1", 500_000)])
         result = vectorize_variant_count(df)
-        self.assertEqual(result["chr1_0"], 1)
+        self.assertEqual(result["chr1_0000"], 1)
         # all other bins must be zero
-        other_counts = {k: v for k, v in result.items() if k != "chr1_0"}
+        other_counts = {k: v for k, v in result.items() if k != "chr1_0000"}
         self.assertTrue(all(v == 0 for v in other_counts.values()))
 
     def test_variant_in_second_bin_of_chr1(self):
-        """A position well inside the second 1 MB window belongs only to chr1_1."""
+        """A position well inside the second 1 MB window belongs only to chr1_0001."""
         df = self._make_df([("chr1", 1_000_002)])
         result = vectorize_variant_count(df)
-        self.assertEqual(result["chr1_1"], 1)
-        self.assertEqual(result["chr1_0"], 0)
+        self.assertEqual(result["chr1_0001"], 1)
+        self.assertEqual(result["chr1_0000"], 0)
 
     def test_bin_boundary_overlap(self):
         """The shared boundary point (start of bin N+1 == end of bin N) is counted
@@ -62,26 +62,26 @@ class TestVectorizeVariantCount(unittest.TestCase):
         # bin 0: [1, 1_000_001], bin 1: [1_000_001, 2_000_001]
         df = self._make_df([("chr1", 1_000_001)])
         result = vectorize_variant_count(df)
-        self.assertEqual(result["chr1_0"], 1)
-        self.assertEqual(result["chr1_1"], 1)
+        self.assertEqual(result["chr1_0000"], 1)
+        self.assertEqual(result["chr1_0001"], 1)
 
     def test_bin_boundary_inclusive_start(self):
         """The start of each bin (i) is inclusive."""
         df = self._make_df([("chr1", 1)])  # first position in the genome
         result = vectorize_variant_count(df)
-        self.assertEqual(result["chr1_0"], 1)
+        self.assertEqual(result["chr1_0000"], 1)
 
     def test_bin_boundary_inclusive_end(self):
         """The end of the first bin (1_000_000) must be counted in chr1_0."""
         df = self._make_df([("chr1", 1_000_000)])
         result = vectorize_variant_count(df)
-        self.assertEqual(result["chr1_0"], 1)
-        self.assertEqual(result["chr1_1"], 0)
+        self.assertEqual(result["chr1_0000"], 1)
+        self.assertEqual(result["chr1_0001"], 0)
 
     def test_multiple_variants_same_bin(self):
         df = self._make_df([("chr2", 100), ("chr2", 200), ("chr2", 999_999)])
         result = vectorize_variant_count(df)
-        self.assertEqual(result["chr2_0"], 3)
+        self.assertEqual(result["chr2_0000"], 3)
 
     def test_variants_across_multiple_chromosomes(self):
         df = self._make_df([
@@ -90,10 +90,10 @@ class TestVectorizeVariantCount(unittest.TestCase):
             ("chrY", 50_000_000),
         ])
         result = vectorize_variant_count(df)
-        self.assertEqual(result["chr1_0"], 1)
-        self.assertEqual(result["chrX_0"], 1)
+        self.assertEqual(result["chr1_0000"], 1)
+        self.assertEqual(result["chrX_0000"], 1)
         # chrY position 50_000_000 is in bin index 49 (0-based, bin_size=1M)
-        self.assertEqual(result["chrY_49"], 1)
+        self.assertEqual(result["chrY_0049"], 1)
 
     # ------------------------------------------------------------------
     # Custom bin_size
@@ -103,8 +103,8 @@ class TestVectorizeVariantCount(unittest.TestCase):
         """With bin_size=500_000 a position well inside the second window is in chr1_1."""
         df = self._make_df([("chr1", 500_002)])
         result = vectorize_variant_count(df, bin_size=500_000)
-        self.assertEqual(result["chr1_1"], 1)
-        self.assertEqual(result["chr1_0"], 0)
+        self.assertEqual(result["chr1_0001"], 1)
+        self.assertEqual(result["chr1_0000"], 0)
 
     # ------------------------------------------------------------------
     # Custom column names
@@ -113,7 +113,7 @@ class TestVectorizeVariantCount(unittest.TestCase):
     def test_custom_column_names(self):
         df = pd.DataFrame({"chrom": ["chr1"], "position": [500_000]})
         result = vectorize_variant_count(df, seq_col="chrom", pos_col="position")
-        self.assertEqual(result["chr1_0"], 1)
+        self.assertEqual(result["chr1_0000"], 1)
 
     # ------------------------------------------------------------------
     # Return type

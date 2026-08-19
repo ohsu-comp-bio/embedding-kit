@@ -9,6 +9,7 @@ import torch
 
 from embkit.__main__ import cli_main
 from embkit.files import H5Writer
+from embkit.losses import MSEVAELoss, BCEVAELoss, BCEWithLogitsVAELoss
 
 model_cmd = importlib.import_module("embkit.commands.model")
 
@@ -49,7 +50,7 @@ class TestModelCommands(unittest.TestCase):
                     "pathway.sif",
                     "--epochs",
                     "1",
-                    "--group-layer-size",
+                    "--group-layer-scale",
                     "4,2,1",
                     "--out",
                     "netvae.model",
@@ -61,7 +62,7 @@ class TestModelCommands(unittest.TestCase):
         netvae_args = netvae_cls.call_args.args
         netvae_kwargs = netvae_cls.call_args.kwargs
         self.assertEqual(netvae_args[0], ["G1", "G2", "G3", "G4"])
-        self.assertEqual(netvae_kwargs["group_layer_size"], [4, 2, 1])
+        self.assertEqual(netvae_kwargs["group_layer_scale"], [4, 2, 1])
         self.assertEqual(set(netvae_kwargs["latent_groups"].keys()), {"TF1", "TF2"})
 
         loader_mock.assert_called_once()
@@ -96,7 +97,7 @@ class TestModelCommands(unittest.TestCase):
 
     @patch.object(model_cmd, "save")
     @patch.object(model_cmd, "fit_vae")
-    @patch.object(model_cmd, "VAE")
+    @patch.object(model_cmd, "BaseVAE")
     def test_train_vae_tsv_branches(self, vae_cls, fit_mock, save_mock):
         dummy_model = MagicMock(name="vae")
         vae_cls.return_value = dummy_model
@@ -130,7 +131,7 @@ class TestModelCommands(unittest.TestCase):
         self.assertIn("Stats saved, to vae_latent256_epochs20.model.stats.tsv", result.output)
 
         fit_mock.assert_called_once()
-        self.assertEqual(fit_mock.call_args.kwargs["loss"], model_cmd.mse)
+        self.assertIsInstance(fit_mock.call_args.kwargs["loss"], MSEVAELoss)
         self.assertEqual(fit_mock.call_args.kwargs["beta_schedule"], [(0.2, 1), (0.4, 1)])
         save_mock.assert_called_once()
 
@@ -248,7 +249,7 @@ class TestModelCommands(unittest.TestCase):
         self.assertEqual(result.exit_code, 0, msg=result.output)
         self.assertIn("No output path provided, using default naming.", result.output)
         self.assertIn("Stats saved, to netvae_latent1_epochs3.model.stats.tsv", result.output)
-        self.assertEqual(fit_mock.call_args.kwargs["loss"], model_cmd.bce)
+        self.assertIsInstance(fit_mock.call_args.kwargs["loss"], BCEVAELoss)
         loader_mock.assert_called_once()
         save_mock.assert_called_once()
 
@@ -266,13 +267,13 @@ class TestModelCommands(unittest.TestCase):
                     "train-netvae",
                     "rna.tsv",
                     "pathway.sif",
-                    "--group-layer-size",
+                    "--group-layer-scale",
                     "0",
                 ],
             )
 
         self.assertNotEqual(result.exit_code, 0)
-        self.assertIn("--group-layer-size must contain one or more positive integers", result.output)
+        self.assertIn("--group-layer-scale must contain one or more positive integers", result.output)
 
     @patch.object(model_cmd, "load")
     @patch.object(model_cmd, "get_device", return_value=torch.device("cpu"))

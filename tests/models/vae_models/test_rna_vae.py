@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import torch
 
+from embkit import optimize
 from embkit.models.vae.rna_vae import RNAVAE
 
 
@@ -14,13 +15,14 @@ class TestRNAVAE(unittest.TestCase):
             columns=[f"G{i}" for i in range(6)],
         )
 
-        model = RNAVAE(features=list(df.columns), latent_dim=3, lr=1e-3)
-        history = model.fit(
+        model = RNAVAE(features=list(df.columns), latent_dim=3)
+        history = optimize.fit_vae(
+            model,
             df,
             epochs=1,
             batch_size=4,
-            kappa=1.0,
-            early_stopping_patience=2,
+            # kappa=1.0,
+            # early_stopping_patience=2,
             device=torch.device("cpu"),
             progress=False,
         )

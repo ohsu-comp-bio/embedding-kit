@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 import numpy as np
 
+from ..factory import nn_module
 from ..factory.layers import ConstraintInfo
 from ..pathway import (
     _normalize_index,
@@ -12,7 +13,7 @@ from ..pathway import (
 
 ConstraintOP = Literal["features-to-group", "group-to-features", "group-to-group"]
 
-
+@nn_module
 class PathwayConstraintInfo(ConstraintInfo):
     """
     ConstraintInfo for pathway-based masking.

@@ -9,7 +9,7 @@ from click.testing import CliRunner
 
 from embkit.__main__ import cli_main
 from embkit.factory import load
-from embkit.losses import bce_with_logits
+from embkit.losses import BCEWithLogitsVAELoss
 from embkit.modules import MaskedLinear
 from embkit.pathway import (
     build_features_to_group_mask,
@@ -47,7 +47,7 @@ class TestNetVAECLIE2E(unittest.TestCase):
                     str(self.pathway_sif),
                     "--epochs",
                     "2",
-                    "--group-layer-size",
+                    "--group-layer-scale",
                     "1",
                     "--save-stats",
                     "--out",
@@ -129,7 +129,7 @@ class TestNetVAECLIE2E(unittest.TestCase):
             opt.zero_grad()
             mu, logvar, z = model.encoder(x)
             recon = model.decoder(z)
-            total, _, _ = bce_with_logits(recon, x, mu, logvar, beta=1.0)
+            total, _, _ = BCEWithLogitsVAELoss(beta=1.0)(recon, x, mu, logvar)
             total.backward()
 
             weight = first_masked.linear.weight

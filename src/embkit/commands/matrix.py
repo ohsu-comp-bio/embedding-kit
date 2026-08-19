@@ -1,6 +1,8 @@
 import click
 import pandas as pd
 from pathlib import Path
+from ..utilities.pca import run_pca
+
 
 matrix = click.Group(name="matrix", help="Model commands.")
 
@@ -35,7 +37,6 @@ def normalize(srcs, out, features, col_quantile, quantile_max, precision):
         normDF = (df / df.quantile(quantile_max)).clip(upper=1.0, lower=0.0).fillna(0.0)
     normDF.round(decimals=precision).to_csv(out, sep="\t")
 
-
 @matrix.command()
 @click.argument("input_path", type=click.Path(exists=True, dir_okay=False, readable=True, path_type=str))
 @click.option("--pca-size", required=True, type=int, help="Number of principal components.")
@@ -43,8 +44,6 @@ def normalize(srcs, out, features, col_quantile, quantile_max, precision):
 def pca(input_path, pca_size, out):
     if pca_size <= 0:
         raise click.BadParameter("--pca-size must be a positive integer.")
-
-    from ..utilities.pca import run_pca
 
     if out is None:
         out = f"{Path(input_path).stem}.pca.tsv"

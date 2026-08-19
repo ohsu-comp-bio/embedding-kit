@@ -24,7 +24,8 @@ def _normalize_index(index_like: Any) -> pd.Index:
 
 def extract_sif_interactions(
         sif_path: str,
-        relation: str = "controls-expression-of",
+        relation: str = "controls-expression-of", 
+        add_src: bool = False,
 ) -> Dict[str, List[str]]:
     """
     Extracts pathway info from a SIF-like TSV with columns: from, relation, to.
@@ -54,7 +55,7 @@ def extract_sif_interactions(
     tmp: Dict[str, "OrderedDict[str, None]"] = defaultdict(OrderedDict)
     for src, _, dst in pc[["from", "relation", "to"]].itertuples(index=False, name=None):
         # keep self as the first item
-        if src not in tmp:
+        if add_src and src not in tmp:
             tmp[src][src] = None
         tmp[src][dst] = None
 

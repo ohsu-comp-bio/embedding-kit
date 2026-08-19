@@ -1,9 +1,14 @@
 from typing import Optional
 import torch
 from torch.utils.data import DataLoader, TensorDataset
+from torch.optim import Adam
 from sklearn.base import BaseEstimator
 from sklearn.metrics import mean_squared_error
 import pandas as pd
+
+from ..models.vae.vae import VAE
+from ..models.vae.base_vae import BaseVAE
+from ..losses import BCEWithLogitsVAELoss
 
 class VAEEstimator(BaseEstimator):
     """
@@ -35,10 +40,7 @@ class VAEEstimator(BaseEstimator):
         feature_dim = X.shape[1]
         features = list(X.columns)
 
-
-        encoder = build_encoder(feature_dim, self.latent_dim, constraint=None)
-        decoder = build_decoder(feature_dim, self.latent_dim)
-        vae = VAE(features, encoder, decoder)
+        vae = VAE(features=features, latent_dim=self.latent_dim)
 
         device = self.device or ('cuda' if torch.cuda.is_available() else 'cpu')
         device = torch.device(device)
@@ -46,7 +48,8 @@ class VAEEstimator(BaseEstimator):
 
         x = torch.tensor(X.values, dtype=torch.float32, device=device)
         loader = DataLoader(TensorDataset(x), batch_size=self.batch_size, shuffle=True)
-        opt = torch.optim.Adam(vae.parameters(), lr=self.learning_rate)
+        opt = Adam(vae.parameters(), lr=self.learning_rate)
+        loss_fn = BCEWithLogitsVAELoss(beta=self.beta)
 
         loss_hist = []
         for _ in range(self.epochs):
@@ -55,7 +58,8 @@ class VAEEstimator(BaseEstimator):
             n = 0
             for (batch_x,) in loader:
                 opt.zero_grad()
-                total, _, _ = vae_loss_from_model(vae, batch_x)
+                recon, mu, logvar, _ = vae(batch_x)
+                total, _, _ = loss_fn(recon, batch_x, mu, logvar)
                 total.backward()
                 opt.step()
                 tot += float(total.item())
@@ -75,4 +79,3 @@ class VAEEstimator(BaseEstimator):
             mu, _, _ = self.model.encoder(x)
             recon = self.model.decoder(mu).cpu().numpy()
         return -mean_squared_error(X.values, recon)
-

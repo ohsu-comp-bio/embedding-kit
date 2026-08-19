@@ -9,17 +9,10 @@ def build(desc):
         desc = desc.to_dict()
 
     if isinstance(desc, dict):
-        className = desc["__class__"]
-        if className not in CLASS_REGISTRY:
-            try:
-                from .base_vae import _import_obj
-                _import_obj(className)
-            except Exception as e:
-                pass
-        
-        if className in CLASS_REGISTRY:
-            return CLASS_REGISTRY[className].from_dict(desc)
-        raise Exception(f"Unknown layer type: {className}")
+        class_name = desc["__class__"]
+        if class_name in CLASS_REGISTRY:
+            return CLASS_REGISTRY[class_name].from_dict(desc)
+        raise TypeError(f"Unknown layer type: {class_name}")
     elif isinstance(desc, list):
         elements = []
         for element in desc:
@@ -30,23 +23,31 @@ def build(desc):
         if cls is not None:
             return cls()
 
-    raise Exception(f"Invalid input for build function: {type(desc)}")
+    raise TypeError(f"Invalid input for build function: {type(desc)}")
 
 def save(model, path):
-    # Safety net: clamp constrained weights before serialization.
-    if isinstance(model, nn.Module):
-        with torch.no_grad():
-            for module in model.modules():
-                clamp = getattr(module, "clamp_masked_weights", None)
-                if callable(clamp):
-                    clamp()
+    """Serialize a model and its description to ``path``.
+
+    Clamps any masked weights before saving, writes the state dict along with
+    the ``__model__`` descriptor, and persists everything via ``torch.save``.
+
+    Args:
+        model: The model to serialize.
+        path: File path where the serialized model will be saved.
+    """
+    with torch.no_grad():
+        for module in model.modules():
+            clamp = getattr(module, "clamp_masked_weights", None)
+            if callable(clamp):
+                clamp()
     state = model.state_dict()
     desc = model.to_dict()    
     state["__model__"] = desc
     torch.save(state, path)
 
 def load(path, device=None, dtype=None):
-    state_dict = torch.load(path, map_location=device)
+    """Load a serialized model from ``path`` and optionally move its tensors."""
+    state_dict = torch.load(path, map_location=device, weights_only=False)
     desc = state_dict.pop("__model__", None)
     if desc is None:
         raise KeyError(

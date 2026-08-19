@@ -7,7 +7,7 @@ import pandas as pd
 
 from embkit.models.vae.net_vae import NetVAE
 from embkit.modules import MaskedLinear
-from embkit.losses import bce_with_logits
+from embkit.losses import BCEWithLogitsVAELoss
 from embkit.optimize import fit_vae, fit_net_vae
 
 class TestNetVAE(unittest.TestCase):
@@ -30,7 +30,7 @@ class TestNetVAE(unittest.TestCase):
             epochs=0,
             batch_size=2,
             lr=1e-3,
-            loss=bce_with_logits,
+            loss=BCEWithLogitsVAELoss(),
             device="cpu",
         )
 
@@ -59,14 +59,14 @@ class TestNetVAE(unittest.TestCase):
             "TF2": ["G2"],
         }
 
-        model = NetVAE(features=list(df.columns), latent_groups=latent_groups, latent_index=latent_index, group_layer_size=[1,1])
+        model = NetVAE(features=list(df.columns), latent_groups=latent_groups, latent_index=latent_index, group_layer_scale=[1,1])
         fit_vae(
             model,
             df,
             epochs=0,
             batch_size=4,
             lr=1e-3,
-            loss=bce_with_logits,
+            loss=BCEWithLogitsVAELoss(),
             device="cpu",
         )
 
@@ -77,7 +77,7 @@ class TestNetVAE(unittest.TestCase):
         x = torch.tensor(df.values, dtype=torch.float32)
         mu, logvar, z = model.encoder(x)
         recon = model.decoder(z)
-        total, _, _ = bce_with_logits(recon, x, mu, logvar, beta=1.0)
+        total, _, _ = BCEWithLogitsVAELoss(beta=1.0)(recon, x, mu, logvar)
         opt.zero_grad()
         total.backward()
 
@@ -105,7 +105,7 @@ class TestNetVAE(unittest.TestCase):
             "TF2": ["G2"],
         }
 
-        model = NetVAE(features=list(df.columns), latent_groups=latent_groups, latent_index=latent_index, group_layer_size=[1, 1])
+        model = NetVAE(features=list(df.columns), latent_groups=latent_groups, latent_index=latent_index, group_layer_scale=[1, 1])
         fit_net_vae(
             model=model,
             X=df,
