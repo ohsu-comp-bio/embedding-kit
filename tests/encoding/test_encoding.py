@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 import torch
 
-from embkit.encoding import OneHotEncoder, ProteinOneHotEncoder
+from embkit.encoding import OneHotEncoder, ProteinOneHotEncoder, position_sin_cos, position_sin_cos_tensor
 
 
 class TestOneHotEncoder(unittest.TestCase):
@@ -62,23 +62,25 @@ class TestProteinOneHotEncoder(unittest.TestCase):
         enc = ProteinOneHotEncoder(full_len=3, encode_x=True, encode_pos=True)
         seq = 'AC'
         out = enc(seq)
-        # shape (L, D+1)
-        self.assertEqual(out.shape, (3, len(enc.alphabet) + 1))
-        # last column holds position (normalized by full_len)
-        pos_col = out[:, -1]
-        expected = torch.tensor([0.0, 1.0 / 3.0, 0.0], dtype=pos_col.dtype)
-        self.assertTrue(torch.allclose(pos_col, expected))
+        # shape (L, D + pe_dim)
+        self.assertEqual(out.shape, (3, len(enc.alphabet) + enc.pe_dim))
+        # last pe_dim columns hold the sinusoidal positional encoding per position
+        pe = out[:, -enc.pe_dim:]
+        expected = torch.stack(
+            [position_sin_cos_tensor(i, enc.pe_dim) for i in range(3)], dim=0
+        ).to(pe.dtype)
+        self.assertTrue(torch.allclose(pe, expected))
 
     def test_encode_pos_column_numpy(self):
         enc = ProteinOneHotEncoder(full_len=3, encode_x=True, encode_pos=True, backend='numpy')
         seq = 'AC'
         out = enc(seq)
-        # shape (L, D+1)
-        self.assertEqual(out.shape, (3, len(enc.alphabet) + 1))
-        # last column holds position (normalized by full_len)
-        pos_col = out[:, -1]
-        expected = np.array([0.0, 1.0 / 3.0, 0.0], dtype=pos_col.dtype)
-        self.assertTrue(np.allclose(pos_col, expected))
+        # shape (L, D + pe_dim)
+        self.assertEqual(out.shape, (3, len(enc.alphabet) + enc.pe_dim))
+        # last pe_dim columns hold the sinusoidal positional encoding per position
+        pe = out[:, -enc.pe_dim:]
+        expected = np.stack([position_sin_cos(i, enc.pe_dim) for i in range(3)], axis=0)
+        self.assertTrue(np.allclose(pe, expected, atol=1e-6))
 
 
 if __name__ == '__main__':

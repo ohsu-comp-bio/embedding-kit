@@ -40,7 +40,7 @@ class VAEEncoder(nn.Module):
     VAE Encoder wrapper that takes a backbone network (e.g., FFN, CNN), 
     projects features to latent mean and log-variance, and calculates KL divergence.
     """
-    def __init__(self, backbone: nn.Module, feature_dim: int, latent_dim: int):
+    def __init__(self, backbone: nn.Module, feature_dim: int, latent_dim: int, device=None, dtype=None):
         """
         Args:
             backbone (nn.Module): Feature extractor module outputting a tensor of shape (batch_size, feature_dim).
@@ -49,10 +49,12 @@ class VAEEncoder(nn.Module):
         """
         super().__init__()
         self.backbone = backbone
-        
+        self.feature_dim = feature_dim
+        self.latent_dim = latent_dim
+
         # Linear projections for mu and log-variance
-        self.fc_mu = nn.Linear(feature_dim, latent_dim)
-        self.fc_logvar = nn.Linear(feature_dim, latent_dim)
+        self.fc_mu = nn.Linear(feature_dim, latent_dim, device=device, dtype=dtype)
+        self.fc_logvar = nn.Linear(feature_dim, latent_dim, device=device, dtype=dtype)
 
     def reparameterize(self, mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
         """

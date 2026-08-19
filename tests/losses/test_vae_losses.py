@@ -1,4 +1,5 @@
 import unittest
+import warnings
 import torch
 from torch import nn
 from embkit.losses import (
@@ -6,6 +7,7 @@ from embkit.losses import (
     MSELoss, BCELoss, BCEWithLogitsLoss, BCEKLWeightedLoss,
     VAELoss, get_vae_loss, VAE_LOSS_REGISTRY, get_loss, LOSS_REGISTRY,
 )
+from embkit.losses import vae_loss as _vae_loss_mod
 
 
 class TestVAELossBase(unittest.TestCase):
@@ -172,6 +174,103 @@ class TestCompatibilityAliases(unittest.TestCase):
         self.assertIs(BCELoss, BCEVAELoss)
         self.assertIs(BCEWithLogitsLoss, BCEWithLogitsVAELoss)
         self.assertIs(BCEKLWeightedLoss, BCEKLWeightedVAELoss)
+
+
+class TestDeprecatedFreeFunctions(unittest.TestCase):
+    """The legacy module-level functions all emit a DeprecationWarning but
+    still delegate to the equivalent ``VAELoss`` subclass."""
+
+    def _sample(self):
+        batch, dim = 6, 4
+        recon = torch.sigmoid(torch.randn(batch, dim))
+        x = (torch.rand(batch, dim) > 0.5).float()
+        mu = torch.randn(batch, dim)
+        logvar = torch.randn(batch, dim)
+        return recon, x, mu, logvar
+
+    def _assert_three_tensors(self, out):
+        self.assertEqual(len(out), 3)
+        for t in out:
+            self.assertIsInstance(t, torch.Tensor)
+            self.assertEqual(t.dim(), 0)
+
+    def test_mse_warns_and_returns(self):
+        recon, x, mu, logvar = self._sample()
+        with self.assertWarns(DeprecationWarning):
+            out = _vae_loss_mod.mse(recon, x, mu, logvar, beta=1.0)
+        self._assert_three_tensors(out)
+        self.assertTrue(torch.isfinite(out[0]))
+
+    def test_bce_warns_and_returns(self):
+        recon, x, mu, logvar = self._sample()
+        with self.assertWarns(DeprecationWarning):
+            out = _vae_loss_mod.bce(recon, x, mu, logvar, beta=1.0)
+        self._assert_three_tensors(out)
+
+    def test_bce_with_logits_warns_and_returns(self):
+        recon, x, mu, logvar = self._sample()
+        with self.assertWarns(DeprecationWarning):
+            out = _vae_loss_mod.bce_with_logits(recon, x, mu, logvar, beta=1.0)
+        self._assert_three_tensors(out)
+
+    def test_bce_kl_weighted_warns_and_returns(self):
+        recon, x, mu, logvar = self._sample()
+        with self.assertWarns(DeprecationWarning):
+            out = _vae_loss_mod.bce_kl_weighted(recon, x, mu, logvar, beta=1.0, kl_weight=1.0)
+        self._assert_three_tensors(out)
+
+    def test_net_vae_loss_bce_branch(self):
+        # Reconstruction kept inside [0, 1] -> BCE path.
+        class EncOut:
+            def __init__(self, mu, logvar, z):
+                self.mu, self.logvar, self.z = mu, logvar, z
+
+        class Enc(nn.Module):
+            def forward(self, x):
+                mu = torch.zeros_like(x)
+                logvar = torch.zeros_like(x)
+                z = mu + torch.randn_like(x) * torch.exp(0.5 * logvar)
+                return EncOut(mu, logvar, z)
+
+        class Dec(nn.Module):
+            def forward(self, z):
+                return torch.sigmoid(z)
+
+        class Model:
+            encoder = Enc()
+            decoder = Dec()
+
+        x = (torch.rand(4, 3) > 0.5).float()
+        with self.assertWarns(DeprecationWarning):
+            out = _vae_loss_mod.net_vae_loss(Model(), x, beta=1.0)
+        self._assert_three_tensors(out)
+        self.assertTrue(torch.isfinite(out[0]))
+
+    def test_net_vae_loss_bce_logit_branch(self):
+        # Reconstruction pushed outside [0, 1] -> BCEWithLogits path.
+        class EncOut:
+            def __init__(self, mu, logvar, z):
+                self.mu, self.logvar, self.z = mu, logvar, z
+
+        class Enc(nn.Module):
+            def forward(self, x):
+                return EncOut(torch.zeros_like(x), torch.zeros_like(x),
+                              torch.zeros_like(x))
+
+        class Dec(nn.Module):
+            def forward(self, z):
+                # raw logits, unbounded and pushed beyond [0, 1]
+                return z + 5.0
+
+        class Model:
+            encoder = Enc()
+            decoder = Dec()
+
+        x = (torch.rand(4, 3) > 0.5).float()
+        with self.assertWarns(DeprecationWarning):
+            out = _vae_loss_mod.net_vae_loss(Model(), x, beta=1.0)
+        self._assert_three_tensors(out)
+        self.assertTrue(torch.isfinite(out[0]))
 
 
 if __name__ == '__main__':
