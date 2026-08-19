@@ -228,7 +228,7 @@ class Encoder(nn.Module):
             z = mu + eps * std
         else:
             z = mu
-        return EncoderOutput(mu=mu, logvar=logvar, z=h)
+        return EncoderOutput(mu=mu, logvar=logvar, z=z)
     
     def to_dict(self):
         return {
