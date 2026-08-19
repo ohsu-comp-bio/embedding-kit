@@ -31,7 +31,7 @@ optimize.fit_vae(
     lr=1e-3,
     beta=1.0,
     beta_schedule=None,    # list of (beta, n_epochs) pairs
-    loss=None,             # required: loss function from embkit.losses
+    loss=None,             # optional: loss module from embkit.losses; defaults to MSEVAELoss()
     optimizer=None,        # optional: custom torch.optim.Optimizer
     device=None,           # auto-detected if None
     progress=True,
@@ -49,11 +49,11 @@ optimize.fit_vae(
 | `torch.Tensor` | wrapped in `TensorDataset` then `DataLoader` |
 | `DataLoader` | used directly |
 
-`loss` is **required**. Pass one of the VAE loss modules from `embkit.losses`.
+`loss` is optional. When `None`, `fit_vae` defaults to `MSEVAELoss()`. Pass one of the VAE loss modules from `embkit.losses` (e.g., `BCEWithLogitsVAELoss()`) to override.
 
 ### Returned value
 
-`fit_vae` returns the final batch loss as a float. Training history is stored on the model at `model.history`.
+`fit_vae` returns the training `history` — a dict of per-epoch means. The same history is also stored on the model at `model.history`.
 
 ---
 

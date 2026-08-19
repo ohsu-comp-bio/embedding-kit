@@ -136,11 +136,11 @@ dec_layers = [
 
 ### 4) Train
 
-This Python API example uses the standard `VAE` class with pathway-constrained masked layers — not the `NetVAE` class. This gives you finer control over layer architecture (multiple depths per group). The `NetVAE` class wraps this pattern and builds the masked stack from `latent_groups` + `group_layer_size`.
+This Python API example uses the standard `VAE` class with pathway-constrained masked layers — not the `NetVAE` class. This gives you finer control over layer architecture (multiple depths per group). The `NetVAE` class wraps this pattern and builds the masked stack from `latent_groups` + `group_layer_scale`.
 
 ```python
 from embkit.models.vae.vae import VAE
-from embkit.losses import bce_with_logits
+from embkit.losses import BCEWithLogitsVAELoss
 from embkit import optimize
 
 dataloader = dataframe_loader(df_norm, batch_size=256)
@@ -159,7 +159,7 @@ optimize.fit_vae(
     X=dataloader,
     beta_schedule=schedule,
     lr=1e-4,
-    loss=bce_with_logits,
+    loss=BCEWithLogitsVAELoss(),
 )
 ```
 

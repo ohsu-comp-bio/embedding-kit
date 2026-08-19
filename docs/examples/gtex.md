@@ -89,7 +89,7 @@ print(df_norm.min().min(), df_norm.max().max())  # should be ~0.0 and ~1.0
 
 ```python
 from embkit import dataframe_loader
-from embkit.losses import bce_with_logits
+from embkit.losses import BCEWithLogitsVAELoss
 from embkit.models.vae import VAE
 from embkit.factory.layers import Layer
 from embkit import optimize
@@ -116,7 +116,7 @@ vae = VAE(
     decoder_layers=decoder_layers,
 )
 
-optimize.fit_vae(vae, X=dataloader, beta_schedule=schedule, lr=1e-3, loss=bce_with_logits)
+optimize.fit_vae(vae, X=dataloader, beta_schedule=schedule, lr=1e-3, loss=BCEWithLogitsVAELoss())
 ```
 
 Progress bars show per-epoch loss, reconstruction loss, KL divergence, and the current beta value.

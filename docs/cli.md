@@ -100,10 +100,11 @@ embkit model train-netvae INPUT_PATH PATHWAY_SIF [OPTIONS]
 | `--learning-rate`, `-r` | `0.0001` | Adam learning rate |
 | `--out`, `-o` | — | Output model file path |
 | `--loss` | `bce-logit` | Loss function: `mse`, `bce`, `bce-logit` |
-| `--group-layer-size` | `5,2,1` | Comma-separated per-group widths for masked NetVAE layers |
+| `--min-group-size` | `2` | Minimum group size filter for the pathway feature map (including self if present) |
+| `--group-layer-scale` | `5,2,1` | Comma-separated per-group widths for masked NetVAE layers |
 | `--save-stats` | false | Save training statistics |
 
-`NetVAE` now accepts only `group_layer_size` in model configs/serialization. The legacy alias `group_layer_scaling` has been removed.
+`NetVAE` takes its per-group widths via the `group_layer_scale` parameter (and serializes it under the `group_layer_scale` key). The `--group-layer-scale` CLI flag maps directly to it.
 
 **Example**
 

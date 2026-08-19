@@ -99,7 +99,7 @@ import pandas as pd
 from embkit import dataframe_loader
 from embkit.models.vae import VAE
 from embkit.factory.layers import Layer
-from embkit.losses import bce_with_logits
+from embkit.losses import BCEWithLogitsVAELoss
 from embkit import optimize
 
 # Load embeddings produced by `embkit protein encode`
@@ -118,7 +118,7 @@ vae = VAE(
     decoder_layers=[Layer(256, activation="relu")],
 )
 
-optimize.fit_vae(vae, X=loader, epochs=50, lr=1e-3, loss=bce_with_logits)
+optimize.fit_vae(vae, X=loader, epochs=50, lr=1e-3, loss=BCEWithLogitsVAELoss())
 ```
 
 ---

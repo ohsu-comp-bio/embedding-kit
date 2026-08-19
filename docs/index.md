@@ -60,7 +60,7 @@ embkit protein encode sequences.fasta --model t33 --output protein_embeddings.ts
 from embkit import dataframe_loader
 from embkit.models.vae import VAE
 from embkit.factory.layers import Layer
-from embkit.losses import bce_with_logits
+from embkit.losses import BCEWithLogitsVAELoss
 from embkit.factory import save, load
 from embkit import optimize
 
@@ -73,7 +73,7 @@ vae = VAE(
     decoder_layers=[Layer(512, activation="relu")],
 )
 
-optimize.fit_vae(vae, X=loader, epochs=60, lr=1e-3, loss=bce_with_logits)
+optimize.fit_vae(vae, X=loader, epochs=60, lr=1e-3, loss=BCEWithLogitsVAELoss())
 
 save(vae, "vae.model")
 ```
