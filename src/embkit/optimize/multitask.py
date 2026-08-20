@@ -128,6 +128,7 @@ def multi_task_train_weighted_sync(
     pairing_mode="truncate",
     gradient_clip_norm=None,
     device=None,
+    lr_gamma=0.5,
 ):
     """
     Weighted multitask training over an arbitrary list of LearningTask.
@@ -142,7 +143,9 @@ def multi_task_train_weighted_sync(
     loaders, trainable_params = _prepare_learning_tasks(tasks)
 
     optimizer = Adam(trainable_params, lr=lr)
-    scheduler = StepLR(optimizer, step_size=1, gamma=0.5)
+    scheduler = None
+    if lr_gamma is not None:
+        scheduler = StepLR(optimizer, step_size=1, gamma=lr_gamma)
 
     pbar = tqdm(range(epochs))
     for epoch in pbar:
@@ -188,7 +191,8 @@ def multi_task_train_weighted_sync(
             postfix.update({f"loss_{i}": float(loss.detach().cpu()) for i, loss in enumerate(task_losses)})
             pbar.set_postfix(**postfix)
 
-        scheduler.step()
+        if scheduler is not None:
+            scheduler.step()
 
 
 def multi_task_train_interleaved(
@@ -199,6 +203,7 @@ def multi_task_train_interleaved(
     steps_per_epoch=None,
     gradient_clip_norm=None,
     device=None,
+    lr_gamma=0.5,
 ):
     """
     Interleaved multitask training over an arbitrary list of LearningTask.
@@ -211,7 +216,9 @@ def multi_task_train_interleaved(
     normalized_schedule = _normalize_task_schedule(task_schedule, len(tasks))
 
     optimizer = Adam(trainable_params, lr=lr)
-    scheduler = StepLR(optimizer, step_size=1, gamma=0.5)
+    scheduler = None
+    if lr_gamma is not None:
+        scheduler = StepLR(optimizer, step_size=1, gamma=lr_gamma)
 
     if steps_per_epoch is None:
         steps_per_epoch = max(len(loader) for loader in loaders)
@@ -252,5 +259,5 @@ def multi_task_train_interleaved(
                 weighted_loss=float(weighted_loss.detach().cpu()),
                 lr=optimizer.param_groups[0]["lr"],
             )
-
-        scheduler.step()
+        if scheduler is not None:
+            scheduler.step()
