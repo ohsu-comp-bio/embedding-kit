@@ -56,7 +56,7 @@ def _task_loss(criterion, model, batch, device=None, unroll_inputs=False, auto_e
 class LearningTask:
     """Defines a learning task with model, dataset, and training configuration."""
 
-    def __init__(self, model, dataset, batch_size, criterion, weight=1.0, auto_encoder=False, unroll_inputs=False):
+    def __init__(self, model, dataset, batch_size, criterion, name="task", weight=1.0, auto_encoder=False, unroll_inputs=False):
         """
         Initialize a LearningTask.
 
@@ -74,6 +74,7 @@ class LearningTask:
         self.batch_size = batch_size
         self.auto_encoder = auto_encoder
         self.unroll_inputs = unroll_inputs
+        self.name = name
 
 
 
@@ -225,6 +226,7 @@ def multi_task_train_interleaved(
 
     schedule_cycle = cycle(normalized_schedule)
 
+    current_scores = {}
     pbar = tqdm(range(epochs))
     for epoch in pbar:
         task_iters = [cycle(loader) for loader in loaders]
@@ -252,12 +254,13 @@ def multi_task_train_interleaved(
                 torch.nn.utils.clip_grad_norm_(trainable_params, gradient_clip_norm)
 
             optimizer.step()
+            current_scores[f"loss_{task.name}"] = float(loss.detach().cpu())
 
             pbar.set_postfix(
                 task=task_idx,
-                loss=float(loss.detach().cpu()),
                 weighted_loss=float(weighted_loss.detach().cpu()),
                 lr=optimizer.param_groups[0]["lr"],
+                **current_scores
             )
         if scheduler is not None:
             scheduler.step()
