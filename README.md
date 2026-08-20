@@ -88,48 +88,6 @@ optimize.fit_vae(vae, X=loader, epochs=60, lr=1e-3, loss=BCEWithLogitsVAELoss())
 save(vae, "vae.model")
 ```
 
-## Development
-
-To install the library locally:
-
-```bash
-pip install -e .
-```
-
-### Running tests
-
-```bash
-coverage run --source=embkit -m unittest discover -s tests
-```
-
-### Coverage report
-
-To generate an HTML coverage report:
-
-```bash
-coverage html
-```
-
-To open the report in a browser:
-
-**macOS**
-
-```bash
-open htmlcov/index.html
-```
-
-**Linux**
-
-```bash
-xdg-open htmlcov/index.html
-```
-
-**Windows**
-
-```bash
-start htmlcov\index.html
-```
-
 ## Documentation
 
 Full documentation, including core concepts, the training guide, the CLI reference, and API docs, is available in the [docs folder](docs/). To build it locally, see [DEV.md](DEV.md).
