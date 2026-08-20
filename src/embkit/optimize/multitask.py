@@ -21,8 +21,12 @@ def _unique_parameters(*models):
     return unique_params
 
 
-def _task_loss(criterion, model, batch, device=None, unroll_inputs=False):
-    inputs, targets = batch
+def _task_loss(criterion, model, batch, device=None, unroll_inputs=False, auto_encoder=False):
+    if auto_encoder:
+        inputs = batch
+        targets = batch
+    else:
+        inputs, targets = batch
 
     if device is not None:
         if isinstance(inputs, (tuple, list)):
@@ -31,6 +35,14 @@ def _task_loss(criterion, model, batch, device=None, unroll_inputs=False):
             inputs = inputs.to(device)
         if torch.is_tensor(targets):
             targets = targets.to(device)
+
+    if auto_encoder:
+        if isinstance(inputs, (tuple, list)) and unroll_inputs:
+            inputs = inputs[0]
+        res = model(inputs)
+        total_loss, recon_loss, kl_loss = criterion(res.recon, inputs, res.mu, res.logvar)
+        return total_loss, res.recon, inputs
+
 
     if isinstance(inputs, (tuple, list)) and unroll_inputs:
         outputs = model(*inputs)
@@ -44,7 +56,7 @@ def _task_loss(criterion, model, batch, device=None, unroll_inputs=False):
 class LearningTask:
     """Defines a learning task with model, dataset, and training configuration."""
 
-    def __init__(self, model, dataset, batch_size, criterion, weight=1.0):
+    def __init__(self, model, dataset, batch_size, criterion, weight=1.0, auto_encoder=False, unroll_inputs=False):
         """
         Initialize a LearningTask.
 
@@ -60,6 +72,9 @@ class LearningTask:
         self.criterion = criterion
         self.weight = weight
         self.batch_size = batch_size
+        self.auto_encoder = auto_encoder
+        self.unroll_inputs = unroll_inputs
+
 
 
 def _prepare_learning_tasks(tasks):
@@ -113,7 +128,6 @@ def multi_task_train_weighted_sync(
     pairing_mode="truncate",
     gradient_clip_norm=None,
     device=None,
-    unroll_inputs=False,
 ):
     """
     Weighted multitask training over an arbitrary list of LearningTask.
@@ -153,7 +167,8 @@ def multi_task_train_weighted_sync(
                     task.model,
                     batch,
                     device=device,
-                    unroll_inputs=unroll_inputs,
+                    unroll_inputs=task.unroll_inputs,
+                    auto_encoder=task.auto_encoder
                 )
                 task_losses.append(loss)
                 weighted_loss = task.weight * loss
@@ -184,7 +199,6 @@ def multi_task_train_interleaved(
     steps_per_epoch=None,
     gradient_clip_norm=None,
     device=None,
-    unroll_inputs=False,
 ):
     """
     Interleaved multitask training over an arbitrary list of LearningTask.
@@ -220,7 +234,8 @@ def multi_task_train_interleaved(
                 task.model,
                 batch,
                 device=device,
-                unroll_inputs=unroll_inputs,
+                unroll_inputs=task.unroll_inputs,
+                auto_encoder=task.auto_encoder
             )
             weighted_loss = task.weight * loss
 
