@@ -81,9 +81,12 @@ class ConstantLabel(Dataset):
 
 class ZipDataset(Dataset):
     def __init__(self, *datasets):
+        if len(datasets) == 0:
+            raise ValueError("ZipDataset requires at least one dataset.")
+        base_len = len(datasets[0])
+        if not all(len(d) == base_len for d in datasets):
+            raise ValueError("All datasets passed to ZipDataset must have equal length.")
         self.datasets = datasets
-        # Ensure all zipped datasets are of equal length
-        assert all(len(d) == len(datasets[0]) for d in datasets)
 
     def __len__(self):
         return len(self.datasets[0])
@@ -93,9 +96,12 @@ class ZipDataset(Dataset):
 
 class ChainDataset(Dataset):
     def __init__(self, *datasets):
+        if len(datasets) == 0:
+            raise ValueError("ChainDataset requires at least one dataset.")
+        base_len = len(datasets[0])
+        if not all(len(d) == base_len for d in datasets):
+            raise ValueError("All datasets passed to ChainDataset must have equal length.")
         self.datasets = datasets
-        # Ensure all chained datasets are of equal length
-        assert all(len(d) == len(datasets[0]) for d in datasets)
 
     def __len__(self):
         return len(self.datasets[0])

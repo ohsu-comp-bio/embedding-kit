@@ -249,7 +249,7 @@ def fit(model, X: Union[torch.Tensor, Dataset, DataLoader],
 
 
 def fit_vae(model, 
-            X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoader], 
+            X: Union[pd.DataFrame, torch.Tensor, Dataset, DataLoader], 
             epochs: int = 20, 
             lr: Optional[float] = 1e-3,
             beta: float = 1.0,
@@ -309,7 +309,7 @@ def fit_vae(model,
     elif isinstance(X, DataLoader):
         data_loader = X
     else:
-        raise TypeError("X must be DataFrame, Tensor, or DataLoader")
+        raise TypeError("X must be DataFrame, Tensor, Dataset, or DataLoader")
 
     opt = _resolve_optimizer(model=model, lr=lr, optimizer=optimizer)
 
@@ -322,7 +322,14 @@ def fit_vae(model,
     phases = _resolve_phases(epochs=epochs, beta=beta, beta_schedule=beta_schedule)
 
     def vae_step(batch, beta_value: float) -> Dict[str, torch.Tensor]:
-        (x_tensor,) = batch
+        if torch.is_tensor(batch):
+            x_tensor = batch
+        elif isinstance(batch, (tuple, list)):
+            if len(batch) != 1:
+                raise ValueError("VAE training batches must contain exactly one tensor input.")
+            x_tensor = batch[0]
+        else:
+            raise TypeError("VAE training batches must be a tensor or a single-item tuple/list.")
         x_tensor = x_tensor.to(device).float()
 
         res = model(x_tensor)

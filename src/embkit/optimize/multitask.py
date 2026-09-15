@@ -37,7 +37,7 @@ def _task_loss(criterion, model, batch, device=None, unroll_inputs=False, auto_e
             targets = targets.to(device)
 
     if auto_encoder:
-        if isinstance(inputs, (tuple, list)) and unroll_inputs:
+        if isinstance(inputs, (tuple, list)) and len(inputs) == 1:
             inputs = inputs[0]
         res = model(inputs)
         total_loss, recon_loss, kl_loss = criterion(res.recon, inputs, res.mu, res.logvar)
@@ -56,7 +56,7 @@ def _task_loss(criterion, model, batch, device=None, unroll_inputs=False, auto_e
 class LearningTask:
     """Defines a learning task with model, dataset, and training configuration."""
 
-    def __init__(self, model, dataset, batch_size, criterion, name="task", weight=1.0, auto_encoder=False, unroll_inputs=False):
+    def __init__(self, model, dataset, batch_size, criterion, weight=1.0, name="task", auto_encoder=False, unroll_inputs=False):
         """
         Initialize a LearningTask.
 
@@ -76,6 +76,14 @@ class LearningTask:
         self.unroll_inputs = unroll_inputs
         self.name = name
 
+
+def _task_loss_key(tasks, idx):
+    task = tasks[idx]
+    name = task.name
+    duplicate_count = sum(1 for t in tasks if t.name == name)
+    if duplicate_count > 1:
+        return f"loss_{name}_{idx}"
+    return f"loss_{name}"
 
 
 def _prepare_learning_tasks(tasks):
@@ -190,7 +198,7 @@ def multi_task_train_weighted_sync(
                 "total_loss": float(total_loss.detach().cpu()),
                 "lr": optimizer.param_groups[0]["lr"],
             }
-            postfix.update({f"loss_{tasks[i].name}": float(loss.detach().cpu()) for i, loss in enumerate(task_losses)})
+            postfix.update({_task_loss_key(tasks, i): float(loss.detach().cpu()) for i, loss in enumerate(task_losses)})
             pbar.set_postfix(**postfix)
 
         if scheduler is not None:
@@ -256,7 +264,7 @@ def multi_task_train_interleaved(
                 torch.nn.utils.clip_grad_norm_(trainable_params, gradient_clip_norm)
 
             optimizer.step()
-            current_scores[f"loss_{task.name}"] = float(loss.detach().cpu())
+            current_scores[_task_loss_key(tasks, task_idx)] = float(loss.detach().cpu())
 
             pbar.set_postfix(
                 task=task_idx,
