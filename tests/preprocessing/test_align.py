@@ -5,7 +5,9 @@ import pandas as pd
 from embkit.align import (
     calc_rmsd,
     procrustes,
+    procrustes_scale,
     matrix_spearman_alignment_linear,
+    procrustes_scale_centered,
 )
 
 
@@ -138,6 +140,66 @@ class TestAlignmentUtils(unittest.TestCase):
         self.assertEqual(S.shape, (4,))
         self.assertTrue(np.all(S >= 0))
         np.testing.assert_array_equal(S, np.sort(S)[::-1])
+
+    # -------- procrustes_scale --------
+    def test_procrustes_scale_identity(self):
+        X = np.eye(3)
+        Y = np.eye(3)
+        R, k, S = procrustes_scale(X, Y)
+        np.testing.assert_array_almost_equal(R, np.eye(3))
+        np.testing.assert_array_almost_equal(k, np.ones(3))
+
+    def test_procrustes_scale_recovers_rotation_and_scale(self):
+        theta = np.pi / 5
+        R_true = np.array(
+            [[np.cos(theta), -np.sin(theta)],
+             [np.sin(theta),  np.cos(theta)]]
+        )
+        k_true = np.array([3.0, 3.0])
+
+        rng = np.random.default_rng(5)
+        X = rng.standard_normal((80, 2))
+        Y = (X @ R_true) * k_true
+
+        R, k, S = procrustes_scale(X, Y)
+
+        np.testing.assert_array_almost_equal(R, R_true, decimal=6)
+        np.testing.assert_array_almost_equal(k, k_true, decimal=6)
+
+        Y_pred = (X @ R) * k
+        np.testing.assert_array_almost_equal(Y_pred, Y, decimal=6)
+
+    # -------- procrustes_scale_centered --------
+    def test_procrustes_scale_centered_means_are_correct(self):
+        rng = np.random.default_rng(3)
+        X = rng.standard_normal((40, 2)) + np.array([5.0, -3.0])
+        Y = rng.standard_normal((40, 2)) + np.array([-2.0, 7.0])
+
+        R, k, Xmean, Ymean, S = procrustes_scale_centered(X, Y)
+
+        np.testing.assert_array_almost_equal(Xmean, X.mean(axis=0))
+        np.testing.assert_array_almost_equal(Ymean, Y.mean(axis=0))
+
+    def test_procrustes_scale_centered_recovers_rotation_scale_and_translation(self):
+        theta = np.pi / 3
+        R_true = np.array(
+            [[np.cos(theta), -np.sin(theta)],
+             [np.sin(theta),  np.cos(theta)]]
+        )
+        k_true = np.array([2.0, 2.0])
+        translation = np.array([10.0, -4.0])
+
+        rng = np.random.default_rng(4)
+        X = rng.standard_normal((100, 2)) + np.array([3.0, 3.0])
+        Y = ((X - X.mean(axis=0)) @ R_true) * k_true + translation
+
+        R, k, Xmean, Ymean, S = procrustes_scale_centered(X, Y)
+
+        np.testing.assert_array_almost_equal(R, R_true, decimal=6)
+        np.testing.assert_array_almost_equal(k, k_true, decimal=6)
+
+        Y_pred = ((X - Xmean) @ R) * k + Ymean
+        np.testing.assert_array_almost_equal(Y_pred, Y, decimal=6)
 
 
 if __name__ == '__main__':
