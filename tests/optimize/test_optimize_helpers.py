@@ -87,6 +87,11 @@ class TestOptimizeHelpers(unittest.TestCase):
         out = fit_vae(vae, loader, epochs=1, loss=BCEWithLogitsVAELoss(), progress=False)
         self.assertIsInstance(out, dict)
 
+    def test_fit_vae_accepts_tensor_dataset(self):
+        vae = BaseVAE(features=["G1", "G2"], latent_dim=1)
+        x = torch.tensor([[0.1, 0.2], [0.2, 0.3]], dtype=torch.float32)
+        out = fit_vae(vae, TensorDataset(x), epochs=1, loss=BCEWithLogitsVAELoss(), progress=False)
+        self.assertIsInstance(out, dict)
     def test_fit_vae_casts_batch_to_model_dtype(self):
         x = torch.tensor([[0.1, 0.2], [0.2, 0.3]], dtype=torch.float32)
         loader = DataLoader(TensorDataset(x), batch_size=1, shuffle=False)

@@ -181,6 +181,10 @@ class TestLearningTask(unittest.TestCase):
         task = make_task(weight=2.5)
         self.assertEqual(task.weight, 2.5)
 
+    def test_positional_weight_compatibility(self):
+        task = LearningTask(TinyModel(), make_dataset(), 2, nn.MSELoss(), 2.0)
+        self.assertEqual(task.weight, 2.0)
+
 
 class TestPrepareLearningTasks(unittest.TestCase):
     def test_returns_loaders_and_params(self):

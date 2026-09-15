@@ -78,3 +78,36 @@ class ConstantLabel(Dataset):
 
     def __getitem__(self, idx):
         return [self.data[idx], self.label]
+
+class ZipDataset(Dataset):
+    def __init__(self, *datasets):
+        if len(datasets) == 0:
+            raise ValueError("ZipDataset requires at least one dataset.")
+        base_len = len(datasets[0])
+        if not all(len(d) == base_len for d in datasets):
+            raise ValueError("All datasets passed to ZipDataset must have equal length.")
+        self.datasets = datasets
+
+    def __len__(self):
+        return len(self.datasets[0])
+
+    def __getitem__(self, idx):
+        return tuple(d[idx] for d in self.datasets)
+
+class ChainDataset(Dataset):
+    def __init__(self, *datasets):
+        if len(datasets) == 0:
+            raise ValueError("ChainDataset requires at least one dataset.")
+        base_len = len(datasets[0])
+        if not all(len(d) == base_len for d in datasets):
+            raise ValueError("All datasets passed to ChainDataset must have equal length.")
+        self.datasets = datasets
+
+    def __len__(self):
+        return len(self.datasets[0])
+
+    def __getitem__(self, idx):
+        out = []
+        for d in self.datasets:
+            out.extend(d[idx])
+        return tuple(out)

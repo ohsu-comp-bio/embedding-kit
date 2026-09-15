@@ -21,8 +21,12 @@ def _unique_parameters(*models):
     return unique_params
 
 
-def _task_loss(criterion, model, batch, device=None, unroll_inputs=False):
-    inputs, targets = batch
+def _task_loss(criterion, model, batch, device=None, unroll_inputs=False, auto_encoder=False):
+    if auto_encoder:
+        inputs = batch
+        targets = batch
+    else:
+        inputs, targets = batch
 
     if device is not None:
         if isinstance(inputs, (tuple, list)):
@@ -31,6 +35,14 @@ def _task_loss(criterion, model, batch, device=None, unroll_inputs=False):
             inputs = inputs.to(device)
         if torch.is_tensor(targets):
             targets = targets.to(device)
+
+    if auto_encoder:
+        if isinstance(inputs, (tuple, list)) and len(inputs) == 1:
+            inputs = inputs[0]
+        res = model(inputs)
+        total_loss, recon_loss, kl_loss = criterion(res.recon, inputs, res.mu, res.logvar)
+        return total_loss, res.recon, inputs
+
 
     if isinstance(inputs, (tuple, list)) and unroll_inputs:
         outputs = model(*inputs)
@@ -44,7 +56,7 @@ def _task_loss(criterion, model, batch, device=None, unroll_inputs=False):
 class LearningTask:
     """Defines a learning task with model, dataset, and training configuration."""
 
-    def __init__(self, model, dataset, batch_size, criterion, weight=1.0):
+    def __init__(self, model, dataset, batch_size, criterion, weight=1.0, name="task", auto_encoder=False, unroll_inputs=False):
         """
         Initialize a LearningTask.
 
@@ -60,6 +72,18 @@ class LearningTask:
         self.criterion = criterion
         self.weight = weight
         self.batch_size = batch_size
+        self.auto_encoder = auto_encoder
+        self.unroll_inputs = unroll_inputs
+        self.name = name
+
+
+def _task_loss_key(tasks, idx):
+    task = tasks[idx]
+    name = task.name
+    duplicate_count = sum(1 for t in tasks if t.name == name)
+    if duplicate_count > 1:
+        return f"loss_{name}_{idx}"
+    return f"loss_{name}"
 
 
 def _prepare_learning_tasks(tasks):
@@ -111,9 +135,10 @@ def multi_task_train_weighted_sync(
     epochs=5,
     lr=0.001,
     pairing_mode="truncate",
+    unroll_inputs=False,
     gradient_clip_norm=None,
     device=None,
-    unroll_inputs=False,
+    lr_gamma=0.5,
 ):
     """
     Weighted multitask training over an arbitrary list of LearningTask.
@@ -128,7 +153,9 @@ def multi_task_train_weighted_sync(
     loaders, trainable_params = _prepare_learning_tasks(tasks)
 
     optimizer = Adam(trainable_params, lr=lr)
-    scheduler = StepLR(optimizer, step_size=1, gamma=0.5)
+    scheduler = None
+    if lr_gamma is not None:
+        scheduler = StepLR(optimizer, step_size=1, gamma=lr_gamma)
 
     pbar = tqdm(range(epochs))
     for epoch in pbar:
@@ -153,7 +180,8 @@ def multi_task_train_weighted_sync(
                     task.model,
                     batch,
                     device=device,
-                    unroll_inputs=unroll_inputs,
+                    unroll_inputs=(task.unroll_inputs or unroll_inputs),
+                    auto_encoder=task.auto_encoder
                 )
                 task_losses.append(loss)
                 weighted_loss = task.weight * loss
@@ -170,10 +198,11 @@ def multi_task_train_weighted_sync(
                 "total_loss": float(total_loss.detach().cpu()),
                 "lr": optimizer.param_groups[0]["lr"],
             }
-            postfix.update({f"loss_{i}": float(loss.detach().cpu()) for i, loss in enumerate(task_losses)})
+            postfix.update({_task_loss_key(tasks, i): float(loss.detach().cpu()) for i, loss in enumerate(task_losses)})
             pbar.set_postfix(**postfix)
 
-        scheduler.step()
+        if scheduler is not None:
+            scheduler.step()
 
 
 def multi_task_train_interleaved(
@@ -182,9 +211,10 @@ def multi_task_train_interleaved(
     lr=0.001,
     task_schedule=None,
     steps_per_epoch=None,
+    unroll_inputs=False,
     gradient_clip_norm=None,
     device=None,
-    unroll_inputs=False,
+    lr_gamma=0.5,
 ):
     """
     Interleaved multitask training over an arbitrary list of LearningTask.
@@ -197,13 +227,16 @@ def multi_task_train_interleaved(
     normalized_schedule = _normalize_task_schedule(task_schedule, len(tasks))
 
     optimizer = Adam(trainable_params, lr=lr)
-    scheduler = StepLR(optimizer, step_size=1, gamma=0.5)
+    scheduler = None
+    if lr_gamma is not None:
+        scheduler = StepLR(optimizer, step_size=1, gamma=lr_gamma)
 
     if steps_per_epoch is None:
         steps_per_epoch = max(len(loader) for loader in loaders)
 
     schedule_cycle = cycle(normalized_schedule)
 
+    current_scores = {}
     pbar = tqdm(range(epochs))
     for epoch in pbar:
         task_iters = [cycle(loader) for loader in loaders]
@@ -220,7 +253,8 @@ def multi_task_train_interleaved(
                 task.model,
                 batch,
                 device=device,
-                unroll_inputs=unroll_inputs,
+                unroll_inputs=(task.unroll_inputs or unroll_inputs),
+                auto_encoder=task.auto_encoder
             )
             weighted_loss = task.weight * loss
 
@@ -230,12 +264,13 @@ def multi_task_train_interleaved(
                 torch.nn.utils.clip_grad_norm_(trainable_params, gradient_clip_norm)
 
             optimizer.step()
+            current_scores[_task_loss_key(tasks, task_idx)] = float(loss.detach().cpu())
 
             pbar.set_postfix(
                 task=task_idx,
-                loss=float(loss.detach().cpu()),
                 weighted_loss=float(weighted_loss.detach().cpu()),
                 lr=optimizer.param_groups[0]["lr"],
+                **current_scores
             )
-
-        scheduler.step()
+        if scheduler is not None:
+            scheduler.step()

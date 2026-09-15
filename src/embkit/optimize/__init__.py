@@ -249,7 +249,7 @@ def fit(model, X: Union[torch.Tensor, Dataset, DataLoader],
 
 
 def fit_vae(model, 
-            X: Union[pd.DataFrame, torch.Tensor, torch.utils.data.DataLoader], 
+            X: Union[pd.DataFrame, torch.Tensor, Dataset, DataLoader], 
             epochs: int = 20, 
             lr: Optional[float] = 1e-3,
             beta: float = 1.0,
@@ -308,10 +308,12 @@ def fit_vae(model,
         data_loader = dataframe_loader(X, batch_size=batch_size, shuffle=shuffle, device=device)
     elif isinstance(X, torch.Tensor):
         data_loader = DataLoader(TensorDataset(X), batch_size=batch_size, shuffle=shuffle)
+    elif isinstance(X, Dataset):
+        data_loader = DataLoader(X, batch_size=batch_size, shuffle=shuffle)
     elif isinstance(X, DataLoader):
         data_loader = X
     else:
-        raise TypeError("X must be DataFrame, Tensor, or DataLoader")
+        raise TypeError("X must be DataFrame, Tensor, Dataset, or DataLoader")
 
     opt = _resolve_optimizer(model=model, lr=lr, optimizer=optimizer)
 

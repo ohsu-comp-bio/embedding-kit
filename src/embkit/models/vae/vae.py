@@ -76,8 +76,8 @@ class VAE(nn.Module):
                 sampling=data.get("sampling", True),
             )
         return VAE(
-            encoder=build( data["encoder"]),
-            decoder=build( data["decoder"]),
+            encoder=build(data["encoder"]),
+            decoder=build(data["decoder"]),
             **data["extra_args"]
         )
 

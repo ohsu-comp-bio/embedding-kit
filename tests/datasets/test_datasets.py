@@ -4,7 +4,7 @@ import unittest
 import torch
 from torch.utils.data import Dataset
 
-from embkit.datasets import BalancedMixer, DatasetMask
+from embkit.datasets import BalancedMixer, ChainDataset, DatasetMask, ZipDataset
 
 
 class TinyDataset(Dataset):
@@ -46,6 +46,24 @@ class TestDatasets(unittest.TestCase):
         self.assertTrue(torch.equal(y0, torch.tensor([6.0])))
         self.assertEqual(x0.device.type, "cpu")
         self.assertEqual(y0.device.type, "cpu")
+
+    def test_zip_dataset_validates_inputs(self):
+        with self.assertRaises(ValueError):
+            ZipDataset()
+
+        d1 = TinyDataset([1, 2])
+        d2 = TinyDataset([3])
+        with self.assertRaises(ValueError):
+            ZipDataset(d1, d2)
+
+    def test_chain_dataset_validates_inputs(self):
+        with self.assertRaises(ValueError):
+            ChainDataset()
+
+        d1 = TinyDataset([(1,), (2,)])
+        d2 = TinyDataset([(3,)])
+        with self.assertRaises(ValueError):
+            ChainDataset(d1, d2)
 
 
 if __name__ == "__main__":
