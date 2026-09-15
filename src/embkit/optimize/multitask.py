@@ -189,7 +189,7 @@ def multi_task_train_weighted_sync(
                 "total_loss": float(total_loss.detach().cpu()),
                 "lr": optimizer.param_groups[0]["lr"],
             }
-            postfix.update({f"loss_{i}": float(loss.detach().cpu()) for i, loss in enumerate(task_losses)})
+            postfix.update({f"loss_{tasks[i].name}": float(loss.detach().cpu()) for i, loss in enumerate(task_losses)})
             pbar.set_postfix(**postfix)
 
         if scheduler is not None:

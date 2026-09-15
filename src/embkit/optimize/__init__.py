@@ -304,6 +304,8 @@ def fit_vae(model,
         data_loader = dataframe_loader(X, batch_size=batch_size, shuffle=shuffle, device=device)
     elif isinstance(X, torch.Tensor):
         data_loader = DataLoader(TensorDataset(X), batch_size=batch_size, shuffle=shuffle)
+    elif isinstance(X, Dataset):
+        data_loader = DataLoader(X, batch_size=batch_size, shuffle=shuffle)
     elif isinstance(X, DataLoader):
         data_loader = X
     else:
