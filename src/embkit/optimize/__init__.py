@@ -298,6 +298,10 @@ def fit_vae(model,
     if hasattr(model, "refresh_masks"):
         model.refresh_masks(device)
     model.train()
+    try:
+        model_dtype = next(model.parameters()).dtype
+    except StopIteration:
+        model_dtype = None
 
     # Build dataloader once
     if isinstance(X, pd.DataFrame):
@@ -322,15 +326,11 @@ def fit_vae(model,
     phases = _resolve_phases(epochs=epochs, beta=beta, beta_schedule=beta_schedule)
 
     def vae_step(batch, beta_value: float) -> Dict[str, torch.Tensor]:
-        if torch.is_tensor(batch):
-            x_tensor = batch
-        elif isinstance(batch, (tuple, list)):
-            if len(batch) != 1:
-                raise ValueError("VAE training batches must contain exactly one tensor input.")
-            x_tensor = batch[0]
+        (x_tensor,) = batch
+        if model_dtype is None:
+            x_tensor = x_tensor.to(device)
         else:
-            raise TypeError("VAE training batches must be a tensor or a single-item tuple/list.")
-        x_tensor = x_tensor.to(device).float()
+            x_tensor = x_tensor.to(device=device, dtype=model_dtype)
 
         res = model(x_tensor)
 
