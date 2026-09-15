@@ -127,6 +127,7 @@ def multi_task_train_weighted_sync(
     epochs=5,
     lr=0.001,
     pairing_mode="truncate",
+    unroll_inputs=False,
     gradient_clip_norm=None,
     device=None,
     lr_gamma=0.5,
@@ -171,7 +172,7 @@ def multi_task_train_weighted_sync(
                     task.model,
                     batch,
                     device=device,
-                    unroll_inputs=task.unroll_inputs,
+                    unroll_inputs=(task.unroll_inputs or unroll_inputs),
                     auto_encoder=task.auto_encoder
                 )
                 task_losses.append(loss)
@@ -202,6 +203,7 @@ def multi_task_train_interleaved(
     lr=0.001,
     task_schedule=None,
     steps_per_epoch=None,
+    unroll_inputs=False,
     gradient_clip_norm=None,
     device=None,
     lr_gamma=0.5,
@@ -243,7 +245,7 @@ def multi_task_train_interleaved(
                 task.model,
                 batch,
                 device=device,
-                unroll_inputs=task.unroll_inputs,
+                unroll_inputs=(task.unroll_inputs or unroll_inputs),
                 auto_encoder=task.auto_encoder
             )
             weighted_loss = task.weight * loss
