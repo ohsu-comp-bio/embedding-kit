@@ -13,6 +13,7 @@ from embkit.optimize import (
 )
 from embkit.losses import BCEWithLogitsVAELoss
 from embkit.models.vae import VAE, BaseVAE
+from embkit.models.vae.vae import VAEOutput
 
 
 class TinyModel(nn.Module):
@@ -22,6 +23,32 @@ class TinyModel(nn.Module):
 
     def forward(self, x):
         return self.lin(x)
+
+
+class TinyVAEForDtype(nn.Module):
+    def __init__(self, dtype: torch.dtype):
+        super().__init__()
+        self.bias = nn.Parameter(torch.zeros(1, dtype=dtype))
+
+    def forward(self, x):
+        recon = x + self.bias
+        mu = torch.zeros_like(x)
+        logvar = torch.zeros_like(x)
+        z = torch.zeros_like(x)
+        return VAEOutput(recon=recon, mu=mu, logvar=logvar, z=z)
+
+
+class CaptureInputDTypeLoss:
+    def __init__(self):
+        self.beta = 1.0
+        self.seen_input_dtypes = []
+
+    def __call__(self, recon, x, mu, logvar):
+        self.seen_input_dtypes.append(x.dtype)
+        recon_loss = ((recon - x) ** 2).mean()
+        kl_loss = torch.zeros((), device=x.device, dtype=recon.dtype)
+        total_loss = recon_loss + kl_loss
+        return total_loss, recon_loss, kl_loss
 
 
 class TestOptimizeHelpers(unittest.TestCase):
@@ -59,6 +86,24 @@ class TestOptimizeHelpers(unittest.TestCase):
         loader = DataLoader(TensorDataset(x), batch_size=1, shuffle=False)
         out = fit_vae(vae, loader, epochs=1, loss=BCEWithLogitsVAELoss(), progress=False)
         self.assertIsInstance(out, dict)
+
+    def test_fit_vae_casts_batch_to_model_dtype(self):
+        x = torch.tensor([[0.1, 0.2], [0.2, 0.3]], dtype=torch.float32)
+        loader = DataLoader(TensorDataset(x), batch_size=1, shuffle=False)
+        model = TinyVAEForDtype(dtype=torch.bfloat16)
+        loss = CaptureInputDTypeLoss()
+
+        fit_vae(
+            model,
+            loader,
+            epochs=1,
+            loss=loss,
+            device=torch.device("cpu"),
+            progress=False,
+        )
+
+        self.assertGreater(len(loss.seen_input_dtypes), 0)
+        self.assertTrue(all(dt == torch.bfloat16 for dt in loss.seen_input_dtypes))
 
 
 if __name__ == "__main__":

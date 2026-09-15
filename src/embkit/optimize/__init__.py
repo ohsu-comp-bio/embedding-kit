@@ -298,6 +298,10 @@ def fit_vae(model,
     if hasattr(model, "refresh_masks"):
         model.refresh_masks(device)
     model.train()
+    try:
+        model_dtype = next(model.parameters()).dtype
+    except StopIteration:
+        model_dtype = None
 
     # Build dataloader once
     if isinstance(X, pd.DataFrame):
@@ -321,7 +325,10 @@ def fit_vae(model,
 
     def vae_step(batch, beta_value: float) -> Dict[str, torch.Tensor]:
         (x_tensor,) = batch
-        x_tensor = x_tensor.to(device).float()
+        if model_dtype is None:
+            x_tensor = x_tensor.to(device)
+        else:
+            x_tensor = x_tensor.to(device=device, dtype=model_dtype)
 
         res = model(x_tensor)
 
