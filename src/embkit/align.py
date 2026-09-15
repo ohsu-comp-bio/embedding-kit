@@ -110,3 +110,30 @@ def procrustes_scale(X, Y):
     denominators = np.sum(A * A, axis=0)
     k = np.divide(numerators, denominators, out=np.zeros_like(numerators), where=denominators!=0)
     return R, k, S
+
+
+def procrustes_scale_centered(X, Y):
+    """
+    Same as procrustes_scale, but mean-centers X and Y before fitting the rotation and scale.
+
+    To apply transformation:
+    (src - Xmean).dot(R) * k + Ymean # element-wise multiplication w per-dim scaling factors
+
+    Args:
+        X: The first matrix (N_points, N_dims).
+        Y: The second matrix (N_points, N_dims).
+
+    Returns:
+        R: The optimal rotation matrix (guaranteed det(R) = +1).
+        k: Per-dimension Scaling factors (shape: (N_dims,)), one scaling value per dim
+        Xmean: Per-dimension mean of X (shape: (N_dims,)), subtract before applying R/k
+        Ymean: Per-dimension mean of Y (shape: (N_dims,)), add back after applying R/k
+        S: Singular values of (X - Xmean).T @ (Y - Ymean)
+        
+    """
+    Xmean = np.array(X).mean(axis=0)
+    Ymean = np.array(Y).mean(axis=0)
+    Xc = np.array(X) - Xmean
+    Yc = np.array(Y) - Ymean
+    R, k, S = procrustes_scale(Xc, Yc)
+    return R, k, Xmean, Ymean, S
