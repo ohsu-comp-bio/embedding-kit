@@ -1,4 +1,4 @@
-# Models
+# VAE
 ::: embkit.models.vae
     options:
       members:

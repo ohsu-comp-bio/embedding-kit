@@ -24,7 +24,7 @@ Latent embeddings
 
 ## Features
 
-- **VAE models** — `VAE` for general tabular data, `RNAVAE` for RNA-seq with biology-specific architecture choices, `NetVAE` for pathway-constrained embeddings
+- **VAE models** — `BaseVAE` for general tabular data, `RNAVAE` for RNA-seq with biology-specific architecture choices, `NetVAE` for pathway-constrained embeddings (**maintenance mode** — the next architecture will be a mixture-of-experts model)
 - **Modular layer system** — build encoder/decoder stacks with `Layer` and `LayerList`; factory serialization stores architecture + weights in a single file
 - **Beta-KL scheduling** — multi-phase annealing to prevent posterior collapse
 - **Normalization** — log2+1 min-max scaling (`ExpMinMaxScaler`), quantile normalization, zero-masking

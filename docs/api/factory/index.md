@@ -21,7 +21,7 @@ This mirrors how `embkit model train-vae` turns `--encode-layers` / `--decode-la
 
 ```python
 from embkit.factory import LayerList, save, load
-from embkit.models.vae.vae import VAE
+from embkit.models.vae import BaseVAE
 
 features = [f"gene_{i}" for i in range(1000)]
 latent = 128
@@ -36,7 +36,7 @@ dec_sizes = [int(v) for v in decode_layers.split(",")] + [len(features)]
 encoder_layers = LayerList(enc_sizes)
 decoder_layers = LayerList(dec_sizes, end_activation=final_activation)
 
-vae = VAE(
+vae = BaseVAE(
     features=features,
     latent_dim=latent,
     encoder_layers=encoder_layers,

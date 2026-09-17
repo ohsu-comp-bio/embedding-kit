@@ -6,8 +6,7 @@ from sklearn.base import BaseEstimator
 from sklearn.metrics import mean_squared_error
 import pandas as pd
 
-from ..models.vae.vae import VAE
-from ..models.vae.base_vae import BaseVAE
+from ..models.vae.vae import VAE, BaseVAE
 from ..losses import BCEWithLogitsVAELoss
 
 class VAEEstimator(BaseEstimator):
@@ -40,7 +39,7 @@ class VAEEstimator(BaseEstimator):
         feature_dim = X.shape[1]
         features = list(X.columns)
 
-        vae = VAE(features=features, latent_dim=self.latent_dim)
+        vae = BaseVAE(features=features, latent_dim=self.latent_dim)
 
         device = self.device or ('cuda' if torch.cuda.is_available() else 'cpu')
         device = torch.device(device)

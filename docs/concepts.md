@@ -66,21 +66,27 @@ A single optimizer is reused across all phases so Adam's momentum is preserved. 
 
 ## Model Classes
 
-### VAE
+### BaseVAE
 
-The standard model. Takes a feature list, latent dimension, and optional `encoder_layers` / `decoder_layers` built from `Layer` objects.
+The standard model to instantiate directly. It builds its encoder and decoder from a feature list, latent dimension, and optional `encoder_layers` / `decoder_layers` built from `Layer` objects.
 
+```python
+from embkit.models.vae import BaseVAE
+
+base_vae = BaseVAE(features, latent_dim, encoder_layers, decoder_layers)
+# forward(x) -> VAEOutput(recon, mu, logvar, z)
+# encode(x)  -> mu   (latent mean, no_grad — use for stable embeddings)
 ```
-VAE(features, latent_dim, encoder_layers, decoder_layers)
-  forward(x) -> recon, mu, logvar, z
-  encode(x)  -> z   (no_grad)
-```
+
+> **Note** — `VAE` is the lower-level base class (`VAE(encoder, decoder)`). Use **`BaseVAE`** for the common "features → VAE" construction shown throughout these docs; `BaseVAE` is a subclass of `VAE`.
 
 ### RNAVAE
 
-A VAE tuned for RNA-seq data. The encoder applies `BatchNorm + ReLU` to the latent heads (mu, logvar), constraining them to non-negative values. It has a built-in `fit()` method with beta warmup and early stopping.
+A VAE tuned for RNA-seq data. The encoder applies `BatchNorm + ReLU` to the latent heads (mu, logvar), constraining them to non-negative values. It is trained with the standard `optimize.fit_vae` loop (no built-in `fit()` method).
 
 ### NetVAE
+
+> **Status note** — NetVAE is in maintenance mode. The team's next architecture is a mixture-of-experts model; no new features are planned for the pathway-constrained path.
 
 A pathway-constrained VAE. The encoder uses `MaskedLinear` layers so each latent dimension corresponds to a biological pathway or transcription factor group. Connections between features and groups not in the pathway are forced to zero.
 
@@ -118,14 +124,14 @@ Layers are described as **configuration objects**, not `nn.Module` instances, be
 ```python
 from embkit.factory.layers import Layer, LayerList
 
-# Layer(units, activation, op, batch_norm, bias)
+# Layer(units, *, op="linear", activation="relu", constraint=None, batch_norm=False, bias=True)
 encoder_layers = LayerList([
     Layer(512, activation="relu"),
     Layer(256, activation="relu"),
 ])
 ```
 
-A `LayerList` is a list of `Layer` configs. When the `VAE` is constructed it calls `LayerList.build(input_dim, latent_dim)` to produce an actual `nn.Sequential`.
+A `LayerList` is a list of `Layer` configs. When the `Encoder`/`Decoder` is constructed it calls `LayerList.build(input_dim, output_dim)` to produce the actual module stack.
 
 You can also pass a comma-separated string of sizes to the CLI; the `train-vae` command parses this into a `LayerList` automatically.
 

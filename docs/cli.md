@@ -2,6 +2,16 @@
 
 `embkit` is the command-line interface for Embedding Kit. It is organized into sub-command groups.
 
+## Global options
+
+| Flag | Description |
+|------|-------------|
+| `--verbose` | Enable verbose (DEBUG-level) logging |
+| `--version` | Show the installed version and exit |
+| `--help`, `-h` | Show help for any command or group |
+
+You can also query help for a nested command (e.g. `embkit help model train-vae`).
+
 ## Top-level help
 
 ```bash
@@ -100,6 +110,7 @@ embkit model train-netvae INPUT_PATH PATHWAY_SIF [OPTIONS]
 | `--learning-rate`, `-r` | `0.0001` | Adam learning rate |
 | `--out`, `-o` | — | Output model file path |
 | `--loss` | `bce-logit` | Loss function: `mse`, `bce`, `bce-logit` |
+| `--schedule`, `-s` | — | Beta KL schedule: `"20:0,20:0.1,40:0.3"` (each segment is `n_epochs:beta`) |
 | `--min-group-size` | `2` | Minimum group size filter for the pathway feature map (including self if present) |
 | `--group-layer-scale` | `5,2,1` | Comma-separated per-group widths for masked NetVAE layers |
 | `--save-stats` | false | Save training statistics |
@@ -297,8 +308,10 @@ embkit protein encode FASTA [OPTIONS]
 |------|-----------|-------|
 | `t6` | 8 M | Fastest; suitable for quick tests |
 | `t12` | 35 M | Good balance |
+| `t30` | 150 M | Higher quality than t12 |
 | `t33` | 650 M | Default; strong general-purpose embeddings |
-| `t48` | 3 B | Highest quality; requires significant GPU memory |
+| `t36` | 3 B | Higher quality; more memory |
+| `t48` | 15 B | Highest quality; requires significant GPU memory |
 
 **Examples**
 
@@ -356,13 +369,63 @@ embkit align pair embeddings_a.tsv embeddings_b.tsv \
 
 ## resources
 
-Commands for downloading external biological datasets to `~/.embkit/`.
+Commands for downloading external biological datasets. Files are cached locally after the first download.
+
+### resources gtex
+
+Download a GTEx RNA-seq dataset (gene TPM or transcript TPM) into a local folder.
 
 ```bash
-embkit resources --help
+embkit resources gtex --output_folder FOLDER [OPTIONS]
 ```
 
-Datasets currently available via the CLI include GTEx gene TPM and transcript TPM. Files are cached locally after the first download.
+**Options**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--output_folder`, `-f` | required | Folder to download the dataset into |
+| `--data_type`, `-t` | — | Dataset name: `gene_tpm` or `transcript_tpm` (default `gene_tpm`) |
+
+**Example**
+
+```bash
+embkit resources gtex --data_type gene_tpm --output_folder data/gtex
+```
+
+### resources hugo
+
+Download the HUGO (HGNC) gene-symbol dataset.
+
+```bash
+embkit resources hugo --output_folder FOLDER [OPTIONS]
+```
+
+**Options**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--output_folder`, `-f` | required | Folder to download the dataset into |
+| `--gtex_conversion`, `-gtex` | false | Also download GTEx and write a HUGO-symbol-renamed copy (`gtex.hugo.tsv`) |
+
+**Example**
+
+```bash
+embkit resources hugo --output_folder data/hugo --gtex_conversion
+```
+
+### resources sif
+
+Download the SIF (Simple Interaction Format) pathway dataset.
+
+```bash
+embkit resources sif --output_folder data/pathway
+```
+
+**Options**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--output_folder`, `-f` | required | Folder to download the dataset into |
 
 ---
 
@@ -370,8 +433,31 @@ Datasets currently available via the CLI include GTEx gene TPM and transcript TP
 
 Commands for accessing cBioPortal data.
 
+### cbio studies
+
+List the available cBioPortal studies (ID and name).
+
 ```bash
-embkit cbio --help
+embkit cbio studies
 ```
 
-Downloads molecular profile data from cBioPortal studies. Use `embkit cbio --help` to list available sub-commands and options.
+### cbio download
+
+Download and unpack a cBioPortal study's molecular profile data.
+
+```bash
+embkit cbio download --study_id STUDY_ID [OPTIONS]
+```
+
+**Options**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--study_id`, `-si` | required | ID of the study to download (find it with `cbio studies`) |
+| `--save_path`, `-s` | — | Path to save the dataset into |
+
+**Example**
+
+```bash
+embkit cbio download --study_id brca_tcga --save_path data/cbio
+```

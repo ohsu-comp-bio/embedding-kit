@@ -97,7 +97,7 @@ ESM embeddings are a fixed-size numeric representation. You can feed them direct
 ```python
 import pandas as pd
 from embkit import dataframe_loader
-from embkit.models.vae import VAE
+from embkit.models.vae import BaseVAE
 from embkit.factory.layers import Layer
 from embkit.losses import BCEWithLogitsVAELoss
 from embkit import optimize
@@ -111,7 +111,7 @@ df = (df - df.min()) / (df.max() - df.min() + 1e-8)
 
 loader = dataframe_loader(df, batch_size=128)
 
-vae = VAE(
+vae = BaseVAE(
     features=list(df.columns),
     latent_dim=64,
     encoder_layers=[Layer(256, activation="relu"), Layer(128, activation="relu")],

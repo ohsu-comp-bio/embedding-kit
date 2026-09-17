@@ -139,13 +139,13 @@ dec_layers = [
 This Python API example uses the standard `VAE` class with pathway-constrained masked layers — not the `NetVAE` class. This gives you finer control over layer architecture (multiple depths per group). The `NetVAE` class wraps this pattern and builds the masked stack from `latent_groups` + `group_layer_scale`.
 
 ```python
-from embkit.models.vae.vae import VAE
+from embkit.models.vae import BaseVAE
 from embkit.losses import BCEWithLogitsVAELoss
 from embkit import optimize
 
 dataloader = dataframe_loader(df_norm, batch_size=256)
 
-vae = VAE(
+vae = BaseVAE(
     features=list(df_norm.columns),
     latent_dim=group_count,
     encoder_layers=enc_layers,

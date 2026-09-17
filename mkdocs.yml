@@ -2,7 +2,7 @@ site_name: Embedding-Kit
 nav:
   - Home: index.md
   - About: about.md
-  - Change Notes: change-notes.md
+  - Release Notes: change-notes.md
   - Core Concepts: concepts.md
   - Training Guide: training.md
   - CLI Reference: cli.md
@@ -12,6 +12,7 @@ nav:
       - NetVAE (Pathway): examples/netvae.md
   - API:
       - Overview: api/index.md
+      - Helpers & Data Adapters: api/helpers.md
       - Factory:
           - Overview: api/factory/index.md
           - Decorators Example: examples/factory.md
@@ -20,12 +21,14 @@ nav:
           - VAE: api/models/vae.md
           - RNAVAE: api/models/rna_vae.md
           - NetVAE: api/models/net_vae.md
+          - FFNN: api/models/ffnn.md
+          - PairPredictor: api/models/pair.md
       - Training:
           - Optimize: api/optimize.md
       - Preprocessing: api/preprocessing.md
-      - Layers:
+      - Modules:
           - Overview: api/layers/layers.md
-          - Layer Info: api/layers/layer_info.md
+          - Layer & LayerList: api/layers/layer_info.md
           - Masked Linear: api/layers/masked_linear.md
           - Pairwise Comparison: api/layers/pairwise_comparison_layer.md
           - Top Scoring Pair: api/layers/tsp.md
@@ -42,6 +45,11 @@ nav:
       - Commands:
           - Overview: api/commands/index.md
           - cbio: api/commands/cbio.md
+      - Resources: api/resources/index.md
+      - Files: api/files/index.md
+      - Encoding: api/encoding/index.md
+      - Utilities: api/utilities/index.md
+      - Align: api/align.md
       - BMEG: api/bmeg.md
       - Pathway: api/pathway.md
 

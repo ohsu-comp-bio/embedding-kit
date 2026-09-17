@@ -90,7 +90,7 @@ print(df_norm.min().min(), df_norm.max().max())  # should be ~0.0 and ~1.0
 ```python
 from embkit import dataframe_loader
 from embkit.losses import BCEWithLogitsVAELoss
-from embkit.models.vae import VAE
+from embkit.models.vae import BaseVAE
 from embkit.factory.layers import Layer
 from embkit import optimize
 
@@ -109,7 +109,7 @@ decoder_layers = [
 # KL annealing schedule: (beta, n_epochs)
 schedule = [(0.0, 20), (0.1, 20), (0.3, 40), (0.4, 40)]
 
-vae = VAE(
+vae = BaseVAE(
     features=list(df_norm.columns),
     latent_dim=128,
     encoder_layers=encoder_layers,

@@ -7,10 +7,11 @@ RNA-specific Variational Autoencoder with BatchNorm latent heads.
       show_source: false
       members:
         - __init__
-        - fit
         - forward
         - encode
+        - verify_integrity
       merge_init_into_class: true
+      allow_inherited: true
       docstring_options:
         ignore_init_summary: true
       filters:

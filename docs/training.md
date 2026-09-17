@@ -8,14 +8,14 @@ This page covers everything you need to know about training VAE models with Embe
 
 ```python
 from embkit import dataframe_loader
-from embkit.models.vae import VAE
+from embkit.models.vae import BaseVAE
 from embkit.factory.layers import Layer
 from embkit.losses import BCEWithLogitsVAELoss
 from embkit import optimize
 
 dataloader = dataframe_loader(df_norm, batch_size=256)
 
-vae = VAE(features=list(df_norm.columns), latent_dim=128)
+vae = BaseVAE(features=list(df_norm.columns), latent_dim=128)
 optimize.fit_vae(vae, X=dataloader, epochs=50, lr=1e-3, loss=BCEWithLogitsVAELoss())
 ```
 
@@ -185,9 +185,10 @@ optimize.fit(
 
 ## Training layer configurations
 
-The `Layer` / `LayerList` API lets you define encoder and decoder stacks before passing them to `VAE`:
+The `Layer` / `LayerList` API lets you define encoder and decoder stacks before passing them to `BaseVAE`:
 
 ```python
+from embkit.models.vae import BaseVAE
 from embkit.factory.layers import Layer, LayerList
 
 encoder_layers = LayerList([
@@ -200,7 +201,7 @@ decoder_layers = LayerList([
     Layer(1024, activation="relu"),
 ])
 
-vae = VAE(
+vae = BaseVAE(
     features=feature_list,
     latent_dim=128,
     encoder_layers=encoder_layers,
