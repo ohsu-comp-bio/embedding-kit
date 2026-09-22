@@ -7,7 +7,7 @@ import torch
 
 from .encoder import Encoder
 from .decoder import Decoder
-from ...factory.layers import LayerList
+from ...factory.layers import Layer, LayerList
 from ...factory.mapping import nn_module
 from ...factory import build
 
