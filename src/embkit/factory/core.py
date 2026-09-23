@@ -47,6 +47,21 @@ def save(model, path):
 
 def load(path, device=None, dtype=None):
     """Load a serialized model from ``path`` and optionally move its tensors."""
+
+    def patch_legacy_linear():
+        '''Check for final linear layer expected in legacy loading and patch if present.'''
+        encoder = getattr(model, "encoder", None)
+        if encoder is None:
+            return False
+        idx = len(encoder.net)
+        weight_key, bias_key = f"encoder.net.{idx}.weight", f"encoder.net.{idx}.bias"
+        if weight_key not in result.unexpected_keys or bias_key not in result.unexpected_keys:
+            return False
+        from .mapping import Linear
+        out_features, in_features = state_dict[weight_key].shape
+        encoder.net.append(Linear(in_features, out_features))
+        return True
+
     state_dict = torch.load(path, map_location=device, weights_only=False)
     desc = state_dict.pop("__model__", None)
     if desc is None:
@@ -55,7 +70,21 @@ def load(path, device=None, dtype=None):
             "The file does not contain a model description and cannot be loaded."
         )
     model = build(desc)
-    model.load_state_dict(state_dict)
+    result = model.load_state_dict(state_dict, strict = False) # Load non-strict
+
+    if result.unexpected_keys and patch_legacy_linear():
+        model.load_state_dict(state_dict, strict = True) # Legacy matches, Strict loading
+    elif result.unexpected_keys:
+        raise RuntimeError(
+            f"Error(s) in loading state_dict for {model.__class__.__name__}: "
+            f"Unexpected key(s) in state_dict: {result.unexpected_keys}."
+        )
+    elif result.missing_keys:
+        raise RuntimeError(
+            f"Error(s) in loading state_dict for {model.__class__.__name__}: "
+            f"Missing key(s) in state_dict: {result.missing_keys}."
+        )
+
     if device is not None or dtype is not None:
         model.to(device=device, dtype=dtype)
     return model
