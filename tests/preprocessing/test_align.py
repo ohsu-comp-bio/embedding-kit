@@ -146,8 +146,9 @@ class TestAlignmentUtils(unittest.TestCase):
         X = np.eye(3)
         Y = np.eye(3)
         R, k, S = procrustes_scale(X, Y)
+        self.assertEqual(np.shape(k), ())
         np.testing.assert_array_almost_equal(R, np.eye(3))
-        np.testing.assert_array_almost_equal(k, np.ones(3))
+        self.assertAlmostEqual(k, 1.0)
 
     def test_procrustes_scale_recovers_rotation_and_scale(self):
         theta = np.pi / 5
@@ -155,7 +156,7 @@ class TestAlignmentUtils(unittest.TestCase):
             [[np.cos(theta), -np.sin(theta)],
              [np.sin(theta),  np.cos(theta)]]
         )
-        k_true = np.array([3.0, 3.0])
+        k_true = 3.0
 
         rng = np.random.default_rng(5)
         X = rng.standard_normal((80, 2))
@@ -163,8 +164,9 @@ class TestAlignmentUtils(unittest.TestCase):
 
         R, k, S = procrustes_scale(X, Y)
 
+        self.assertEqual(np.shape(k), ())
         np.testing.assert_array_almost_equal(R, R_true, decimal=6)
-        np.testing.assert_array_almost_equal(k, k_true, decimal=6)
+        self.assertAlmostEqual(k, k_true, places=6)
 
         Y_pred = (X @ R) * k
         np.testing.assert_array_almost_equal(Y_pred, Y, decimal=6)
@@ -186,7 +188,7 @@ class TestAlignmentUtils(unittest.TestCase):
             [[np.cos(theta), -np.sin(theta)],
              [np.sin(theta),  np.cos(theta)]]
         )
-        k_true = np.array([2.0, 2.0])
+        k_true = 2.0
         translation = np.array([10.0, -4.0])
 
         rng = np.random.default_rng(4)
@@ -195,8 +197,9 @@ class TestAlignmentUtils(unittest.TestCase):
 
         R, k, Xmean, Ymean, S = procrustes_scale_centered(X, Y)
 
+        self.assertEqual(np.shape(k), ())
         np.testing.assert_array_almost_equal(R, R_true, decimal=6)
-        np.testing.assert_array_almost_equal(k, k_true, decimal=6)
+        self.assertAlmostEqual(k, k_true, places=6)
 
         Y_pred = ((X - Xmean) @ R) * k + Ymean
         np.testing.assert_array_almost_equal(Y_pred, Y, decimal=6)
