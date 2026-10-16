@@ -58,8 +58,7 @@ def matrix_spearman_alignment_linear(a, b, cutoff=0.0):
 
 def procrustes(X, Y):
     """
-    Computes the Procrustes transformation (optimal PURE rotation)
-    to align X to Y, correcting for reflections.
+    Computes the Procrustes transformation (optimal PURE rotation) to align X to Y, correcting for reflections.
 
     Args:
         X: The first matrix (N_points, N_dims).
@@ -75,7 +74,7 @@ def procrustes(X, Y):
 
     U, S, Vt = np.linalg.svd(M)
 
-    R = np.dot(U, Vt)
+    R = np.dot(U, Vt) # R can be optimized indep. of scalar
 
     if np.linalg.det(R) < 0:
         Vt_corrected = Vt.copy()
@@ -84,40 +83,36 @@ def procrustes(X, Y):
 
     return R,S
 
-
 def procrustes_scale(X, Y):
     """
-    Compute the procrustes transformation (R), then compute scaling factors (k) to rescale the src matrix. 
+    Compute the procrustes transformation (R), then a single (scalar) scale factor k = ||Y||_F / ||X||_F (equivalently ||Y||_F / ||X @ R||_F, since rotation preserves Frobenius norm). 
+    Note: Scaling is calculated without Least-Squares, unlike more traditional approaches, to match Y's spread directly and avoid shrinking under noisy correspondances.
     
-    To apply transformtion:
-    src.dot(R) * k # element-wise multiplication w per-dim scaling factors
+    To apply transformation:
+    src.dot(R) * k
 
-    
     Args:
         X: The first matrix (N_points, N_dims).
         Y: The second matrix (N_points, N_dims).
 
     Returns:
         R: The optimal rotation matrix (guaranteed det(R) = +1).
-        k: Per-dimension Scaling factors (shape: (N_dims,)), one scaling value per dim
+        k: Scalar scaling factor, ||Y||_F / ||X||_F
         S: Singular values of X.T @ Y
 
     """
-    R,S = procrustes(X,Y)
-    A = np.array(X.dot(R))
-    B = np.array(Y)
-    numerators = np.sum(A * B, axis=0)
-    denominators = np.sum(A * A, axis=0)
-    k = np.divide(numerators, denominators, out=np.zeros_like(numerators), where=denominators!=0)
+    R, S = procrustes(X, Y)
+    Xnorm = np.linalg.norm(X)
+    k = np.linalg.norm(Y) / Xnorm if Xnorm != 0 else 0.0 # Unlike Least Squares (superceded), we dont bias towards shrinking under noisy correspondence.
     return R, k, S
-
 
 def procrustes_scale_centered(X, Y):
     """
-    Same as procrustes_scale, but mean-centers X and Y before fitting the rotation and scale.
+    Mean-centers X and Y, fits the rotation, then scales: k = ||Yc||_F / ||Xc||_F (equivalently ||Yc||_F / ||Xc @ R||_F, since rotation preserves Frobenius norm).
+    Note: Scaling is calculated without Least-Squares, unlike more traditional approaches, to match Y's spread directly and avoid shrinking under noisy correspondances.
 
     To apply transformation:
-    (src - Xmean).dot(R) * k + Ymean # element-wise multiplication w per-dim scaling factors
+    (src - Xmean).dot(R) * k + Ymean
 
     Args:
         X: The first matrix (N_points, N_dims).
@@ -125,11 +120,11 @@ def procrustes_scale_centered(X, Y):
 
     Returns:
         R: The optimal rotation matrix (guaranteed det(R) = +1).
-        k: Per-dimension Scaling factors (shape: (N_dims,)), one scaling value per dim
+        k: Scalar scaling factor, ||Yc||_F / ||Xc||_F
         Xmean: Per-dimension mean of X (shape: (N_dims,)), subtract before applying R/k
         Ymean: Per-dimension mean of Y (shape: (N_dims,)), add back after applying R/k
         S: Singular values of (X - Xmean).T @ (Y - Ymean)
-        
+
     """
     Xmean = np.array(X).mean(axis=0)
     Ymean = np.array(Y).mean(axis=0)
@@ -137,3 +132,7 @@ def procrustes_scale_centered(X, Y):
     Yc = np.array(Y) - Ymean
     R, k, S = procrustes_scale(Xc, Yc)
     return R, k, Xmean, Ymean, S
+
+
+
+    
