@@ -1,5 +1,21 @@
 """
-NetVAE implementation
+NetVAE — a pathway-constrained embedding model.
+
+A plain VAE embeds each sample independently. NetVAE (Network VAE) does the
+same with a structural prior: features are organized into latent groups (for
+example biological pathways, or sets of targets driven by a common
+transcription factor), and the encoder/decoder are constrained so that
+connections only flow along that group structure. Features in the same group are
+pooled into a shared latent representation, while connections outside a group
+are forced to zero.
+
+The result is an embedding that reflects the supplied domain structure rather
+than a purely data-driven one — useful when the goal is to understand how
+predefined biological units behave and interact. This is the model trained by
+``embkit model train --model netvae`` and is built on the base
+:class:`~embkit.models.vae.vae.VAE`, using
+:class:`~embkit.models.vae.encoder.Encoder`/
+:class:`~embkit.models.vae.decoder.Decoder` with pathway masks.
 """
 import logging
 
@@ -24,12 +40,20 @@ logger = logging.getLogger(__name__)
 @factory.nn_module
 class NetVAE(VAE):
     """
-    NetVAE
+    A group-constrained VAE for structure-aware embeddings.
 
-    A VAE model with group based constraint. Designed to work with 
-    transcription factor network groups. All elements controlled by a common
-    transcription factor a pooled into a single embedding variable. All other connections
-    in from the input layer are forced to be zero
+    Designed to work with network/group structure such as transcription-factor
+    target sets or biological pathways. Every feature controlled by a common
+    group (e.g. a single transcription factor) is pooled into a shared latent
+    representation, and all other connections into and out of that layer are
+    forced to zero. This yields an embedding that respects the supplied group
+    structure, which is the whole point of the model.
+
+    The public surface includes the standard :meth:`forward`/:meth:`encode`
+    inherited from :class:`~embkit.models.vae.vae.VAE`, plus the constraint
+    controls :meth:`set_constraint_active`, :meth:`update_membership`, and
+    :meth:`refresh_masks`, and the :meth:`verify_integrity` audit that confirms
+    the masking is being enforced.
     """
 
     def __init__(
@@ -42,6 +66,34 @@ class NetVAE(VAE):
             device: Optional[torch.device] = None,
             dtype: Optional[torch.dtype] = None,
     ):
+        """
+        Build a pathway-constrained VAE from a feature-to-group map.
+
+        NetVAE structures the VAE around a set of latent groups (e.g. pathways
+        or transcription-factor targets). Features are pooled into groups; each
+        group is represented by one or more latent dimensions (the width is
+        controlled by ``group_layer_scale``), and every linear layer is masked so
+        that connections only follow the group structure — connections outside a
+        group's membership are forced to zero. This yields an embedding where
+        related features are encoded jointly, which is the model's whole point.
+
+        Parameters:
+            features: Input feature names (matrix columns).
+            latent_groups: Mapping of group name -> list of member features.
+                Must be non-empty.
+            latent_index: Optional ordering of the latent groups; if omitted the
+                group order is derived from ``latent_groups``.
+            group_layer_scale: Width multiplier per encoder/decoder layer
+                (each latent group is represented by ``group_size * scale``
+                dimensions in that layer). Defaults to ``[1, 1]``; must be
+                positive integers.
+            batch_norm: Whether to enable batch normalization in the encoder.
+            device, dtype: Device/dtype for module construction.
+
+        Raises:
+            ValueError: If ``latent_groups``, ``latent_index``, or any
+                ``group_layer_scale`` entry is empty/invalid.
+        """
         if not latent_groups:
             raise ValueError("latent_groups cannot be empty for NetVAE.")
 
@@ -148,6 +200,19 @@ class NetVAE(VAE):
         self.features = feature_list
 
     def _iter_pathway_constraints(self):
+        """
+        Yield every masked pathway layer and its constraint in the model.
+
+        Walks the encoder and decoder module stacks and yields each
+        :class:`~embkit.modules.MaskedLinear` together with the
+        :class:`~embkit.constraints.PathwayConstraintInfo` attached to it. This
+        is the single place the class finds its constrained layers, so that
+        operations like mask refresh and the integrity audit stay consistent.
+
+        Yields:
+            Tuples of ``(module, constraint_info)`` for each masked linear layer
+            that carries a pathway constraint.
+        """
         modules = []
         if self.encoder is not None:
             modules.extend(self.encoder.net)
@@ -160,17 +225,51 @@ class NetVAE(VAE):
                     yield module, constraint_info
 
     def set_constraint_active(self, active: bool) -> None:
+        """
+        Enable or disable the pathway constraints across all masked layers.
+
+        When active, weights outside the mask are forced to zero; when disabled
+        the model behaves like a fully-connected VAE. Useful for comparing
+        constrained vs. unconstrained embeddings on the same data.
+
+        Parameters:
+            active: Whether the pathway constraints should be enforced.
+        """
         for _, constraint_info in self._iter_pathway_constraints():
             if hasattr(constraint_info, "set_active"):
                 constraint_info.set_active(active)
 
     def update_membership(self, latent_groups: Dict[str, List[str]]) -> None:
+        """
+        Change which features belong to each latent group, in place.
+
+        Updates the stored group map and propagates the new membership to every
+        pathway constraint so that subsequent :meth:`refresh_masks` calls rebuild
+        the connectivity to match the new groups (e.g. after editing pathway
+        definitions).
+
+        Parameters:
+            latent_groups: New mapping of group name -> list of member features.
+        """
         self.latent_groups = latent_groups
         for _, constraint_info in self._iter_pathway_constraints():
             if hasattr(constraint_info, "update_membership"):
                 constraint_info.update_membership(latent_groups)
 
     def refresh_masks(self, device: Optional[torch.device] = None) -> None:
+        """
+        Rebuild all pathway masks and re-apply them to the masked weights.
+
+        Regenerates each constraint's connectivity mask from the current group
+        membership, moves it to the given device, and zeroes the underlying
+        linear weights outside the mask. Call this after
+        :meth:`update_membership` (or a constraint change) so the model's
+        effective connectivity reflects the intended group structure.
+
+        Parameters:
+            device: Device to build the mask tensors on; if ``None`` the device
+                of the first model parameter is used (falling back to CPU).
+        """
         if device is None:
             try:
                 device = next(self.parameters()).device
@@ -193,6 +292,19 @@ class NetVAE(VAE):
                 module.linear.weight.mul_(module.mask)
 
     def get_constraint_projection_weights(self) -> Optional[np.ndarray]:
+        """
+        Return the raw weights of the encoder's first masked (feature-to-group)
+        projection layer.
+
+        This is the matrix that maps input features into the latent groups, so
+        it is the most direct view of how strongly each feature feeds each
+        group. Handy for inspecting or visualizing the learned feature-to-group
+        structure.
+
+        Returns:
+            A numpy array with the projection weights, or ``None`` if there is
+            no encoder / no masked linear layer to read from.
+        """
         if self.encoder is None:
             return None
         for module in self.encoder.net:
@@ -264,6 +376,15 @@ class NetVAE(VAE):
         return report
 
     def to_dict(self) -> Dict[str, Any]:
+        """
+        Serialize the NetVAE configuration (architecture, not weights).
+
+        Because a NetVAE is fully determined by its feature list, latent groups,
+        group ordering, and layer scale, these are enough to rebuild an
+        equivalent model — the individual layers are derived from them in
+        :meth:`from_dict`. Learned weights are saved separately from the state
+        dict.
+        """
         return {
             "features": self.features,
             "latent_groups": self.latent_groups,
@@ -273,6 +394,17 @@ class NetVAE(VAE):
 
     @classmethod
     def from_dict(cls, d):
+        """
+        Rebuild a :class:`NetVAE` from its :meth:`to_dict` description.
+
+        Reconstructs the constrained encoder/decoder from the feature list,
+        latent groups, group ordering, and layer scale. If the feature list is
+        missing it is inferred from the union of the groups' members. Weights
+        must then be loaded from the state dict to recover a trained model.
+
+        Parameters:
+            d: A description dict produced by :meth:`to_dict`.
+        """
         features = d.get("features")
         if features is None:
             fmap = d.get("latent_groups") or {}

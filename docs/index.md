@@ -17,7 +17,7 @@ Use Embedding Kit when you want to move from tabular molecular data (RNA-seq, pr
 pip install embkit
 ```
 
-## Quickstart
+## CLI Quickstart
 
 ### 1) Inspect available commands
 

@@ -12,6 +12,15 @@ logger = logging.getLogger(__name__)
 
 
 class CBIOPortal(Resource):
+    """
+    Download a cBioPortal cancer-genomics study as a cached resource.
+
+    A cBioPortal study bundles the molecular profile data (gene expression,
+    mutations, etc.) for a cohort of samples. This resource fetches the study's
+    tarball from the cBioPortal data hub into the local cache, and
+    :meth:`unpack` expands it into a folder. Use the resulting path as the input
+    for training embeddings on that study's expression matrix.
+    """
     BASE_URL = "https://cbioportal-datahub.s3.amazonaws.com/"
 
     def __init__(

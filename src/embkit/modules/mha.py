@@ -67,6 +67,17 @@ class MHABlock(nn.Module):
 
 @factory.nn_module
 class MHAPooling(nn.Module):
+    """
+    Attention-based sequence pooling via a learnable query token.
+
+    Given a variable-length sequence of embeddings, this module compresses it
+    to a single vector by running cross-attention with one shared, learnable
+    query token against the sequence as keys/values. Because the query is
+    learned, the model decides which positions to "pay attention to" rather
+    than using a fixed mean/max reduction. This is the standard way to fold an
+    encoded sequence (e.g. a protein) into one fixed-size vector for downstream
+    use.
+    """
     def __init__(self, embed_dim, num_heads=1, device=None, dtype=None):
         super().__init__()
         # The learnable query token that "probes the sequence

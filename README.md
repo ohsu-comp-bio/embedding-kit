@@ -27,42 +27,6 @@ Use Embedding Kit when you want to move from tabular molecular data (RNA-seq, pr
 pip install embkit
 ```
 
-## Quickstart
-
-### 1) Inspect available commands
-
-```bash
-embkit --help
-embkit model --help
-```
-
-### 2) Normalize a matrix
-
-```bash
-embkit matrix normalize data/raw.tsv --out data/normalized.tsv
-```
-
-### 3) Train a VAE
-
-```bash
-embkit model train-vae data/normalized.tsv \
-    --epochs 120 \
-    --latent 256 \
-    --schedule "20:0,20:0.1,40:0.3,40:0.4" \
-    --out vae.model
-```
-
-### 4) Encode samples into latent space
-
-```bash
-embkit model encode data/normalized.tsv vae.model --out embedding.tsv
-```
-
-### 5) Encode protein sequences
-
-```bash
-embkit protein encode sequences.fasta --model t33 --output protein_embeddings.tsv
-```
 
 ## Training in Python
 

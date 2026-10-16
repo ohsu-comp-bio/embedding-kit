@@ -1,3 +1,23 @@
+"""
+Encoder components for the VAE.
+
+The encoder is the half of a VAE that compresses a sample's input features into
+the latent space: it produces the mean (``mu``) and log-variance (``logvar``)
+of the latent distribution, and a sampled latent vector ``z``. A good encoder is
+what makes the downstream embedding meaningful — it decides which structure in
+the input is preserved in the compact representation.
+
+This module provides two encoders:
+
+- :class:`VAEEncoder` — a general wrapper that takes an arbitrary backbone
+  network, adds the latent mean/log-variance heads, and computes per-unit KL
+  terms.
+- :class:`Encoder` — the concrete fully-connected encoder used by the standard
+  embedding VAE (:class:`~embkit.models.vae.vae.BaseVAE`), built from a
+  :class:`~embkit.factory.layers.LayerList` and supporting optional
+  connection constraints (used by
+  :class:`~embkit.models.vae.net_vae.NetVAE`).
+"""
 from typing import Optional, List, Union, NamedTuple
 from torch import nn
 import torch
@@ -17,6 +37,20 @@ logger = logging.getLogger(__name__)
 
 
 def _module_out_features(module: nn.Module) -> Optional[int]:
+    """
+    Report a module's output width, if it has one.
+
+    Helper for validating that an encoder's final hidden width matches the
+    declared ``latent_dim``. Understands both :class:`~embkit.modules.MaskedLinear`
+    (whose width lives on the inner ``linear``) and plain ``nn.Linear``; returns
+    ``None`` for modules without an output width (activations, batch-norm, etc.).
+
+    Parameters:
+        module: An ``nn.Module``.
+
+    Returns:
+        The module's output feature count, or ``None`` if it doesn't have one.
+    """
     if isinstance(module, MaskedLinear):
         return int(module.linear.out_features)
     if isinstance(module, nn.Linear):
@@ -109,6 +143,12 @@ class VAEEncoder(nn.Module):
         return EncoderOutput(mu=mu, logvar=logvar, z=z)
 
     def to_dict(self):
+        """
+        Serialize the encoder configuration (backbone description + dimensions).
+
+        The backbone is captured as its own description so it can be resolved
+        through the factory on rebuild.
+        """
         return {
             "backbone": self.backbone.to_dict(),
             "latent_dim": self.latent_dim,
@@ -117,6 +157,10 @@ class VAEEncoder(nn.Module):
 
     @classmethod
     def from_dict(cls, d):
+        """
+        Rebuild a :class:`VAEEncoder` from its :meth:`to_dict` description,
+        resolving the backbone through the factory build.
+        """
         return VAEEncoder(
             feature_dim=d["feature_dim"],
             latent_dim=d["latent_dim"],
@@ -126,12 +170,26 @@ class VAEEncoder(nn.Module):
 @factory.nn_module
 class Encoder(nn.Module):
     """
-    input -> [optional global BN] -> [LayerInfo...] -> (latent heads optional)
+    Fully-connected encoder that maps input features to the latent distribution.
 
-    If `layers` is provided:
+    Pipeline: input -> [optional global batch-norm] -> a stack of linear layers
+    -> two heads producing the latent mean (``mu``) and log-variance
+    (``logvar``) -> a sampled latent vector ``z``.
 
-    If `layers` is None/empty:
-      - Insert a Linear projection to latent_dim (+ optional act + BN) and attach latent heads.
+    Two construction modes:
+
+    - If ``layers`` is provided, the encoder body is built from that
+      :class:`~embkit.factory.layers.LayerList`, which must terminate at a width
+      equal to ``latent_dim`` (the latent heads are then added on top).
+    - If ``layers`` is ``None``/empty, a single linear projection to
+      ``latent_dim`` is inserted automatically (optionally masked by a
+      constraint, e.g. for :class:`~embkit.models.vae.net_vae.NetVAE`), with an
+      optional activation and batch-norm, before the latent heads.
+
+    The :meth:`forward` output is an :class:`EncoderOutput` of
+    ``(mu, logvar, z)``. During training ``z`` is sampled from the latent
+    distribution (reparameterization); during evaluation ``z == mu`` so the
+    embedding is deterministic.
     """
 
     def __init__(self,
@@ -143,6 +201,27 @@ class Encoder(nn.Module):
                  sampling : bool = True,
                  constraint: Optional[ConstraintInfo] = None,
                  device=None, dtype=None):
+        """
+        Build the encoder body and the latent mean/log-variance heads.
+
+        Parameters:
+            feature_dim: Number of input features (matrix columns).
+            latent_dim: Width of the latent space the sample is encoded into.
+            layers: Optional layer stack describing the encoder body; if omitted
+                a single projection to ``latent_dim`` is created.
+            batch_norm: Whether to apply batch normalization (on the input and,
+                when auto-projecting, after the projection).
+            default_activation: Activation used after the auto-projection.
+            sampling: Whether ``forward`` samples the latent vector during
+                training (True) or returns ``mu`` deterministically (False).
+            constraint: Optional connection constraint used to mask the
+                auto-projection (e.g. pathway groups in NetVAE).
+            device, dtype: Device/dtype for module construction.
+
+        Raises:
+            ValueError: If a ``layers`` stack is given whose final width does not
+                equal ``latent_dim``.
+        """
         super().__init__()
         self.feature_dim = int(feature_dim)
         self.latent_dim = int(latent_dim)
@@ -217,6 +296,20 @@ class Encoder(nn.Module):
         self._final_width = in_features
 
     def forward(self, x: torch.Tensor):
+        """
+        Encode a batch of samples into latent statistics and a latent sample.
+
+        Pushes the input through the encoder body, then the two latent heads.
+        Returns an :class:`EncoderOutput` of ``(mu, logvar, z)`` where ``z`` is
+        the sampled latent vector (via reparameterization during training, and
+        equal to ``mu`` during evaluation).
+
+        Parameters:
+            x: Input batch tensor of shape ``(batch_size, feature_dim)``.
+
+        Returns:
+            EncoderOutput: Tuple ``(mu, logvar, z)``.
+        """
         h = x
         for layer in self.net:
             h = layer(h)
@@ -231,6 +324,14 @@ class Encoder(nn.Module):
         return EncoderOutput(mu=mu, logvar=logvar, z=z)
     
     def to_dict(self):
+        """
+        Serialize the encoder's configuration (architecture, not weights).
+
+        Captures dimensions, the layer stack, batch-norm/activation/sampling
+        flags, and any connection constraint so that :meth:`from_dict` can
+        rebuild an equivalent encoder. Learned weights are restored separately
+        from the state dict during load.
+        """
         return {
             "feature_dim": self.feature_dim,
             "latent_dim": self.latent_dim,
@@ -243,6 +344,13 @@ class Encoder(nn.Module):
 
     @classmethod
     def from_dict(cls, d):
+        """
+        Rebuild an :class:`Encoder` from its :meth:`to_dict` description.
+
+        Resolves any constraint and layer stack through the factory
+        :func:`~embkit.factory.core.build` and reconstructs an equivalent
+        encoder. Weight tensors are loaded separately from the state dict.
+        """
         constraint = build(d["constraint"]) if d.get("constraint") else None
         layers = build(d["layers"]) if d.get("layers") else None
         return Encoder(
