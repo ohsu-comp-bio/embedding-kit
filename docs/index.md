@@ -4,10 +4,16 @@ Embedding Kit is a toolkit for building and applying embedding models in computa
 
 It combines:
 
-- CLI commands for repeatable model training and encoding
-- PyTorch VAE model components for custom pipelines
+- CLI commands for repeatable model training, encoding, and data inspection
+- PyTorch VAE model components with configurable encoder/decoder architectures
+- Beta-KL annealing schedules for controlled latent-space regularization
+- Multiple loss functions tailored to discrete and continuous molecular data
 - Utilities for loading, normalizing, and aligning large molecular datasets
+- Efficient batch-based data loading for GPU-accelerated training
+- Model serialization and deserialization for checkpointing and deployment
 - ESM2-based protein sequence embeddings
+- Support for multiple molecular data modalities (RNA-seq, proteomics, methylation)
+- Optimizer utilities with learning-rate scheduling and early-stopping support
 
 Use Embedding Kit when you want to move from tabular molecular data (RNA-seq, proteomics, methylation) to trainable latent representations that can be reused for downstream analysis.
 
