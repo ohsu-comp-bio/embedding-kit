@@ -192,3 +192,17 @@ embkit model train-vae gtex.normalized.tsv \
 # Encode
 embkit model encode gtex.normalized.tsv gtex.vae.model --out gtex.embedding.tsv
 ```
+
+---
+
+## Runnable script
+
+A self-contained, immediately runnable version of this workflow lives at
+[`examples/train_vae.py`](https://github.com/ohsu-comp-bio/embedding-kit/blob/main/examples/train_vae.py).
+It trains a `BaseVAE` on a small bundled expression matrix, saves and reloads the model,
+encodes samples, and scores the reconstruction — no downloads required. To point it at
+real GTEx data, see the "Real-data variant" section of the script's docstring.
+
+```bash
+python examples/train_vae.py
+```

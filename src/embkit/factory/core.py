@@ -1,3 +1,23 @@
+"""
+Model build and (de)serialization core.
+
+The factory is how embkit turns a *description* of a model — a JSON-style
+structure of layers, activations, and constraints — into a live PyTorch model,
+and back again. This is the mechanism that lets a trained embedding model be
+saved to a single ``.model`` file and rebuilt on any machine without the code
+that originally constructed it.
+
+The three public entry points work together:
+
+- :func:`build` — reconstruct a model object from a description.
+- :func:`save` — serialize a model (weights + description) to disk.
+- :func:`load` — the inverse of :func:`save`; the function you'll reach for
+  most when loading a previously trained model.
+
+A description is either a registered class instance (anything with ``to_dict``),
+a plain dict carrying a ``"__class__"`` key, a list of such elements (built into
+a :class:`~embkit.factory.mapping.Sequential`), or an activation name string.
+"""
 from .mapping import get_activation, Sequential
 from .registry import CLASS_REGISTRY
 
@@ -5,6 +25,38 @@ from torch import nn
 import torch
 
 def build(desc):
+    """
+    Reconstruct a PyTorch model (or module) from a serializable description.
+
+    This is the core of embkit's model (re)construction: it reads a description
+    and, using the :data:`~embkit.factory.registry.CLASS_REGISTRY` populated by
+    the :func:`~embkit.factory.registry.nn_module` decorator, resolves each
+    ``"__class__"`` entry back to the original class and calls its ``from_dict``
+    method. Nested structures are resolved recursively.
+
+    The description may be any of:
+
+    - an object exposing a ``to_dict`` method (normalized to a dict first);
+    - a dict with a ``"__class__"`` key naming a registered class;
+    - a list of descriptions, built into a
+      :class:`~embkit.factory.mapping.Sequential` stack; or
+    - a string naming a registered activation (e.g. ``"relu"``).
+
+    Parameters:
+        desc: A model/module description (see above).
+
+    Returns:
+        The reconstructed ``nn.Module`` instance (an ``nn.ModuleList``-style
+        stack for lists, an activation instance for strings).
+
+    Raises:
+        TypeError: If ``desc`` is a dict naming an unregistered class, or a type
+            that cannot be interpreted as a model description.
+
+    Example:
+        >>> from embkit import factory
+        >>> model = factory.build({"__class__": "...Encoder", "units": 64})
+    """
     if getattr(desc, "to_dict", None) is not None:
         desc = desc.to_dict()
 

@@ -8,6 +8,59 @@
 embkit --help
 ```
 
+### 1) Inspect available commands
+
+```bash
+$ embkit --help
+Usage: embkit [OPTIONS] COMMAND [ARGS]...
+
+  Embedding Kit CLI.
+
+  Use 'embkit help [COMMAND]' for details on a specific command.
+
+Options:
+  --verbose  Enable verbose logging
+  --version  Show version information
+  --help     Show this message and exit.
+
+Commands:
+  align      Embedding Alignment methods
+  cbio       cBIO commands.
+  help       Show help for the CLI or a specific command.
+  matrix     Model commands.
+  model      VAE Model commands.
+  protein    Protein commands.
+  resources  Resource commands.
+```
+
+### 2) Normalize a matrix
+
+```bash
+embkit matrix normalize data/raw.tsv --out data/normalized.tsv
+```
+
+### 3) Train a VAE
+
+```bash
+embkit model train-vae data/normalized.tsv \
+    --epochs 120 \
+    --latent 256 \
+    --schedule "20:0,20:0.1,40:0.3,40:0.4" \
+    --out vae.model
+```
+
+### 4) Encode samples into latent space
+
+```bash
+embkit model encode data/normalized.tsv vae.model --out embedding.tsv
+```
+
+### 5) Encode protein sequences
+
+```bash
+embkit protein encode sequences.fasta --model t33 --output protein_embeddings.tsv
+```
+
 ---
 
 ## model

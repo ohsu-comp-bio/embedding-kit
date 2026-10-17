@@ -130,3 +130,32 @@ Use `--trim` to round values to a fixed number of significant figures, reducing 
 ```bash
 embkit protein encode sequences.fasta --trim 5 --output embeddings_trimmed.tsv
 ```
+
+---
+
+## Runnable script
+
+A self-contained, immediately runnable version of this workflow lives at
+[`examples/protein_embed.py`](https://github.com/ohsu-comp-bio/embedding-kit/blob/main/examples/protein_embed.py).
+It shells out to `embkit protein encode` on a bundled FASTA file, then loads the
+embeddings and reports within-group vs. between-group cosine similarity. A `--fallback`
+mode uses pre-computed embeddings when `fair-esm` or a GPU is unavailable.
+
+```bash
+# default (t33)
+python examples/protein_embed.py
+# fastest, CPU-friendly
+python examples/protein_embed.py --model t6 --batch-size 16
+# no fair-esm / no GPU / no network
+python examples/protein_embed.py --fallback
+```
+
+To inspect the embeddings (PCA / UMAP, clustering, and ARI/silhouette scoring against
+labels), run the companion
+[`examples/analyze_embeddings.py`](https://github.com/ohsu-comp-bio/embedding-kit/blob/main/examples/analyze_embeddings.py):
+
+```bash
+python examples/analyze_embeddings.py \
+    --embedding examples/data/protein_embeddings.tsv \
+    --labels examples/data/protein_labels.tsv
+```

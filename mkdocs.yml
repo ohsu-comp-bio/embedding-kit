@@ -2,7 +2,6 @@ site_name: Embedding-Kit
 nav:
   - Home: index.md
   - About: about.md
-  - Change Notes: change-notes.md
   - Core Concepts: concepts.md
   - Training Guide: training.md
   - CLI Reference: cli.md
