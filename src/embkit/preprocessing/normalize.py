@@ -1,5 +1,25 @@
 """
+Normalization of expression / count matrices.
 
+Before an embedding model can learn a meaningful representation of, say, gene
+expression or mutation-count data, the input matrix is almost always dominated by
+a handful of high-value features. Normalization rescales the matrix so that every
+feature contributes on a comparable scale and the result fits in ``[0, 1]``.
+
+This module provides the transformations embkit applies at that step:
+
+- :func:`quantile_max_norm` — the workhorse "quantile max" normalization used by
+  the ``embkit matrix normalize`` command: each sample is divided by a chosen
+  quantile of its own values, then clipped to ``[0, 1]``. Robust to outliers
+  because it is quantile-based rather than max-based.
+- :func:`exp_max_norm` and :class:`ExpMinMaxScaler` — log2-based alternatives for
+  data where the dynamic range spans many orders of magnitude.
+- :func:`get_dataset_nonzero_mask` — inspects a dataset to find which features
+  are meaningfully populated, producing the binary feature masks used downstream.
+
+All functions operate on pandas DataFrames (or a torch :class:`Dataset` for the
+mask helper) and return the transformed data as the same type, so they compose
+cleanly with the rest of the pipeline.
 """
 
 from sklearn.preprocessing import MinMaxScaler
@@ -26,8 +46,23 @@ def quantile_max_norm(df: pd.DataFrame, quantile_max: float = 0.9) -> pd.DataFra
 
 def exp_max_norm(df: pd.DataFrame) -> pd.DataFrame:
     """
-    exp_max_norm
+    Log2, max-based normalization of an expression matrix.
 
+    Applies a ``log2(x + 1)`` transform to tame the wide dynamic range of
+    count/expression data, then divides each sample by its own maximum so that
+    the values for every row fall in ``[0, 1]`` (with the sample's largest
+    feature rescaled to exactly 1).
+
+    Compared to :func:`quantile_max_norm`, this is max-based rather than
+    quantile-based, so a single extreme feature will compress the rest of the
+    sample more aggressively. Use it when you want the relative spread preserved
+    after a log transform rather than robustness to a single outlier.
+
+    Parameters:
+        df: Input DataFrame of shape ``(samples, features)``.
+
+    Returns:
+        A DataFrame of the same shape with each sample scaled to ``[0, 1]``.
     """
     t = np.log2(df+1)
     return (t.transpose() / t.max(axis=1)).transpose()

@@ -1,4 +1,21 @@
 
+"""
+Encoders that turn symbolic inputs into numeric feature vectors.
+
+Embedding models operate on numbers, so anything discrete — a categorical
+label, an amino-acid sequence, a precomputed vector file — needs to be mapped
+into a fixed-width numeric representation first. This module provides those
+encoders plus the positional-encoding helpers used by the protein encoder:
+
+- :class:`OneHotEncoder` — map an arbitrary set of discrete classes to
+  one-hot vectors.
+- :class:`ProteinOneHotEncoder` — map amino-acid sequences to one-hot matrices
+  (optionally with position encoding and/or padding to a fixed length).
+- :class:`PreEncoded` — look up precomputed feature vectors by name from a
+  table.
+- :func:`position_fractional` / :func:`position_sin_cos` /
+  :func:`position_sin_cos_tensor` — positional encodings for sequences.
+"""
 import math
 
 import numpy as np
@@ -10,6 +27,16 @@ from ..files import CsvReader
 
 @factory.nn_module
 class OneHotEncoder:
+    """
+    Map discrete class labels to one-hot vectors.
+
+    Given a set of classes (any hashable values, e.g. strings), each label is
+    represented by a length-``num_classes`` vector with a single ``1`` at the
+    label's position and zeros elsewhere. Works for a single label or a batch of
+    labels, and is registry-serializable (``to_dict``/``from_dict``) so it can
+    be part of a saved model. This is the standard way to feed a categorical
+    feature into a model that expects numeric inputs.
+    """
     def __init__(self, classes, device=None, dtype=None):
         self.classes = sorted(classes)
         self.num_classes = len(self.classes)
@@ -264,6 +291,16 @@ def position_sin_cos_tensor(pos: int, pe_dim: int, log_base: float = 10000.0, de
 
 
 class PreEncoded:
+    """
+    Look up precomputed feature vectors by name from a table file.
+
+    When a sample's numeric representation was already computed elsewhere
+    (e.g. by a protein or genome encoder in a previous step), this adapter reads
+    that table and serves up the vector for each named row — so the downstream
+    model can be trained on existing embeddings without re-encoding. Each row is
+    cached in memory and served as a numpy array or torch tensor depending on
+    ``backend``.
+    """
     def __init__(self, path, backend="numpy"):
         self.path = path
         self.backend = backend

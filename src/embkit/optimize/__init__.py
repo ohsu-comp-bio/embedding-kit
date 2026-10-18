@@ -84,6 +84,15 @@ def _enforce_model_masks(model: nn.Module) -> None:
                 clamp()
 
 class TrainingPhase:
+    """
+    Configuration for one phase of a (multi-phase) training run.
+
+    A single phase fixes a learning rate (``lr``), a KL/regularization weight
+    (``beta``), and a number of epochs (``n_epochs``). Sequencing several
+    :class:`TrainingPhase` objects is how embkit schedules training — e.g. a
+    reconstruction-focused warmup phase followed by a phase that increases the
+    regularization weight to shape the latent space.
+    """
     def __init__(self, lr, beta: float, n_epochs: int):
         self.lr = lr
         self.beta = beta

@@ -1,4 +1,18 @@
 
+"""
+Class registry for serializable model components.
+
+This is the piece that makes :func:`~embkit.factory.core.build` possible. The
+factory must turn a saved model description back into real objects, and to do
+that it needs a name-to-class lookup table. The registry is that table: classes
+opt in by being decorated with :func:`nn_module` (or :func:`nn_module_named`),
+which records them under a stable, fully-qualified name and requires them to
+implement the ``to_dict``/``from_dict`` contract.
+
+The registry is what decouples a model description from the exact import path
+that built it — the same descriptor can be rebuilt long after the original
+training script is gone.
+"""
 from typing import Dict, Type
 
 # The global map (registry) where classes will be stored
@@ -14,6 +28,23 @@ def nn_module(cls: Type) -> Type:
     return nn_module_wrap_register(cls, name)
 
 class nn_module_named:
+    """
+    Register a class under an explicit name, instead of its fully-qualified one.
+
+    This is the named form of the :func:`nn_module` decorator. By default a class
+    is registered under ``module.ClassName``; when you want a model description to
+    reference a class by a specific, stable identifier (e.g. to keep a name stable
+    across refactors, or to register the same class under an alias), pass that
+    name here instead.
+
+    Like :func:`nn_module`, the decorated class must implement both ``to_dict``
+    and ``from_dict`` — it is rejected otherwise.
+
+    Example:
+        @nn_module_named("embkit.factory.LegendaryLayer")
+        class LegendaryLayer:
+            ...
+    """
     def __init__(self, name):
         self.name = name
     def __call__(self, cls):

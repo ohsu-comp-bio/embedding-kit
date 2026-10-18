@@ -1,5 +1,16 @@
 """
-Dataset base classes
+Resource downloaders.
+
+A "resource" is a named, downloadable data artifact (a cBioPortal study, a
+GTEx matrix, a pathway/SIF file, etc.) that embkit pulls from a remote source
+into a local cache and then hands to the pipeline. This module defines the base
+:class:`Resource` contract — where to cache, whether to fetch immediately — and
+:class:`SingleFileDownloader`, the general-purpose implementation for a plain
+URL. Concrete resources in this package (see :mod:`embkit.resources.c_bio_portal`,
+:mod:`embkit.resources.gtex`, etc.) build on these.
+
+All resources resolve to a filesystem path via ``os.PathLike`` (``fspath``), so
+they can be passed anywhere a path is expected.
 """
 
 from abc import ABC, abstractmethod
@@ -14,13 +25,27 @@ REPO_DIR = ".embkit"
 
 
 class Resource(os.PathLike[str]):
+    """
+    Abstract base for a named, downloadable data resource.
+
+    Encapsulates the shared concerns of every resource: choosing where to cache
+    the artifact (the explicit ``save_path``, or the ``EMBKIT_HOME``/``.embkit``
+    default under the home directory), deciding whether to fetch it immediately,
+    and exposing the result as a filesystem path (``os.PathLike``). Subclasses
+    only need to implement :meth:`download`, which fetches the data and sets
+    :attr:`_unpacked_file_path` to the ready-to-use file or folder.
+    """
     def __init__(
         self, name: str, save_path: Path | str | None, download: bool = True
     ) -> None:
         """
-        Initialize the TMP dataset handler.
-        :param save_path: Path to save the dataset.
-        :param download: Whether to download the dataset immediately. If False, you must call download() manually.
+        Set up the resource's cache location and optionally download it.
+
+        :param name: The resource's name (used to locate it under the save path).
+        :param save_path: Path to cache the resource under. If ``None``, the
+            ``EMBKIT_HOME`` environment variable or ``~/.embkit`` is used.
+        :param download: Whether to download the resource immediately. If False,
+            you must call :meth:`download` manually.
         :raises ValueError: If save_path is not provided.
         :raises FileNotFoundError: If the specified save path does not exist.
         """
@@ -76,6 +101,15 @@ class Resource(os.PathLike[str]):
 
 
 class SingleFileDownloader(Resource):
+    """
+    A resource that is a single file at a fixed URL.
+
+    The most common resource shape: one remote file (a matrix, an archive, a
+    table) downloaded to the cache and resolved to its local path. Uses
+    streaming with a progress bar, writes to a temp file first, and moves it
+    into place only after a successful download so a failed fetch never leaves a
+    partial file behind. Re-downloads are skipped if the file already exists.
+    """
     def __init__(self, url: str, name: str, save_path=None, download=True):
         """
         :param save_path: Path to save the dataset

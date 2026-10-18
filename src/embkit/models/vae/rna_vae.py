@@ -45,6 +45,21 @@ class RNAEncoder(Encoder):
     def __init__(self, feature_dim: int, latent_dim: int, 
                  layers: Optional[List[Layer]] = None,
                  batch_norm: bool = False):
+        """
+        Build the standard encoder body, then replace the latent heads.
+
+        Calls the parent :class:`~embkit.models.vae.encoder.Encoder` constructor
+        (which sets up the body network) and then swaps in the custom
+        ``Linear -> BatchNorm -> ReLU`` heads for ``mu`` and ``logvar`` so the
+        latent outputs are constrained to be non-negative, matching the target
+        reference architecture.
+
+        Parameters:
+            feature_dim: Number of input features.
+            latent_dim: Width of the latent space.
+            layers: Optional layer stack for the encoder body.
+            batch_norm: Whether the encoder body uses batch normalization.
+        """
         # Initialize parent without making latent heads
         super().__init__(
             feature_dim=feature_dim,
@@ -68,6 +83,19 @@ class RNAEncoder(Encoder):
         nn.init.zeros_(self.z_log_var_linear.bias)
     
     def forward(self, x: torch.Tensor):
+        """
+        Encode a batch into latent statistics with the constrained heads.
+
+        Runs the input through the encoder body, then through the custom
+        ``Linear -> BatchNorm -> ReLU`` heads to obtain non-negative ``mu`` and
+        ``logvar``, and finally samples ``z`` via reparameterization.
+
+        Parameters:
+            x: Input batch tensor of shape ``(batch_size, feature_dim)``.
+
+        Returns:
+            EncoderOutput: Tuple ``(mu, logvar, z)``.
+        """
         # Pass through main network
         h = x
         for layer in self.net:
@@ -107,6 +135,19 @@ class RNAVAE(VAE):
             features: List[str],
             latent_dim: int = 768,
     ):
+        """
+        Construct an RNAVAE for the given feature set.
+
+        Builds the fixed RNA architecture — a two-layer encoder
+        (``feature_dim -> feature_dim//2 -> feature_dim//3``) with non-negative
+        latent heads, and a single-layer sigmoid decoder back to the input
+        dimensionality. The architecture is intentionally fixed; the only
+        configuration is the feature list and latent width.
+
+        Parameters:
+            features: Input feature names (matrix columns).
+            latent_dim: Width of the latent space (default 768).
+        """
         feature_dim = len(features)
 
         # Build encoder: feature_dim -> feature_dim//2 -> feature_dim//3
@@ -148,7 +189,18 @@ class RNAVAE(VAE):
                 m._initialized = True
 
     def forward(self, x: torch.Tensor):
-        """Standard VAE forward pass"""
+        """
+        Standard VAE forward pass.
+
+        Encodes the input to latent statistics, samples a latent vector, and
+        decodes it back to the input feature space.
+
+        Parameters:
+            x: Input batch tensor of shape ``(batch_size, feature_dim)``.
+
+        Returns:
+            VAEOutput: Tuple ``(recon, mu, logvar, z)``.
+        """
         mu, logvar, z = self.encoder(x)
         recon = self.decoder(z)
         return VAEOutput(recon=recon, mu=mu, logvar=logvar, z=z)
@@ -189,6 +241,13 @@ class RNAVAE(VAE):
         return report
 
     def to_dict(self) -> Dict[str, Any]:
+        """
+        Serialize the model description.
+
+        The RNAVAE architecture is fully determined by the feature list and
+        latent dimension (all layer widths are derived from them), so these two
+        values are enough to rebuild an equivalent model in :meth:`from_dict`.
+        """
         return {
             "features": self.features,
             "latent_dim": self.latent_dim,
@@ -196,6 +255,10 @@ class RNAVAE(VAE):
 
     @classmethod
     def from_dict(cls, d):
+        """
+        Rebuild an :class:`RNAVAE` from its :meth:`to_dict` description
+        (weights are loaded separately from the state dict).
+        """
         model = RNAVAE(
             features=d["features"],
             latent_dim=d.get("latent_dim", 768)

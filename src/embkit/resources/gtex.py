@@ -15,6 +15,15 @@ logger = logging.getLogger(__name__)
 
 
 class GTEx(Resource):
+    """
+    Download GTEx bulk RNA-seq expression data as a cached resource.
+
+    GTEx provides tissue-wide gene expression (TPM) measurements across many
+    samples and tissues, a common reference dataset for training and comparing
+    gene-expression embeddings. Select the data type (gene-level or transcript-
+    level TPM) and the file is fetched from the GTEx public bucket into the
+    local cache, resolvable as a path.
+    """
     # pragma: no cover
     BASE_URLS = {
         "gene_tpm": "https://storage.googleapis.com/adult-gtex/bulk-gex/v10/rna-seq/GTEx_Analysis_v10_RNASeQCv2.4.2_gene_tpm.gct.gz",
@@ -33,10 +42,13 @@ class GTEx(Resource):
             **kwargs
     ) -> None:
         """
-        Initialize the CBIOPortal dataset handler.
-        :param dataset_name: cBioPortal study ID, e.g., 'brca_tcga'
-        :param save_path: Path to save the dataset
-        :param download: Whether to immediately download
+        Initialize the GTEx dataset handler.
+
+        :param data_type: Which GTEx matrix to fetch — ``"gene_tpm"`` or
+            ``"transcript_tpm"``.
+        :param save_path: Path to save the dataset (or the ``EMBKIT_HOME``/
+            ``.embkit`` default if omitted).
+        :param download: Whether to immediately download.
         """
         self.data_type = data_type
         super().__init__(save_path=save_path, download=download, name=self.NAMES[data_type])
@@ -51,7 +63,11 @@ class GTEx(Resource):
 
     def download(self) -> bytes:
         """
-        Download all molecular profile data for all samples in the given study.
+        Download the selected GTEx expression matrix from the public bucket.
+
+        Streams the file to a temp location with a progress bar and moves it
+        into the cache only on success. Skips the download if the file is
+        already present.
         """
         if getattr(self, "_download_called_from_init", False):
             warnings.warn(

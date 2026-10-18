@@ -118,7 +118,14 @@ class Layer:
 @nn_module
 class LayerModule(nn.ModuleList):
     """
-    LayerModule
+    A serializable group of pre-built modules.
+
+    Whereas :class:`LayerList` holds *descriptions* of layers (and builds them
+    on demand), a :class:`LayerModule` holds an already-constructed set of
+    ``nn.Module`` objects and keeps them together as one unit. It carries the
+    ``to_dict``/``from_dict`` pair so the whole group can be embedded in a model
+    description: each member is serialized in order and rebuilt from the registry
+    on load.
     """
     def __init__(self, modules = None):
         super().__init__(modules)
@@ -135,6 +142,25 @@ class LayerModule(nn.ModuleList):
 
 @nn_module
 class LayerList:
+    """
+    An ordered, serializable stack of layer descriptions that builds a module.
+
+    A :class:`LayerList` is the high-level way to declare a model's feed-forward
+    trunk. You give it a list of :class:`Layer` objects (or plain integers for
+    "a linear layer of this width") and it turns that description into an actual
+    ``nn.Module`` via :meth:`build`. The final layer's activation is handled
+    separately (``end_activation``) so a network can end, for example, with
+    sigmoid while using relu throughout.
+
+    Because it implements ``to_dict``/``from_dict``, a :class:`LayerList` is the
+    natural unit to embed inside an encoder/decoder description — which is how a
+    trained model's architecture is preserved across ``save``/``load``.
+
+    Example:
+        >>> trunk = LayerList(layers=[64, Layer(32, activation="tanh")],
+        ...                  end_activation="sigmoid")
+        >>> module = trunk.build(input_dim=1000, output_dim=1000)
+    """
     def __init__(self, layers: Optional[List[Layer]] = None, activation="relu", end_activation="relu"):
         new_layers = []
         if layers is not None:
