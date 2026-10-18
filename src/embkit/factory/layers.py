@@ -168,8 +168,7 @@ class LayerList:
             else:
                 raise ValueError(f"Unsupported layer type: {type(layer)}")
 
-        if cur_dim != output_dim:
-            layers.append(Linear(in_features=cur_dim, out_features=output_dim, device=device, dtype=dtype))
+        layers.append(Linear(in_features=cur_dim, out_features=output_dim, device=device, dtype=dtype))
         return Sequential(*layers)
 
     def to_dict(self):
