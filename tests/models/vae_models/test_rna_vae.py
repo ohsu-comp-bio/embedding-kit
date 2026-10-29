@@ -31,6 +31,15 @@ class TestRNAVAE(unittest.TestCase):
         self.assertGreaterEqual(len(history["loss"]), 1)
         self.assertEqual(model.latent_dim, 3)
 
+    def test_decoder_output_is_sigmoid_layer(self):
+        # includes_output=True: the sigmoid Layer is the output, no Linear appended after it
+        model = RNAVAE(features=[f"G{i}" for i in range(6)], latent_dim=3)
+        net = list(model.decoder.net)
+        self.assertEqual(len(net), 2)
+        self.assertIsInstance(net[0], torch.nn.Linear)
+        self.assertIsInstance(net[1], torch.nn.Sigmoid)
+        self.assertEqual(net[0].out_features, 6)
+
 
 if __name__ == "__main__":
     unittest.main()
