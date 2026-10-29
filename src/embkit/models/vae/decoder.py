@@ -3,6 +3,7 @@ import torch
 from torch import nn
 
 from ... import factory
+from ...modules import MaskedLinear
 from ...factory.layers import Layer, LayerList
 import logging
 
@@ -37,7 +38,7 @@ class Decoder(nn.Module):
             dec_net = layers.build( latent_dim, feature_dim, device=device, dtype=dtype )
             self.net.extend(dec_net)
             logger.debug("Decoder net built with %d modules", len(dec_net))
-            self.out = dec_net[-1] # Always ends with Linear(..., feature_dim)
+            self.out = [m for m in dec_net if isinstance(m, (nn.Linear, MaskedLinear))][-1] # Last projection. Output activation may follow
         else:
             logger.info("Adding final projection layer to %d units", self.feature_dim)
             self.out = nn.Linear(in_features, self.feature_dim, device=device, dtype=dtype)
@@ -54,15 +55,19 @@ class Decoder(nn.Module):
             "latent_dim": self.latent_dim,
             "feature_dim": self.feature_dim,
             "batch_norm": self._global_bn,
-            "layers": [li.to_dict() for li in self._layers_cfg] if self._layers_cfg else []
+            "layers": self._layers_cfg.to_dict() if self._layers_cfg else []
         }
 
     @classmethod
     def from_dict(cls, d):
-        layers = [Layer.from_dict(ld) for ld in d.get("layers", [])]
+        raw = d.get("layers")
+        if isinstance(raw, dict): # LayerList dict 
+            layers = factory.build(raw)
+        else: # Legacy Format: list of Layer dicts
+            layers = LayerList([Layer.from_dict(ld) for ld in raw]) if raw else None
         return Decoder(
             latent_dim=d["latent_dim"],
             feature_dim=d["feature_dim"],
             batch_norm=d.get("batch_norm", False),
-            layers=LayerList(layers) if layers else None
+            layers=layers
         )

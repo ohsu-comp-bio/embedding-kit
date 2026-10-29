@@ -131,7 +131,7 @@ class RNAVAE(VAE):
         decoder = Decoder(
             feature_dim=feature_dim,
             latent_dim=latent_dim,
-            layers=LayerList(dec_layers),
+            layers=LayerList(dec_layers, includes_output=True),
         )
 
         super().__init__(encoder=encoder, decoder=decoder)
