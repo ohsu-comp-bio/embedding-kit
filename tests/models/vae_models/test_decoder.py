@@ -77,6 +77,41 @@ class TestDecoder(unittest.TestCase):
 
         self.assertIn("Unknown Layer.op 'foo_bar'", str(context.exception))
 
+    def test_cli_style_int_layers_relu_on_every_hidden(self):
+        # Mirrors commands/model.py: LayerList(sizes, output_activation=final_activation)
+        dec = Decoder(latent_dim=3, feature_dim=7, layers=LayerList([4, 6], output_activation="none"))
+        net = list(dec.net)
+        expected = [nn.Linear, nn.ReLU, nn.Linear, nn.ReLU, nn.Linear]
+        self.assertEqual(len(net), len(expected))
+        for m, t in zip(net, expected):
+            self.assertIsInstance(m, t)
+        self.assertIs(dec.out, net[-1])
+
+    def test_output_activation_follows_out(self):
+        dec = Decoder(latent_dim=3, feature_dim=7, layers=LayerList([4], output_activation="sigmoid"))
+        net = list(dec.net)
+        self.assertIsInstance(net[-1], nn.Sigmoid)
+        self.assertIs(dec.out, net[-2])
+        self.assertEqual(dec.out.out_features, 7)
+
+    def test_round_trip_keeps_output_activation(self):
+        layers = LayerList([Layer(units=4)], output_activation="sigmoid")
+        dec = Decoder(latent_dim=3, feature_dim=7, layers=layers)
+        dec2 = Decoder.from_dict(dec.to_dict())
+        self.assertEqual(len(dec2.net), len(dec.net))
+        self.assertIsInstance(list(dec2.net)[-1], nn.Sigmoid)
+
+    def test_from_dict_legacy_layer_list(self):
+        # Decoder dicts saved before to_dict stored the full LayerList: a plain list of Layer dicts
+        legacy = {"latent_dim": 3, "feature_dim": 7, "batch_norm": False,
+                  "layers": [Layer(units=4).to_dict()]}
+        dec = Decoder.from_dict(legacy)
+        net = list(dec.net)
+        expected = [nn.Linear, nn.ReLU, nn.Linear]
+        self.assertEqual(len(net), len(expected))
+        for m, t in zip(net, expected):
+            self.assertIsInstance(m, t)
+
 
 if __name__ == "__main__":
     unittest.main()
