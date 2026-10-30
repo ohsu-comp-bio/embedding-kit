@@ -94,8 +94,8 @@ class TestDecoder(unittest.TestCase):
         self.assertIs(dec.out, net[-2])
         self.assertEqual(dec.out.out_features, 7)
 
-    def test_round_trip_keeps_layerlist_flags(self):
-        layers = LayerList([Layer(units=4), Layer(units=7, activation="sigmoid")], includes_output=True)
+    def test_round_trip_keeps_output_activation(self):
+        layers = LayerList([Layer(units=4)], output_activation="sigmoid")
         dec = Decoder(latent_dim=3, feature_dim=7, layers=layers)
         dec2 = Decoder.from_dict(dec.to_dict())
         self.assertEqual(len(dec2.net), len(dec.net))

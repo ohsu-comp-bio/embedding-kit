@@ -127,7 +127,7 @@ class NetVAE(VAE):
         encoder = Encoder(
             feature_dim=len(feature_list),
             latent_dim=latent_size,
-            layers=factory.LayerList(enc_layers, includes_output=True),
+            layers=factory.LayerList(enc_layers),
             batch_norm=batch_norm,
             device=device,
             dtype=dtype,
@@ -135,7 +135,7 @@ class NetVAE(VAE):
         decoder = Decoder(
             feature_dim=len(feature_list),
             latent_dim=latent_size,
-            layers=factory.LayerList(dec_layers, includes_output=True),
+            layers=factory.LayerList(dec_layers),
             device=device,
             dtype=dtype,
         )

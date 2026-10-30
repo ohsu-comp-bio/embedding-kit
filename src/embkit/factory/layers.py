@@ -136,7 +136,7 @@ class LayerModule(nn.ModuleList):
 @nn_module
 class LayerList:
     def __init__(self, layers: Optional[List[Layer]] = None, activation="relu", end_activation="relu",
-                 output_activation: Optional[str] = None, includes_output: bool = False):
+                 output_activation: Optional[str] = None):
         new_layers = []
         if layers is not None:
             for l in layers:
@@ -148,7 +148,6 @@ class LayerList:
         self.activation = activation
         self.end_activation = end_activation # end_activation: deprecated and ignored. Kept so configs saved before output_activation still load.
         self.output_activation = output_activation # output_activation: activation applied after the output Linear appended by build().
-        self.includes_output = includes_output # includes_output: True :last Layer is output layer and build() appends nothing. Only used by RNAVAE (decoder) and NetVAE (encoder, decoder) and should be dep. if RNA/NetVAE are.
 
 
     def build(self, input_dim:int, output_dim:Optional[int], device=None, dtype=None) -> nn.Module:
@@ -172,14 +171,10 @@ class LayerList:
 
         if output_dim is None:
             return Sequential(*layers)
-        if self.includes_output:
-            if cur_dim != output_dim:
-                raise ValueError(f"includes_output=True but the last layer has {cur_dim} units, expected output_dim={output_dim}.")
-        else:
-            layers.append(Linear(in_features=cur_dim, out_features=output_dim, device=device, dtype=dtype))
-            act = get_activation(self.output_activation)
-            if act is not None:
-                layers.append(act())
+        layers.append(Linear(in_features=cur_dim, out_features=output_dim, device=device, dtype=dtype))
+        act = get_activation(self.output_activation)
+        if act is not None:
+            layers.append(act())
         return Sequential(*layers)
 
     def to_dict(self):
@@ -187,16 +182,14 @@ class LayerList:
             "layers": list( l.to_dict() for l in self.layers ),
             "activation": self.activation,
             "end_activation": self.end_activation,
-            "output_activation": self.output_activation,
-            "includes_output": self.includes_output
+            "output_activation": self.output_activation
         }
 
     @classmethod
     def from_dict(cls, d):
         l = list( build(i) for i in d["layers"] )
         return LayerList(layers=l, activation=d["activation"], end_activation=d["end_activation"],
-                         output_activation=d.get("output_activation"),
-                         includes_output=d.get("includes_output", False))
+                         output_activation=d.get("output_activation"))
 
     def __repr__(self):
         o = []

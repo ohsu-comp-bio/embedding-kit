@@ -47,17 +47,6 @@ class TestNetVAE(unittest.TestCase):
         )
         np.testing.assert_array_equal(mask, expected)
 
-    def test_no_dense_layer_after_masked_output(self):
-        # includes_output=True: the masked output layers are the outputs, no dense Linear appended
-        latent_index = ["TF1", "TF2"]
-        latent_groups = {"TF1": ["G1", "G3"], "TF2": ["G2"]}
-        model = NetVAE(features=["G1", "G2", "G3"], latent_groups=latent_groups, latent_index=latent_index)
-
-        for net in (model.encoder.net, model.decoder.net):
-            dense = [m for m in net if isinstance(m, torch.nn.Linear) and not isinstance(m, MaskedLinear)]
-            self.assertEqual(dense, [])
-        self.assertIsInstance(list(model.decoder.net)[-1], MaskedLinear)
-
     def test_masked_edges_remain_zero_during_training(self):
         df = pd.DataFrame(
             np.random.rand(8, 3),

@@ -163,7 +163,7 @@ class Encoder(nn.Module):
 
         if layers:
             logger.info("Building encoder with %d layers", len(layers))
-            if heads_from_hidden and not layers.includes_output:
+            if heads_from_hidden:
                 enc_net = layers.build( input_dim=in_features, output_dim=None, device=device, dtype=dtype)
             else:
                 enc_net = layers.build( input_dim=in_features, output_dim=self.latent_dim, device=device, dtype=dtype)
