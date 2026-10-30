@@ -106,7 +106,7 @@ def train_vae(input_path: str,
     enc_layers_list = LayerList( layer_sizes )
 
     layer_sizes = list( int(i) for i in decode_layers.split(",") )
-    dec_layers_list = LayerList( layer_sizes, end_activation=final_activation )
+    dec_layers_list = LayerList( layer_sizes, output_activation=final_activation )
 
     beta_schedule = None
     if schedule is not None:

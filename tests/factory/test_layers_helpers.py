@@ -72,6 +72,41 @@ class TestLayerHelpers(unittest.TestCase):
         self.assertEqual(net[2].out_features, 2)
         self.assertEqual(net[4].out_features, 1)
 
+    def _assert_modules(self, net, expected):
+        self.assertEqual(len(net), len(expected))
+        for m, t in zip(net, expected):
+            self.assertIsInstance(m, t)
+
+    def test_layerlist_int_entries_all_get_activation(self):
+        # Int lists are hidden layers only: every entry gets `activation`, build() appends the output Linear
+        net = layers.LayerList([3, 2]).build(input_dim=5, output_dim=1)
+        self._assert_modules(net, [nn.Linear, nn.ReLU, nn.Linear, nn.ReLU, nn.Linear])
+
+    def test_layerlist_end_activation_ignored(self):
+        net = layers.LayerList([3, 2], end_activation="none").build(input_dim=5, output_dim=1)
+        self._assert_modules(net, [nn.Linear, nn.ReLU, nn.Linear, nn.ReLU, nn.Linear])
+
+    def test_layerlist_output_activation_after_output(self):
+        net = layers.LayerList([3], output_activation="sigmoid").build(input_dim=5, output_dim=2)
+        self._assert_modules(net, [nn.Linear, nn.ReLU, nn.Linear, nn.Sigmoid])
+        self.assertEqual(net[2].out_features, 2)
+
+    def test_layerlist_output_activation_none_string(self):
+        net = layers.LayerList([3], output_activation="none").build(input_dim=5, output_dim=2)
+        self._assert_modules(net, [nn.Linear, nn.ReLU, nn.Linear])
+
+    def test_layerlist_round_trip_keeps_output_activation(self):
+        ll = layers.LayerList([3], output_activation="sigmoid")
+        ll2 = layers.LayerList.from_dict(ll.to_dict())
+        self.assertEqual(ll2.output_activation, "sigmoid")
+
+    def test_layerlist_from_legacy_dict_defaults(self):
+        # Configs saved before output_activation existed still load as hidden-only, no output activation
+        legacy = {"layers": [layers.Layer(3).to_dict()], "activation": "relu", "end_activation": "relu"}
+        ll = layers.LayerList.from_dict(legacy)
+        self.assertIsNone(ll.output_activation)
+        self._assert_modules(ll.build(input_dim=5, output_dim=2), [nn.Linear, nn.ReLU, nn.Linear])
+
 
 if __name__ == "__main__":
     unittest.main()

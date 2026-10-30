@@ -200,6 +200,7 @@ class Encoder(nn.Module):
                  default_activation: Union[str, None] = "relu",
                  sampling : bool = True,
                  constraint: Optional[ConstraintInfo] = None,
+                 heads_from_hidden: bool = False,
                  device=None, dtype=None):
         """
         Build the encoder body and the latent mean/log-variance heads.
@@ -230,6 +231,7 @@ class Encoder(nn.Module):
         self.constraint = constraint
         self.layers = layers
         self.batch_norm = batch_norm
+        self.heads_from_hidden = heads_from_hidden # True: z_mean / z_log_var project from the last hidden layer. False: older layout (layers project to latent, heads latent -> latent), kept so saved models load
 
         self.net = nn.ModuleList()
         in_features = feature_dim
@@ -240,7 +242,10 @@ class Encoder(nn.Module):
 
         if layers:
             logger.info("Building encoder with %d layers", len(layers))
-            enc_net = layers.build( input_dim=in_features, output_dim=self.latent_dim, device=device, dtype=dtype)
+            if heads_from_hidden:
+                enc_net = layers.build( input_dim=in_features, output_dim=None, device=device, dtype=dtype)
+            else:
+                enc_net = layers.build( input_dim=in_features, output_dim=self.latent_dim, device=device, dtype=dtype)
             self.net.extend(enc_net)
             in_features = self.latent_dim
             for module in reversed(enc_net):
@@ -252,8 +257,8 @@ class Encoder(nn.Module):
             # Latent heads requirement
             self.z_mean = None
             self.z_log_var = None
-            self.z_mean = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
-            self.z_log_var = nn.Linear(self.latent_dim, self.latent_dim, device=device, dtype=dtype)
+            self.z_mean = nn.Linear(in_features, self.latent_dim, device=device, dtype=dtype)
+            self.z_log_var = nn.Linear(in_features, self.latent_dim, device=device, dtype=dtype)
 
         else:
             logger.info("No encoder layers provided; inserting auto-projection to latent_dim=%d", self.latent_dim)
@@ -333,6 +338,7 @@ class Encoder(nn.Module):
             "sampling": self.sampling,
             "constraint": self.constraint.to_dict() if self.constraint else None,
             "layers": self.layers.to_dict() if self.layers else None,
+            "heads_from_hidden": self.heads_from_hidden,
         }
 
     @classmethod
@@ -353,7 +359,8 @@ class Encoder(nn.Module):
             batch_norm=d.get("batch_norm", False),
             default_activation=d.get("default_activation", "relu"),
             sampling=d.get("sampling", False),
-            constraint=constraint
+            constraint=constraint,
+            heads_from_hidden=d.get("heads_from_hidden", False)
         )
 
     def refresh_mask(self, device: torch.device) -> None:

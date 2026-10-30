@@ -3,6 +3,7 @@ import torch
 from torch import nn
 
 from embkit.models.vae.encoder import Encoder
+from embkit.models.vae.vae import BaseVAE
 from embkit.factory.layers import Layer, LayerList
 from embkit.modules import MaskedLinear
 from embkit.constraints import PathwayConstraintInfo
@@ -114,6 +115,44 @@ class TestEncoder(unittest.TestCase):
         """Encoder default should have sampling enabled for proper VAE training."""
         enc = Encoder(feature_dim=6, latent_dim=3)
         self.assertTrue(enc.sampling, "Default sampling should be True")
+
+    def test_heads_from_hidden_projects_from_last_hidden(self):
+        enc = Encoder(feature_dim=5, latent_dim=3, layers=LayerList([8, 4]), heads_from_hidden=True)
+        # No latent projection in net; heads are Linear(last hidden -> latent)
+        self.assertEqual([m.out_features for m in enc.net if isinstance(m, nn.Linear)], [8, 4])
+        self.assertEqual(enc.z_mean.in_features, 4)
+        self.assertEqual(enc.z_log_var.in_features, 4)
+        self.assertEqual(enc.z_mean.out_features, 3)
+        mu, logvar, z = enc(torch.randn(2, 5))
+        self.assertEqual(tuple(mu.shape), (2, 3))
+
+    def test_heads_default_keeps_older_layout(self):
+        enc = Encoder(feature_dim=5, latent_dim=3, layers=LayerList([8, 4]))
+        # Older layout: net projects to latent, heads are latent -> latent
+        self.assertEqual([m.out_features for m in enc.net if isinstance(m, nn.Linear)], [8, 4, 3])
+        self.assertEqual(enc.z_mean.in_features, 3)
+
+    def test_heads_from_hidden_round_trip(self):
+        enc = Encoder(feature_dim=5, latent_dim=3, layers=LayerList([8, 4]), heads_from_hidden=True)
+        enc2 = Encoder.from_dict(enc.to_dict())
+        self.assertTrue(enc2.heads_from_hidden)
+        self.assertEqual(enc2.z_mean.in_features, 4)
+
+    def test_base_vae_heads_saved_and_legacy_default(self):
+        features = [f"G{i}" for i in range(5)]
+        vae = BaseVAE(features=features, latent_dim=3, encoder_layers=LayerList([8, 4]), decoder_layers=LayerList([4, 8]))
+        self.assertEqual(vae.encoder.z_mean.in_features, 4)  # new models: heads from last hidden layer
+        d = vae.to_dict()
+        self.assertEqual(BaseVAE.from_dict(d).encoder.z_mean.in_features, 4)
+
+        # Models saved before heads_from_hidden existed load in the older layout and accept their weights
+        old = BaseVAE(features=features, latent_dim=3, encoder_layers=LayerList([8, 4]), decoder_layers=LayerList([4, 8]),
+                      heads_from_hidden=False)
+        legacy = old.to_dict()
+        legacy.pop("heads_from_hidden")
+        loaded = BaseVAE.from_dict(legacy)
+        self.assertEqual(loaded.encoder.z_mean.in_features, 3)
+        loaded.load_state_dict(old.state_dict())  # strict
 
 
 if __name__ == "__main__":

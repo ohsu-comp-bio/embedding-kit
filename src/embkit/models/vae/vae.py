@@ -158,6 +158,7 @@ class VAE(nn.Module):
                 decoder_layers=build_layer_list(data.get("decoder_layers")),
                 batch_norm=data.get("batch_norm", False),
                 sampling=data.get("sampling", True),
+                heads_from_hidden=False,
             )
         return VAE(
             encoder=build(data["encoder"]),
@@ -296,6 +297,7 @@ class BaseVAE(VAE):
             decoder_layers: Optional[LayerList] = None,
             batch_norm: bool = False,
             sampling: bool = True,
+            heads_from_hidden: bool = True,
             device: Optional[torch.device] = None,
             dtype: Optional[torch.dtype] = None
     ):
@@ -308,6 +310,8 @@ class BaseVAE(VAE):
             batch_norm: enable encoder batch normalization blocks
             sampling: enable reparameterization sampling during the forward pass (VAE).
                       Set to False for a deterministic autoencoder (mu is used as z).
+            heads_from_hidden: latent heads project from the last encoder hidden layer (standard VAE).
+                      Models saved without this field load with the older layout (False).
             device: torch device used for module initialization
             dtype: torch dtype used for module initialization
         """
@@ -330,6 +334,7 @@ class BaseVAE(VAE):
             layers=encoder_layers,
             batch_norm=batch_norm,
             sampling=sampling,
+            heads_from_hidden=heads_from_hidden,
             device=device, dtype=dtype
         )
         decoder = Decoder(
@@ -353,6 +358,7 @@ class BaseVAE(VAE):
         self.decoder_layers = decoder_layers
         self.batch_norm = batch_norm
         self.sampling = sampling
+        self.heads_from_hidden = heads_from_hidden
         self.latent_dim = latent_dim
         self.features = features
 
@@ -372,6 +378,7 @@ class BaseVAE(VAE):
             "decoder_layers": self.decoder_layers.to_dict() if self.decoder_layers else None,
             "batch_norm": self.batch_norm,
             "sampling": self.sampling,
+            "heads_from_hidden": self.heads_from_hidden,
         }
 
     @classmethod
@@ -388,5 +395,6 @@ class BaseVAE(VAE):
             features=data["features"],
             latent_dim=data["latent_dim"],
             encoder_layers=build(data["encoder_layers"]) if data["encoder_layers"] else None,
-            decoder_layers=build(data["decoder_layers"]) if data["decoder_layers"] else None
+            decoder_layers=build(data["decoder_layers"]) if data["decoder_layers"] else None,
+            heads_from_hidden=data.get("heads_from_hidden", False)
         )
