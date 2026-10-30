@@ -13,6 +13,22 @@ from torch import nn
 from .registry import nn_module, get_class_name, class_dict_wrapper, CLASS_REGISTRY
 
 def clean_params(params):
+    """
+    Strip the registry's ``"__class__"`` key from a serialized parameter dict.
+
+    The :func:`~embkit.factory.registry.nn_module` decorator tags every
+    ``to_dict`` output with a ``"__class__"`` identifier so that
+    :func:`~embkit.factory.core.build` can resolve it back to the correct class.
+    When a class rebuilds itself from that dict (via ``from_dict``), the
+    ``"__class__"`` key is not a real constructor argument — this helper removes
+    it so the remaining entries can be unpacked straight into ``cls(**params)``.
+
+    Parameters:
+        params: A serialized parameter dict, optionally including ``"__class__"``.
+
+    Returns:
+        A new dict identical to ``params`` but without the ``"__class__"`` key.
+    """
     out = {}
     for k, v in params.items():
         if k not in ["__class__"]:
@@ -21,6 +37,22 @@ def clean_params(params):
 
 @nn_module
 class Linear(nn.Linear):
+    """
+    A serializable ``nn.Linear`` layer.
+
+    This is the workhorse connection layer of embkit's factory. It subclasses
+    ``nn.Linear`` only to add the ``to_dict``/``from_dict`` pair required by the
+    registry, so that a layer's configuration (dimensions, bias flag) survives a
+    round-trip through ``save``/``load``. Use this rather than a raw
+    ``nn.Linear`` whenever the layer needs to be part of a (de)serializable
+    model description.
+
+    Note:
+        The serialized params (``in_features``, ``out_features``, ``bias``) are
+        what gets rebuilt; learned weights are restored separately from the state
+        dict during :func:`~embkit.factory.core.load`.
+    """
+
     def __init__(self, in_features, out_features, bias = True, device=None, dtype=None):
         super().__init__(in_features=in_features, out_features=out_features, bias=bias, device=device, dtype=dtype)
         self._params = {
@@ -40,6 +72,16 @@ class Linear(nn.Linear):
 
 @nn_module
 class BatchNorm1d(nn.BatchNorm1d):
+    """
+    A serializable ``nn.BatchNorm1d`` layer.
+
+    Batch normalization stabilizes training by standardizing each feature's
+    activations across a batch. This subclass mirrors
+    :class:`Linear` — it adds ``to_dict``/``from_dict`` so the layer can be part
+    of a model description that is saved and rebuilt, while retaining its running
+    statistics (which are weights and are restored from the state dict).
+    """
+
     def __init__(self, num_features, eps=1e-05, momentum=0.1, affine=True, device=None, dtype=None):
         super().__init__(num_features=num_features, eps=eps, momentum=momentum, affine=affine, device=device, dtype=dtype)
         self._params = {
@@ -60,6 +102,22 @@ class BatchNorm1d(nn.BatchNorm1d):
 
 @nn_module
 class Sequential(nn.Sequential):
+    """
+    A serializable ``nn.Sequential`` container.
+
+    A :class:`Sequential` stacks a series of layers into a single ordered
+    pipeline — the way an embkit model's layers are composed. This subclass adds
+    the ``to_dict``/``from_dict`` pair so that an entire stack can be captured in
+    a model description and reconstructed element-by-element: each child module is
+    resolved through the :data:`~embkit.factory.registry.CLASS_REGISTRY` rather
+    than relying on pickled classes.
+
+    Note:
+        Reconstruction relies on every child module itself being registry-
+        serializable (e.g. :class:`Linear`, :class:`BatchNorm1d`, or one of the
+        activation wrappers below).
+    """
+
     def __init__(self, *args):
         super().__init__(*args)
         self._params = {"args": args}

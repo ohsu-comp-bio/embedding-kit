@@ -1,3 +1,23 @@
+"""
+Variational Autoencoder (VAE) base model and standard variant.
+
+A VAE is embkit's core model for turning a high-dimensional feature matrix
+(e.g. per-sample gene expression) into a compact latent embedding. Each sample
+is mapped to a latent distribution (``mu``/``logvar``); a single vector is
+sampled from it (``z``) and decoded back to the input. The balance between
+faithful reconstruction and a well-shaped latent space is what produces useful
+embeddings — one sample per point that preserves the structure of the original
+data.
+
+This module defines:
+
+- :class:`VAEOutput` — the ``(recon, mu, logvar, z)`` bundle returned by
+  ``forward``.
+- :class:`VAE` — the minimal encoder/decoder container and its ``encode``/
+  serialize helpers that all variants share.
+- :class:`BaseVAE` — the standard fully-connected embedding VAE, built from
+  layer configs; the default model produced by ``embkit model train``.
+"""
 import logging
 from typing import Any, List, Optional, Dict, TypeVar, NamedTuple
 
@@ -27,19 +47,68 @@ class VAEOutput(NamedTuple):
 @nn_module
 class VAE(nn.Module):
     """
-    Minimal VAE wrapper to hold encoder/decoder and provide forward().
+    Base Variational Autoencoder that pairs an encoder with a decoder.
+
+    This is the abstract building block every embkit embedding model inherits
+    from. It owns no architecture itself — just the ``encoder``/``decoder`` pair
+    and the shared behavior all variants rely on: the :meth:`forward` pass
+    (encode -> sample -> decode), :meth:`encode` for producing a stable
+    per-sample embedding (``mu``), and the :meth:`to_dict`/:meth:`from_dict`
+    contract that lets a trained model be saved and rebuilt through the factory.
+
+    Concrete models (e.g. :class:`BaseVAE` for plain expression data, or
+    :class:`~embkit.models.vae.net_vae.NetVAE` for pathway-constrained data)
+    configure the encoder/decoder to fit their use case.
     """
 
     def __init__(self, encoder: Encoder = None, decoder: Decoder = None, **kwargs):
+        """
+        Initialize a VAE from an encoder and a decoder.
+
+        A VAE (Variational Autoencoder) is the core embedding model in embkit:
+        it learns a compressed latent representation of each sample (``mu``/
+        ``logvar``) and can reconstruct the input from it. This base class just
+        pairs an :class:`~embkit.models.vae.encoder.Encoder` with a
+        :class:`~embkit.models.vae.decoder.Decoder`; the concrete variants
+        (e.g. :class:`~embkit.models.vae.net_vae.NetVAE`) configure those parts
+        for a specific use case.
+
+        Parameters:
+            encoder: The encoder mapping input features to the latent space.
+            decoder: The decoder mapping the latent space back to input features.
+            **kwargs: Extra configuration stashed on :attr:`extra_args` so
+                subclasses can serialize and rebuild their own settings.
+        """
         super().__init__()
         self.encoder: Encoder = encoder
         self.decoder: Decoder = decoder
         self.extra_args = kwargs  # for subclasses to stash configs
 
     def to(self, device=None, dtype=None):
+        """
+        Move the model's parameters to the given device/dtype (delegates to ``nn.Module``).
+        """
         return super().to(device=device, dtype=dtype)
 
     def forward(self, x: torch.Tensor):
+        """
+        Run one pass through the encoder and decoder.
+
+        The input ``x`` (a batch of samples) is encoded into the latent
+        statistics (``mu``, ``logvar``) and a sampled latent vector ``z``, then
+        decoded back to the input space. Returns a :class:`VAEOutput` bundling
+        the reconstruction and all three latent quantities, which is what the
+        training losses consume.
+
+        Parameters:
+            x: Input batch tensor of shape ``(batch_size, features)``.
+
+        Returns:
+            VAEOutput: Tuple of ``(recon, mu, logvar, z)``.
+
+        Raises:
+            RuntimeError: If the encoder or decoder has not been initialized.
+        """
         if self.encoder is None or self.decoder is None:
             raise RuntimeError("VAE encoder/decoder not initialized.")
         encoder_out = self.encoder(x)
@@ -64,6 +133,21 @@ class VAE(nn.Module):
 
     @classmethod
     def from_dict(cls, data):
+        """
+        Rebuild a VAE from a serialized description (inverse of :meth:`to_dict`).
+
+        Handles two formats: the current form (``encoder``/``decoder``
+        descriptions resolved via the factory :func:`~embkit.factory.core.build`)
+        and a legacy flat format (``encoder_layers``/``decoder_layers``), which is
+        upgraded into a :class:`~embkit.models.vae.vae.BaseVAE`. This is the path
+        that lets a trained model be restored from its ``.model`` file.
+
+        Parameters:
+            data: A description dict produced by :meth:`to_dict`.
+
+        Returns:
+            A reconstructed ``VAE`` (or ``BaseVAE`` for legacy descriptions).
+        """
         if "encoder" not in data: # Legacy format 
             def build_layer_list(raw):
                 return LayerList([Layer.from_dict(li) for li in raw]) if raw else None
@@ -188,9 +272,21 @@ class VAE(nn.Module):
 @nn_module
 class BaseVAE(VAE):
     """
-    Concrete VAE that composes the modular Encoder/Decoder from BaseVAE
+    The standard, fully-connected embedding VAE.
 
-    BaseVAE.forward(x) returns: recon, mu, logvar, z
+    This is the model you get when you train an embedding from a plain feature
+    matrix (e.g. gene expression) with no structural constraints. It wires the
+    generic :class:`~embkit.models.vae.encoder.Encoder` and
+    :class:`~embkit.models.vae.decoder.Decoder` together from layer
+    configurations, and is the default target of ``embkit model train``.
+
+    A call — ``model(x)`` — returns a :class:`VAEOutput` of
+    ``(recon, mu, logvar, z)``: the reconstruction, the latent mean, the latent
+    log-variance, and the sampled latent vector. :meth:`encode` returns ``mu``
+    directly, which is the stable per-sample embedding vector used downstream.
+
+    Subclasses like :class:`~embkit.models.vae.net_vae.NetVAE` add structure
+    (e.g. pathway-based connection constraints) on top of this base model.
     """
 
     def __init__(
@@ -267,6 +363,14 @@ class BaseVAE(VAE):
         self.features = features
 
     def to_dict(self):
+        """
+        Serialize the model description (architecture, not weights).
+
+        Captures the feature list, latent dimension, and the encoder/decoder
+        layer configurations so that :meth:`from_dict` can rebuild an
+        equivalent model. Learned weights are serialized separately by
+        :func:`embkit.factory.core.save` from the state dict.
+        """
         return {
             "features": self.features,
             "latent_dim": self.latent_dim,
@@ -279,6 +383,14 @@ class BaseVAE(VAE):
 
     @classmethod
     def from_dict(cls, data):
+        """
+        Rebuild a :class:`BaseVAE` from its :meth:`to_dict` description.
+
+        Resolves the encoder/decoder layer lists through the factory
+        :func:`~embkit.factory.core.build` and reconstructs an equivalent model.
+        Weight tensors must then be loaded from the state dict (see
+        :func:`embkit.factory.core.load`) to recover a trained model.
+        """
         return BaseVAE(
             features=data["features"],
             latent_dim=data["latent_dim"],

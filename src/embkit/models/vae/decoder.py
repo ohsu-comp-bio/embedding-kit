@@ -1,3 +1,12 @@
+"""
+Decoder for the VAE.
+
+The decoder is the inverse of the encoder: it maps a latent vector back to the
+input feature space, producing the model's reconstruction of a sample. Requiring
+the decoder to faithfully reconstruct the input is what forces the encoder's
+latent representation to actually carry the information needed to describe each
+sample — without it, the latent space would collapse to nothing useful.
+"""
 from typing import List, Optional
 import torch
 from torch import nn
@@ -13,7 +22,15 @@ logger = logging.getLogger(__name__)
 @factory.nn_module
 class Decoder(nn.Module):
     """
-    z -> [LayerInfo...] -> recon(features)
+    Fully-connected decoder that maps a latent vector back to input features.
+
+    Pipeline: ``z`` -> a stack of linear layers -> reconstruction of the input
+    features. Built from a :class:`~embkit.factory.layers.LayerList`; if the
+    stack does not already end at ``feature_dim``, a final projection is added
+    so the output always has the input feature width.
+
+    The output of :meth:`forward` is the reconstruction tensor, which the
+    training loss compares against the original input to drive learning.
     """
 
     def __init__(
@@ -24,6 +41,18 @@ class Decoder(nn.Module):
         batch_norm: bool = False,
         device=None, dtype=None
     ):
+        """
+        Build the decoder body, ensuring the output width equals ``feature_dim``.
+
+        Parameters:
+            latent_dim: Width of the input latent space.
+            feature_dim: Width of the reconstructed output (input feature count).
+            layers: Optional layer stack describing the decoder body; if the
+                stack does not end at ``feature_dim`` a final projection is
+                appended.
+            batch_norm: Whether batch normalization is enabled for the decoder.
+            device, dtype: Device/dtype for module construction.
+        """
         super().__init__()
         self.latent_dim = int(latent_dim)  # <- help BaseVAE.save()
         self.feature_dim = int(feature_dim)
@@ -45,12 +74,25 @@ class Decoder(nn.Module):
             self.net.append(self.out)
 
     def forward(self, z: torch.Tensor) -> torch.Tensor:
+        """
+        Decode a latent vector back to the input feature space.
+
+        Parameters:
+            z: Latent vector(s) of shape ``(batch_size, latent_dim)``.
+
+        Returns:
+            The reconstruction tensor of shape ``(batch_size, feature_dim)``.
+        """
         h = z
         for layer in self.net:
             h = layer(h)
         return h
 
     def to_dict(self):
+        """
+        Serialize the decoder's configuration (architecture, not weights) so
+        that :meth:`from_dict` can rebuild an equivalent decoder.
+        """
         return {
             "latent_dim": self.latent_dim,
             "feature_dim": self.feature_dim,
