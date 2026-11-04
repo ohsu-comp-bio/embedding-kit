@@ -11,8 +11,14 @@ Note:
     Layer configuration (previously ``LayerInfo``) now lives under ``embkit.factory.layers.Layer``.
 """
 
+import torch.nn as nn
+
 from .masked_linear import MaskedLinear
 from .pairwise_comparison_layer import PairwiseComparison
 from .tsp import TSPLayer
 
 
+
+class PassThrough(nn.Module):
+    def forward(self, x):
+        return x
