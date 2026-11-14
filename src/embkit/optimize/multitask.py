@@ -1,7 +1,7 @@
 
 from itertools import cycle
 
-from tqdm import tqdm
+from tqdm.autonotebook import tqdm
 
 import torch
 from torch.utils.data import DataLoader
@@ -130,7 +130,7 @@ def _normalize_task_schedule(task_schedule, task_count):
     return tuple(normalized)
 
 
-def multi_task_train_weighted_sync(
+def multi_task_train_sync(
     tasks,
     epochs=5,
     lr=0.001,
