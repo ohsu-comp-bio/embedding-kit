@@ -25,7 +25,7 @@ dependencies = [
     "tqdm",
     "biopython",
     "fair-esm",
-    "faiss-cpu",
+    "rbloom",
     "h5py"
 ]
 

@@ -205,6 +205,10 @@ def multi_task_train_sync(
             scheduler.step()
 
 
+# Preserve the original public name while exposing the shorter equivalent.
+multi_task_train_weighted_sync = multi_task_train_sync
+
+
 def multi_task_train_interleaved(
     tasks,
     epochs=5,

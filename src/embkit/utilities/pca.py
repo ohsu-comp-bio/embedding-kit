@@ -2,8 +2,8 @@ from pathlib import Path
 import logging
 from ..files import LargeCsvReader
 import numpy as np
-import faiss
 import pandas as pd
+from sklearn.decomposition import PCA
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +29,7 @@ def run_pca(input_file: Path | str, pca_size: int, output_file: Path | str | Non
             names.append(k)
 
     logger.info("Calculating PCA")
-    mat = faiss.PCAMatrix(data.shape[1], pca_size)
-    mat.train(data)
-
-    logger.info("Building PCA matrix")
-    data_pca = mat.apply(data)
+    data_pca = PCA(n_components=pca_size).fit_transform(data)
 
     df = pd.DataFrame(data_pca, index=names)
     if output_file is not None:
