@@ -81,7 +81,7 @@ class PairProbabilityPredictor(nn.Module):
         self.learning_dim = learning_dim
 
         self.pair_predict = nn.Sequential(
-            nn.BatchNorm1d( item_dim + item_dim, dtype=dtype),
+            nn.LayerNorm( item_dim + item_dim, dtype=dtype),
             nn.Linear( item_dim + item_dim, learning_dim, dtype=dtype ), nn.ReLU(),
             nn.Dropout(0.2),
             nn.Linear( learning_dim, learning_dim, dtype=dtype), nn.ReLU(),
