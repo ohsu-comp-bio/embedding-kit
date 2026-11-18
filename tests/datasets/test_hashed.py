@@ -1,6 +1,5 @@
 
 
-import pytest
 from embkit.datasets.hashed import DatasetBloomFilter, HashedDataset, hash_sha256
 
 
