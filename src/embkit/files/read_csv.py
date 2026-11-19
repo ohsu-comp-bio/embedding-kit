@@ -103,7 +103,8 @@ class LargeCsvReader(Dataset):
             csv_path (str): The path to the large CSV file.
             index_path (str, optional): The path to store the index file.
                                         Defaults to a .index JSON file next to the CSV.
-            sep (str, optional): The delimiter used in the CSV file. Defaults to ','.
+            sep (str, optional): The delimiter used in the CSV file. When omitted,
+                                 it is detected from the first line.
             skip_header (bool, optional): Whether to skip the first line as a header.
                                           Defaults to False.
             save_index (bool, optional): If True, saves the index to disk.
