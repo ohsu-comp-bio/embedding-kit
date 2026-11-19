@@ -42,3 +42,6 @@ class DatasetBloomFilter(HashedDataset):
 
     def save_bloom(self, bloom_file):
         self.bloom.save(bloom_file)
+
+    def __contains__(self, item):
+        return self.has(item)

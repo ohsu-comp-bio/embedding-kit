@@ -23,13 +23,10 @@ def run_kmeans(input_file: Path | str, chunk_size: int = 1000, n_iter=10, sample
         np.ndarray: Array of cluster assignments for each data point.
     """
 
-    csvfile: LargeCsvReader = LargeCsvReader(input_file, sep="\t", index_column=0, skip_header=True, cache_size=128)
+    csvfile = LargeCsvReader(input_file, sep="\t", skip_header=True)
     data = np.array(list(csvfile.read(show_progress=verbose)))
 
-    names = []
-    with csvfile:
-        for name, _ in csvfile:
-            names.append(name)
+    names = [row[0] for row in csvfile]
 
     training_data = data
     max_training_points = k * max_points_per_centroid
