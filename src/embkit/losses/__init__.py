@@ -21,3 +21,22 @@ from .vae_loss import (
     mse,
     bce_kl_weighted,
 )
+from .likelihood import (
+    # Element-wise negative log-likelihoods
+    gaussian_nll,
+    poisson_nll,
+    nb_nll,
+    zinb_nll,
+    beta_nll,
+    binomial_nll,
+    beta_binomial_nll,
+    # Count-data VAE losses
+    PoissonVAELoss,
+    NBVAELoss,
+)
+from .alignment import (
+    kl_diag_gaussians,
+    pairwise_alignment_loss,
+    info_nce_loss,
+    mmd_loss,
+)
