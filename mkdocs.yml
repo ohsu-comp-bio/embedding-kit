@@ -19,8 +19,12 @@ nav:
           - VAE: api/models/vae.md
           - RNAVAE: api/models/rna_vae.md
           - NetVAE: api/models/net_vae.md
+          - Pair Prediction: api/models/pair.md
       - Training:
           - Optimize: api/optimize.md
+      - Datasets: api/datasets.md
+      - Files: api/files.md
+      - Utilities: api/utilities.md
       - Preprocessing: api/preprocessing.md
       - Layers:
           - Overview: api/layers/layers.md

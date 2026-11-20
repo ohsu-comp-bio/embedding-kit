@@ -1,8 +1,9 @@
 from pathlib import Path
 from ..files import LargeCsvReader
 import numpy as np
-import faiss
 import pandas as pd
+from sklearn.cluster import KMeans
+
 
 def run_kmeans(input_file: Path | str, chunk_size: int = 1000, n_iter=10, sample_size: int = 1000000, k: int = 10, verbose: bool = False, max_points_per_centroid: int = 100000, output_file: Path | str | None = None) -> np.ndarray:
     """
@@ -22,25 +23,27 @@ def run_kmeans(input_file: Path | str, chunk_size: int = 1000, n_iter=10, sample
         np.ndarray: Array of cluster assignments for each data point.
     """
 
-    csvfile: LargeCsvReader = LargeCsvReader(input_file, sep="\t", index_column=0, skip_header=True, cache_size=128)
-    d = csvfile.shape[1] - 1
-
+    csvfile = LargeCsvReader(input_file, sep="\t", skip_header=True)
     data = np.array(list(csvfile.read(show_progress=verbose)))
 
-    keys = list(csvfile._index.keys())
+    names = [row[0] for row in csvfile]
 
-    names = []
-    with csvfile:
-        for k, _ in csvfile:
-            names.append(k)
+    training_data = data
+    max_training_points = k * max_points_per_centroid
+    if len(data) > max_training_points:
+        sample_indices = np.random.choice(len(data), max_training_points, replace=False)
+        training_data = data[sample_indices]
 
-
-    kmeans = faiss.Kmeans(data.shape[1], k, niter=n_iter, verbose=verbose, max_points_per_centroid=max_points_per_centroid )
-    kmeans.train(data)
-
-    D, I = kmeans.index.search(data, 1)
+    kmeans = KMeans(
+        n_clusters=k,
+        max_iter=n_iter,
+        n_init=10,
+        verbose=int(verbose),
+    )
+    kmeans.fit(training_data)
+    labels = kmeans.predict(data)
 
     if output_file is not None:
-        pd.Series(I[:,0], index=names).to_csv(output_file, sep="\t", header=None)
+        pd.Series(labels, index=names).to_csv(output_file, sep="\t", header=None)
         
-    return I[:,0]
+    return labels

@@ -68,3 +68,44 @@ class PairPredictor(nn.Module):
             context_dim=params["context_dim"],
             learning_dim=params["learning_dim"]
         )
+
+@factory.nn_module
+class PairProbabilityPredictor(nn.Module):
+    """
+    Predicts the probability of a pair of items being related based on their embeddings, with no additional context.
+    """
+    def __init__(self, item_module, item_dim, learning_dim = 256, device=None, dtype=None):
+        super().__init__()
+        self.item_module = item_module
+        self.item_dim = item_dim
+        self.learning_dim = learning_dim
+
+        self.pair_predict = nn.Sequential(
+            nn.LayerNorm( item_dim + item_dim, dtype=dtype),
+            nn.Linear( item_dim + item_dim, learning_dim, dtype=dtype ), nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear( learning_dim, learning_dim, dtype=dtype), nn.ReLU(),
+            nn.Linear( learning_dim, 1, dtype=dtype)
+        ).to(device)
+
+    def forward(self, x):
+        item1, item2 = x
+        h1 = self.item_module(item1)
+        h2 = self.item_module(item2)
+        pin = torch.cat([h1,h2], dim=-1)
+        return self.pair_predict(pin)
+
+    def to_dict(self):
+        return {
+            "item_module": self.item_module.to_dict(),
+            "item_dim": self.item_dim,
+            "learning_dim": self.learning_dim
+        }
+
+    @classmethod
+    def from_dict(cls, params):
+        return PairProbabilityPredictor(
+            item_module=factory.build(params["item_module"]),
+            item_dim=params["item_dim"],
+            learning_dim=params["learning_dim"]
+        )

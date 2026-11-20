@@ -15,11 +15,16 @@ usable dataset so the same training loop works across all of them.
 - :class:`ConstantLabel` — attach a fixed label to every sample.
 - :class:`ZipDataset` / :class:`ChainDataset` — combine datasets that share the
   same index.
+- :class:`PairwiseDataset` — sample co-occurring pairs across multiple datasets.
+- :class:`PairBloomFilter` — probabilistic "has this pair co-occurred" test.
+- :class:`DatasetKeyBloom` — per-dataset key membership (Bloom filter).
 """
 import numpy as np
 import torch
 from torch import nn
 from torch.utils.data import IterableDataset, DataLoader, Dataset
+
+from .pair import PairwiseDataset, PairBloomFilter, DatasetKeyBloom
 
 
 
