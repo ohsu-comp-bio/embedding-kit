@@ -19,6 +19,7 @@ nav:
           - VAE: api/models/vae.md
           - RNAVAE: api/models/rna_vae.md
           - NetVAE: api/models/net_vae.md
+          - Gaussian HMM: api/models/hmm.md
       - Training:
           - Optimize: api/optimize.md
       - Preprocessing: api/preprocessing.md
@@ -28,13 +29,21 @@ nav:
           - Masked Linear: api/layers/masked_linear.md
           - Pairwise Comparison: api/layers/pairwise_comparison_layer.md
           - Top Scoring Pair: api/layers/tsp.md
+          - Conv Backbone / Decoder: api/layers/conv.md
+          - Product of Experts: api/layers/fusion.md
+          - Gradient Reversal: api/layers/grad_reverse.md
       - Losses:
           - Overview: api/losses/index.md
           - VAE Loss: api/losses/vae_loss.md
+          - Likelihood Losses: api/losses/likelihood.md
+          - Alignment Losses: api/losses/alignment.md
       - Constraints:
           - Overview: api/constraints/index.md
       - Metrics:
           - Distance: api/metrics/distance.md
+          - Integration: api/metrics/alignment.md
+          - Neighbourhood: api/metrics/neighbors.md
+          - Reconstruction: api/metrics/reconstruction.md
       - Estimator:
           - Overview: api/estimator/index.md
           - VAE Estimator: api/estimator/vae_estimator.md
@@ -43,6 +52,12 @@ nav:
           - cbio: api/commands/cbio.md
       - BMEG: api/bmeg.md
       - Pathway: api/pathway.md
+      - Latent Geometry: api/geometry.md
+      - Analysis:
+          - Hierarchy: api/analysis/hierarchy.md
+          - Spatial: api/analysis/spatial.md
+          - Matching: api/analysis/matching.md
+          - Interpretability: api/analysis/interpret.md
 
 theme: readthedocs
 
